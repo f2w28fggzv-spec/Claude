@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="REMLET — the silent vibration wake-up bracelet from Latvia. Screenless, private, built for heavy sleepers and the deaf and hard-of-hearing community. Reserve yours.">
+<title>REMLET — Silent wake-up bracelet</title>
+<style>
+/* ============ tokens ============ */
+:root {
+  --bg: #F4F4F1;
+  --surface: #FFFFFF;
+  --surface-2: #ECEDE8;
+  --ink: #1C2025;
+  --muted: #5B636B;
+  --accent: #2F6D62;
+  --accent-soft: #DCE9E5;
+  --sand: #C9A96A;
+  --sand-soft: #F1E7D2;
+  --line: #DFE1DA;
+  --night: #14171D;
+  --night-surface: #1D222B;
+  --night-ink: #EAECE8;
+  --night-muted: #98A0A8;
+  --night-line: #2B313B;
+  --night-accent: #74BFAD;
+  --capsule: #17191E;
+  --strap: #17191E;
+  --shadow: 0 18px 50px -18px rgba(28, 32, 37, .25);
+  --font-display: "Avenir Next", Avenir, Futura, "Futura PT", "Century Gothic", "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-body: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171D;
+    --surface: #1D222B;
+    --surface-2: #232935;
+    --ink: #EAECE8;
+    --muted: #98A0A8;
+    --accent: #74BFAD;
+    --accent-soft: #223732;
+    --sand: #CDB283;
+    --sand-soft: #2E2A20;
+    --line: #2B313B;
+    --shadow: 0 18px 50px -18px rgba(0, 0, 0, .55);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14171D;
+  --surface: #1D222B;
+  --surface-2: #232935;
+  --ink: #EAECE8;
+  --muted: #98A0A8;
+  --accent: #74BFAD;
+  --accent-soft: #223732;
+  --sand: #CDB283;
+  --sand-soft: #2E2A20;
+  --line: #2B313B;
+  --shadow: 0 18px 50px -18px rgba(0, 0, 0, .55);
+}
+:root[data-theme="light"] {
+  --bg: #F4F4F1;
+  --surface: #FFFFFF;
+  --surface-2: #ECEDE8;
+  --ink: #1C2025;
+  --muted: #5B636B;
+  --accent: #2F6D62;
+  --accent-soft: #DCE9E5;
+  --sand: #C9A96A;
+  --sand-soft: #F1E7D2;
+  --line: #DFE1DA;
+  --shadow: 0 18px 50px -18px rgba(28, 32, 37, .25);
+}
+
+/* ============ base ============ */
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 {
+  font-family: var(--font-display);
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  margin: 0;
+}
+p { margin: 0; }
+a { color: inherit; }
+img, svg { max-width: 100%; }
+button { font: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+.eyebrow {
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.section { padding: 96px 0; }
+.section-head { max-width: 560px; display: flex; flex-direction: column; gap: 14px; margin-bottom: 48px; }
+.section-head h2 { font-size: clamp(1.7rem, 3.4vw, 2.4rem); }
+.section-head p { color: var(--muted); }
+
+/* reveal on scroll */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .ring { animation: none !important; opacity: .25 !important; }
+}
+
+/* ============ nav ============ */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.nav-inner { display: flex; align-items: center; gap: 28px; padding: 14px 0; }
+.logo {
+  font-family: var(--font-display);
+  font-weight: 700; font-size: 1.15rem; letter-spacing: .14em;
+  text-decoration: none;
+}
+.logo sup { font-size: .5em; letter-spacing: 0; color: var(--muted); }
+.nav-links { display: flex; gap: 22px; margin-left: auto; }
+.nav-links a {
+  text-decoration: none; font-size: .88rem; color: var(--muted);
+  transition: color .2s;
+}
+.nav-links a:hover { color: var(--ink); }
+.lang-toggle {
+  display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden;
+}
+.lang-toggle button {
+  border: 0; background: transparent; color: var(--muted);
+  padding: 5px 12px; font-size: .78rem; font-weight: 700; letter-spacing: .06em;
+}
+.lang-toggle button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+@media (max-width: 720px) { .nav-links { display: none; } .lang-toggle { margin-left: auto; } }
+
+/* ============ hero ============ */
+.hero { padding: 84px 0 100px; overflow: hidden; }
+.hero-grid {
+  display: grid; grid-template-columns: 1.05fr .95fr;
+  gap: 48px; align-items: center;
+}
+@media (max-width: 860px) { .hero-grid { grid-template-columns: 1fr; } }
+.hero h1 { font-size: clamp(2.5rem, 5.6vw, 4rem); }
+.hero-copy { display: flex; flex-direction: column; gap: 22px; }
+.hero-sub { color: var(--muted); font-size: 1.12rem; max-width: 32em; }
+.hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: 999px; padding: 13px 26px;
+  font-weight: 700; font-size: .95rem; text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 10px 26px -12px var(--accent); }
+:root[data-theme="dark"] .btn-primary, .v2 .btn-primary { color: #10201B; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn-primary { color: #10201B; } }
+.btn-ghost { border-color: var(--line); color: var(--ink); background: transparent; }
+.hero-note { font-size: .82rem; color: var(--muted); }
+.hero-note strong { color: var(--sand); }
+
+/* bracelet visual */
+.stage { position: relative; display: grid; place-items: center; min-height: 460px; }
+.rings { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.ring {
+  position: absolute; border: 1.5px solid var(--accent);
+  border-radius: 50%; width: 240px; height: 240px; opacity: 0;
+  animation: pulse 3.2s ease-out infinite;
+}
+.ring:nth-child(2) { animation-delay: 1.05s; }
+.ring:nth-child(3) { animation-delay: 2.1s; }
+@keyframes pulse {
+  0% { transform: scale(.62); opacity: .5; }
+  70% { opacity: .12; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+.bracelet { position: relative; filter: drop-shadow(var(--shadow)); }
+.stage-caption {
+  position: absolute; bottom: 6px; font-size: .74rem; color: var(--muted);
+  letter-spacing: .08em; text-transform: uppercase;
+}
+
+/* ============ features ============ */
+.features { background: var(--surface-2); border-block: 1px solid var(--line); }
+.feature-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+}
+@media (max-width: 860px) { .feature-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .feature-grid { grid-template-columns: 1fr; } }
+.feature {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 26px 24px; display: flex; flex-direction: column; gap: 10px;
+}
+.feature h3 { font-size: 1.02rem; letter-spacing: 0; }
+.feature p { color: var(--muted); font-size: .92rem; }
+.glyph {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: var(--accent-soft); color: var(--accent);
+  display: grid; place-items: center;
+}
+.glyph svg { width: 22px; height: 22px; }
+
+/* ============ colorways ============ */
+.color-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 48px; align-items: center; }
+@media (max-width: 860px) { .color-grid { grid-template-columns: 1fr; } }
+.swatches { display: flex; gap: 14px; flex-wrap: wrap; }
+.swatch {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 2px solid var(--line); padding: 0;
+  transition: transform .15s ease, border-color .15s ease;
+}
+.swatch:hover { transform: scale(1.1); }
+.swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.swatch-label { margin-top: 14px; font-size: .9rem; color: var(--muted); min-height: 1.4em; }
+.color-note {
+  margin-top: 26px; padding: 16px 18px; border-radius: var(--radius);
+  background: var(--sand-soft); border: 1px solid color-mix(in srgb, var(--sand) 40%, transparent);
+  font-size: .9rem;
+}
+
+/* ============ reserve ============ */
+.reserve-grid { display: grid; grid-template-columns: .85fr 1.15fr; gap: 48px; align-items: start; }
+@media (max-width: 860px) { .reserve-grid { grid-template-columns: 1fr; } }
+.price-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 30px; display: flex; flex-direction: column; gap: 18px; box-shadow: var(--shadow);
+}
+.price-row { display: flex; align-items: baseline; gap: 12px; }
+.price-now { font-family: var(--font-display); font-size: 3rem; font-weight: 700; color: var(--sand); font-variant-numeric: tabular-nums; }
+.price-was { font-size: 1.2rem; color: var(--muted); text-decoration: line-through; font-variant-numeric: tabular-nums; }
+.price-tag { font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--sand); }
+.price-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: .92rem; color: var(--muted); }
+.price-list li { display: flex; gap: 10px; align-items: start; }
+.price-list li::before { content: ""; flex: 0 0 7px; height: 7px; margin-top: 8px; border-radius: 50%; background: var(--accent); }
+
+form.reserve-form {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+}
+@media (max-width: 560px) { form.reserve-form { grid-template-columns: 1fr; } }
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field.full { grid-column: 1 / -1; }
+.field label { font-size: .8rem; font-weight: 700; letter-spacing: .04em; }
+.field input, .field select {
+  font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px;
+}
+.field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.consent { grid-column: 1 / -1; display: flex; gap: 12px; align-items: start; font-size: .84rem; color: var(--muted); }
+.consent input { margin-top: 4px; accent-color: var(--accent); }
+.form-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.form-actions .btn-primary { border: 0; }
+.form-hint { font-size: .8rem; color: var(--muted); }
+.form-error { grid-column: 1 / -1; color: #B4423A; font-size: .88rem; display: none; }
+.form-error.show { display: block; }
+.form-success {
+  display: none; grid-column: 1 / -1; padding: 22px; border-radius: var(--radius);
+  background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.form-success.show { display: block; }
+.form-success h3 { color: var(--accent); margin-bottom: 6px; }
+.form-success p { font-size: .92rem; }
+
+/* ============ V2 night band ============ */
+.v2 {
+  background: var(--night); color: var(--night-ink);
+  border-block: 1px solid var(--night-line);
+}
+.v2 .eyebrow { color: var(--night-accent); }
+.v2 .section-head p, .v2 .muted { color: var(--night-muted); }
+.v2-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+@media (max-width: 860px) { .v2-grid { grid-template-columns: 1fr; } }
+.v2-points { list-style: none; margin: 24px 0 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.v2-points li { display: flex; gap: 14px; align-items: start; }
+.v2-points .glyph { background: rgba(116, 191, 173, .12); color: var(--night-accent); flex: 0 0 40px; }
+.v2-points h3 { font-size: .98rem; letter-spacing: 0; margin-bottom: 3px; }
+.v2-points p { color: var(--night-muted); font-size: .9rem; }
+.v2-stage { position: relative; display: grid; place-items: center; min-height: 420px; }
+.v2-stage .ring { border-color: var(--night-accent); }
+.concept-chip {
+  position: absolute; top: 8px; right: 8px;
+  font-size: .68rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--night-accent); border: 1px solid var(--night-accent);
+  border-radius: 999px; padding: 5px 12px;
+}
+.v2 .btn-ghost { border-color: var(--night-line); color: var(--night-ink); }
+
+/* roadmap */
+.roadmap { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin-top: 56px; }
+@media (max-width: 720px) { .roadmap { grid-template-columns: 1fr; } }
+.milestone {
+  border: 1px solid var(--night-line); border-radius: var(--radius);
+  background: var(--night-surface); padding: 22px;
+}
+.milestone .when { font-size: .74rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--night-accent); }
+.milestone h3 { font-size: 1rem; margin: 8px 0 6px; letter-spacing: 0; }
+.milestone p { color: var(--night-muted); font-size: .88rem; }
+.milestone.now { border-color: var(--night-accent); }
+
+/* ============ FAQ ============ */
+.faq-list { max-width: 720px; display: flex; flex-direction: column; gap: 12px; }
+details {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--surface); padding: 0 22px;
+}
+details summary {
+  cursor: pointer; list-style: none; padding: 18px 0;
+  font-weight: 700; font-size: .98rem;
+  display: flex; justify-content: space-between; align-items: center; gap: 16px;
+}
+details summary::-webkit-details-marker { display: none; }
+details summary::after { content: "+"; font-size: 1.3rem; color: var(--accent); flex: 0 0 auto; }
+details[open] summary::after { content: "–"; }
+details p { padding: 0 0 20px; color: var(--muted); font-size: .93rem; max-width: 60ch; }
+
+/* ============ footer ============ */
+footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
+.foot-grid { display: flex; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+.foot-brand { display: flex; flex-direction: column; gap: 8px; max-width: 340px; }
+.foot-brand .logo { font-size: 1rem; }
+.foot-brand p, .foot-meta { color: var(--muted); font-size: .84rem; }
+.foot-links { display: flex; gap: 20px; align-items: start; font-size: .88rem; }
+.foot-links a { color: var(--muted); text-decoration: none; }
+.foot-links a:hover { color: var(--ink); }
+.foot-meta { margin-top: 34px; font-size: .76rem; }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="logo" href="#top">REMLET<sup>™</sup></a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#features" data-i18n="nav.features">The bracelet</a>
+      <a href="#colors" data-i18n="nav.colors">Colors</a>
+      <a href="#reserve" data-i18n="nav.reserve">Reserve</a>
+      <a href="#v2" data-i18n="nav.v2">V2 · 2027</a>
+      <a href="#faq" data-i18n="nav.faq">FAQ</a>
+    </nav>
+    <div class="lang-toggle" role="group" aria-label="Language">
+      <button type="button" id="lang-en" aria-pressed="true">EN</button>
+      <button type="button" id="lang-lv" aria-pressed="false">LV</button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="eyebrow" data-i18n="hero.eyebrow">Silent wake-up bracelet · Made by a Latvian student startup</span>
+        <h1 data-i18n="hero.title">Wake up without a sound.</h1>
+        <p class="hero-sub" data-i18n="hero.sub">REMLET is a screenless bracelet that wakes you and reminds you of what matters — with quiet vibration on your wrist. No noise, no screen, no tracking.</p>
+        <div class="hero-ctas">
+          <a class="btn btn-primary" href="#reserve" data-i18n="hero.cta">Reserve yours — €25</a>
+          <a class="btn btn-ghost" href="#v2" data-i18n="hero.cta2">See what's next</a>
+        </div>
+        <p class="hero-note" data-i18n="hero.note">Free reservation · pay on delivery · first deliveries October 2026 · early-bird <strong>€25</strong> (launch price €29)</p>
+      </div>
+      <div class="stage" aria-hidden="true">
+        <div class="rings"><span class="ring"></span><span class="ring"></span><span class="ring"></span></div>
+        <!-- Replace this concept SVG with product render photos when final -->
+        <svg class="bracelet" id="bracelet-svg" width="220" height="440" viewBox="0 0 220 440" role="img" aria-label="REMLET bracelet">
+          <defs>
+            <linearGradient id="capShine" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#ffffff" stop-opacity=".14"/>
+              <stop offset=".5" stop-color="#ffffff" stop-opacity="0"/>
+              <stop offset="1" stop-color="#000000" stop-opacity=".18"/>
+            </linearGradient>
+          </defs>
+          <!-- strap -->
+          <rect x="76" y="10" width="68" height="420" rx="34" fill="var(--strap)"/>
+          <rect x="76" y="10" width="68" height="420" rx="34" fill="url(#capShine)"/>
+          <!-- keeper holes -->
+          <circle cx="110" cy="356" r="4" fill="#000" opacity=".28"/>
+          <circle cx="110" cy="378" r="4" fill="#000" opacity=".28"/>
+          <circle cx="110" cy="400" r="4" fill="#000" opacity=".28"/>
+          <!-- capsule -->
+          <rect x="64" y="140" width="92" height="160" rx="46" fill="var(--capsule)"/>
+          <rect x="64" y="140" width="92" height="160" rx="46" fill="url(#capShine)"/>
+          <!-- status LED -->
+          <circle cx="110" cy="220" r="5" fill="var(--accent)">
+            <animate attributeName="opacity" values="1;.25;1" dur="2.6s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+        <span class="stage-caption" data-i18n="hero.caption">V1 · concept render</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section class="features section" id="features">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow" data-i18n="feat.eyebrow">REMLET V1 · Bluetooth</span>
+        <h2 data-i18n="feat.title">Everything you need to get up. Nothing you don't.</h2>
+        <p data-i18n="feat.sub">Set alarms and reminders from your phone. The bracelet does the rest — silently.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature reveal">
+          <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v2M5.6 5.6l1.4 1.4M18.4 5.6 17 7M12 21a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z"/><path d="M12 11v3l2 2"/></svg></span>
+          <h3 data-i18n="feat.1t">Silent wake-up alarm</h3>
+          <p data-i18n="feat.1p">A strong, quiet vibration wakes you — not your family, not your roommate. Tested to wake real sleepers.</p>
+        </div>
+        <div class="feature reveal">
+          <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 5h13M8 12h13M8 19h13"/><circle cx="4" cy="5" r="1.3" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="4" cy="19" r="1.3" fill="currentColor" stroke="none"/></svg></span>
+          <h3 data-i18n="feat.2t">All-day reminders</h3>
+          <p data-i18n="feat.2p">Medication, training, the bus, the meeting — set named reminders in the app and feel them on your wrist.</p>
+        </div>
+        <div class="feature reveal">
+          <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>
+          <h3 data-i18n="feat.3t">Find my bracelet</h3>
+          <p data-i18n="feat.3p">Lost it in the sofa again? Trigger a vibration burst from the app and follow the buzz.</p>
+        </div>
+        <div class="feature reveal">
+          <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="7" width="16" height="10" rx="2"/><path d="M20 10v4M6 10v4" /></svg></span>
+          <h3 data-i18n="feat.4t">5+ day battery</h3>
+          <p data-i18n="feat.4p">Charge it once, forget it for a school week. USB charging included in the box.</p>
+        </div>
+        <div class="feature reveal">
+          <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 4 6v6c0 4.4 3.4 8.2 8 9 4.6-.8 8-4.6 8-9V6l-8-3Z"/></svg></span>
+          <h3 data-i18n="feat.5t">Private by design</h3>
+          <p data-i18n="feat.5p">No GPS, no SIM, no location servers. V1 connects only to your phone over Bluetooth — your data stays with you.</p>
+        </div>
+        <div class="feature reveal">
+          <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h3l2.5-6L13 18l2.5-6H21"/></svg></span>
+          <h3 data-i18n="feat.6t">Made for silence</h3>
+          <p data-i18n="feat.6p">Designed with the deaf and hard-of-hearing community in mind — alarms and alerts you feel, not hear. Splash-proof (IP65+).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COLORWAYS ============ -->
+  <section class="section" id="colors">
+    <div class="wrap color-grid">
+      <div class="reveal">
+        <div class="section-head" style="margin-bottom:28px">
+          <span class="eyebrow" data-i18n="col.eyebrow">Colorways</span>
+          <h2 data-i18n="col.title">One capsule. Your strap.</h2>
+          <p data-i18n="col.sub">The launch batch ships with a matte black capsule and your choice of strap. Swap straps in seconds — extra 2-packs available at delivery.</p>
+        </div>
+        <div class="swatches" role="group" aria-label="Strap colors">
+          <button class="swatch" type="button" data-color="#17191E" data-name-en="Black" data-name-lv="Melna" style="background:#17191E" aria-pressed="true" aria-label="Black"></button>
+          <button class="swatch" type="button" data-color="#D9C6A0" data-name-en="Sand" data-name-lv="Smilšu" style="background:#D9C6A0" aria-pressed="false" aria-label="Sand"></button>
+          <button class="swatch" type="button" data-color="#8FA391" data-name-en="Sage" data-name-lv="Salvijas" style="background:#8FA391" aria-pressed="false" aria-label="Sage"></button>
+          <button class="swatch" type="button" data-color="#2A3A55" data-name-en="Navy" data-name-lv="Tumši zila" style="background:#2A3A55" aria-pressed="false" aria-label="Navy"></button>
+          <button class="swatch" type="button" data-color="#D9A0AC" data-name-en="Pink" data-name-lv="Rozā" style="background:#D9A0AC" aria-pressed="false" aria-label="Pink"></button>
+          <button class="swatch" type="button" data-color="#1F4E48" data-name-en="Dark teal" data-name-lv="Tumši zaļganzila" style="background:#1F4E48" aria-pressed="false" aria-label="Dark teal"></button>
+        </div>
+        <p class="swatch-label" id="swatch-label">Black</p>
+        <p class="color-note" data-i18n="col.note">Launch batch straps: black, sand + one accent color. All six colors arrive as accessory strap 2-packs (€7).</p>
+      </div>
+      <div class="stage reveal" aria-hidden="true">
+        <svg class="bracelet" width="200" height="400" viewBox="0 0 220 440">
+          <rect x="76" y="10" width="68" height="420" rx="34" fill="var(--strap)"/>
+          <circle cx="110" cy="356" r="4" fill="#000" opacity=".28"/>
+          <circle cx="110" cy="378" r="4" fill="#000" opacity=".28"/>
+          <circle cx="110" cy="400" r="4" fill="#000" opacity=".28"/>
+          <rect x="64" y="140" width="92" height="160" rx="46" fill="var(--capsule)"/>
+          <circle cx="110" cy="220" r="5" fill="var(--accent)"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESERVE ============ -->
+  <section class="section" id="reserve" style="padding-top:40px">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow" data-i18n="res.eyebrow">Reserve · V1</span>
+        <h2 data-i18n="res.title">Reserve yours. Pay nothing today.</h2>
+        <p data-i18n="res.sub">Reservations are free and non-binding. We hand-deliver or ship in Latvia from mid-October 2026 — you pay on delivery.</p>
+      </div>
+      <div class="reserve-grid">
+        <aside class="price-card reveal">
+          <span class="price-tag" data-i18n="res.tag">Early-bird reservation</span>
+          <div class="price-row">
+            <span class="price-now">€25</span>
+            <span class="price-was">€29</span>
+          </div>
+          <ul class="price-list">
+            <li data-i18n="res.b1">REMLET bracelet, black capsule + strap of your choice</li>
+            <li data-i18n="res.b2">Charger, quick-start card and 2-year warranty in the box</li>
+            <li data-i18n="res.b3">Pay cash or by card on delivery — cancel any time</li>
+            <li data-i18n="res.b4">Extra strap 2-pack add-on for €7</li>
+          </ul>
+        </aside>
+        <form class="reserve-form reveal" id="reserve-form" novalidate>
+          <div class="field">
+            <label for="f-name" data-i18n="res.name">Name</label>
+            <input id="f-name" name="name" type="text" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label for="f-email" data-i18n="res.email">E-mail</label>
+            <input id="f-email" name="email" type="email" autocomplete="email" required>
+          </div>
+          <div class="field">
+            <label for="f-strap" data-i18n="res.strap">Strap color</label>
+            <select id="f-strap" name="strap">
+              <option value="black" data-i18n="res.strap1">Black</option>
+              <option value="sand" data-i18n="res.strap2">Sand</option>
+              <option value="accent" data-i18n="res.strap3">Accent (voted by reservers)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-qty" data-i18n="res.qty">Quantity</label>
+            <select id="f-qty" name="qty">
+              <option>1</option><option>2</option><option>3</option><option>4</option>
+            </select>
+          </div>
+          <label class="consent">
+            <input type="checkbox" id="f-consent" required>
+            <span data-i18n="res.consent">I agree that REMLET stores my name and e-mail to manage this reservation, and only for that. No newsletters, no sharing. Delete any time — one e-mail is enough.</span>
+          </label>
+          <p class="form-error" id="form-error" data-i18n="res.error">Please fill in your name, a valid e-mail, and tick the consent box.</p>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit" data-i18n="res.submit">Reserve for €25</button>
+            <span class="form-hint" data-i18n="res.hint">Takes 20 seconds. No payment details asked — ever, until delivery.</span>
+          </div>
+          <div class="form-success" id="form-success" role="status">
+            <h3 data-i18n="res.okT">You're on the list! 🎉</h3>
+            <p data-i18n="res.okP">We've saved your reservation. You'll get one e-mail to confirm it and one when your REMLET is ready for delivery in October. That's it.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ V2 NIGHT BAND ============ -->
+  <section class="v2 section" id="v2">
+    <div class="wrap">
+      <div class="v2-grid">
+        <div class="reveal">
+          <div class="section-head" style="margin-bottom:0">
+            <span class="eyebrow" data-i18n="v2.eyebrow">Next · REMLET V2 · 2027</span>
+            <h2 data-i18n="v2.title">The same silence. Now it finds its way home.</h2>
+            <p data-i18n="v2.sub">V2 is our funded next step: the bracelet families have asked for — location when it matters, still private by default.</p>
+          </div>
+          <ul class="v2-points">
+            <li>
+              <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+              <div>
+                <h3 data-i18n="v2.1t">GPS + 4G location</h3>
+                <p data-i18n="v2.1p">Parents see where the bracelet is when they need to — school run, training, the way home.</p>
+              </div>
+            </li>
+            <li>
+              <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 4 6v6c0 4.4 3.4 8.2 8 9 4.6-.8 8-4.6 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+              <div>
+                <h3 data-i18n="v2.2t">EU-hosted, GDPR-first</h3>
+                <p data-i18n="v2.2p">Location data stays on servers in the EU, visible only to the people you choose. Consent-first, always.</p>
+              </div>
+            </li>
+            <li>
+              <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/><circle cx="12" cy="12" r="4"/></svg></span>
+              <div>
+                <h3 data-i18n="v2.3t">Everything V1 does</h3>
+                <p data-i18n="v2.3p">Silent alarms, reminders, find-my-bracelet — plus a safe-zone alert when the bracelet leaves an area you set.</p>
+              </div>
+            </li>
+          </ul>
+          <div class="hero-ctas" style="margin-top:30px">
+            <a class="btn btn-ghost" href="#reserve" id="v2-waitlist-btn" data-i18n="v2.cta">Join the V2 waitlist with your reservation</a>
+          </div>
+        </div>
+        <div class="v2-stage reveal" aria-hidden="true">
+          <span class="concept-chip" data-i18n="v2.chip">2027 concept</span>
+          <div class="rings"><span class="ring"></span><span class="ring"></span><span class="ring"></span></div>
+          <svg class="bracelet" width="210" height="420" viewBox="0 0 220 440">
+            <rect x="72" y="10" width="76" height="420" rx="38" fill="#20242C"/>
+            <circle cx="110" cy="356" r="4" fill="#000" opacity=".35"/>
+            <circle cx="110" cy="378" r="4" fill="#000" opacity=".35"/>
+            <circle cx="110" cy="400" r="4" fill="#000" opacity=".35"/>
+            <rect x="58" y="132" width="104" height="176" rx="52" fill="#0E1116"/>
+            <!-- V2: second microphone/antenna line + pin glyph etched -->
+            <path d="M110 196s-13-10.5-13-21a13 13 0 0 1 26 0c0 10.5-13 21-13 21Z" fill="none" stroke="#74BFAD" stroke-width="2"/>
+            <circle cx="110" cy="174" r="4" fill="#74BFAD"/>
+            <circle cx="110" cy="252" r="5" fill="#74BFAD">
+              <animate attributeName="opacity" values="1;.25;1" dur="2.6s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+        </div>
+      </div>
+
+      <div class="roadmap">
+        <div class="milestone now reveal">
+          <span class="when" data-i18n="rm.1w">Now → October 2026</span>
+          <h3 data-i18n="rm.1t">V1 · Bluetooth</h3>
+          <p data-i18n="rm.1p">Reservations open. Pilot batch of 40, hand-checked one by one, delivered across Latvia.</p>
+        </div>
+        <div class="milestone reveal">
+          <span class="when" data-i18n="rm.2w">Late 2026</span>
+          <h3 data-i18n="rm.2t">Remlet app</h3>
+          <p data-i18n="rm.2p">Our own Android app: named reminders with distinct vibration patterns, silent alarms, find-my-bracelet.</p>
+        </div>
+        <div class="milestone reveal">
+          <span class="when" data-i18n="rm.3w">2027</span>
+          <h3 data-i18n="rm.3t">V2 · GPS</h3>
+          <p data-i18n="rm.3p">Location for families, safe-zone alerts, EU-hosted backend. Funded by V1 sales, grants and crowdfunding.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FAQ ============ -->
+  <section class="section" id="faq">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">FAQ</span>
+        <h2 data-i18n="faq.title">Honest answers</h2>
+      </div>
+      <div class="faq-list reveal">
+        <details>
+          <summary data-i18n="faq.1q">Does REMLET V1 have GPS?</summary>
+          <p data-i18n="faq.1a">No — and that's on purpose. V1 has no GPS, no SIM card and no location servers: it connects only to your phone over Bluetooth, so there is simply no location data to leak, sell or subpoena. GPS arrives in V2 (2027) as an opt-in family feature with EU-hosted, consent-first infrastructure.</p>
+        </details>
+        <details>
+          <summary data-i18n="faq.2q">How does a reservation work? Do I pay now?</summary>
+          <p data-i18n="faq.2a">You pay nothing now. A reservation locks the €25 early-bird price and your place in the first batch. When your bracelet is ready — from mid-October 2026 — we contact you and you pay on delivery. You can cancel any time with one e-mail.</p>
+        </details>
+        <details>
+          <summary data-i18n="faq.3q">Which app does it use?</summary>
+          <p data-i18n="faq.3a">At launch, the bracelet pairs with a companion Android/iOS app for alarms and reminders — set-up takes about two minutes and the quick-start card in the box walks you through it. Our own Remlet app for Android follows shortly after launch, with named reminders and distinct vibration patterns.</p>
+        </details>
+        <details>
+          <summary data-i18n="faq.4q">What about warranty and returns?</summary>
+          <p data-i18n="faq.4a">EU consumer rules apply in full: a 2-year legal conformity warranty and a 14-day right of withdrawal for distance purchases. The bracelet is CE-marked (RED, RoHS) with skin-safe silicone, and we keep service stock from every batch for quick replacements.</p>
+        </details>
+        <details>
+          <summary data-i18n="faq.5q">Who is behind REMLET?</summary>
+          <p data-i18n="faq.5a">Three student founders from Mārupe, Latvia — Martins, Nikolass and Henrijs — running REMLET as a student mini-company (SMU) in the Junior Achievement Latvia program. Every bracelet in the first batch is tested and packed by us personally.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="logo" href="#top">REMLET<sup>™</sup></a>
+        <p data-i18n="foot.tag">Silent vibration wake-up bracelet. Designed in Mārupe, Latvia by a student mini-company (SMU, JA Latvia).</p>
+      </div>
+      <nav class="foot-links" aria-label="Footer">
+        <a href="mailto:hello@remlet.lv">hello@remlet.lv</a>
+        <a href="https://instagram.com" rel="noopener">Instagram</a>
+        <a href="https://tiktok.com" rel="noopener">TikTok</a>
+      </nav>
+    </div>
+    <p class="foot-meta" data-i18n="foot.legal">© 2026 REMLET (SMU) · REMLET™ is an unregistered trademark · CE-marked product; dispose of electronics and batteries at collection points (WEEE) · Reservation data is stored with consent and used only to fulfil reservations.</p>
+  </div>
+</footer>
+
+<script>
+/* ============ i18n ============ */
+const I18N = {
+  en: {
+    "nav.features": "The bracelet", "nav.colors": "Colors", "nav.reserve": "Reserve", "nav.v2": "V2 · 2027", "nav.faq": "FAQ",
+    "hero.eyebrow": "Silent wake-up bracelet · Made by a Latvian student startup",
+    "hero.title": "Wake up without a sound.",
+    "hero.sub": "REMLET is a screenless bracelet that wakes you and reminds you of what matters — with quiet vibration on your wrist. No noise, no screen, no tracking.",
+    "hero.cta": "Reserve yours — €25", "hero.cta2": "See what's next",
+    "hero.note": "Free reservation · pay on delivery · first deliveries October 2026 · early-bird €25 (launch price €29)",
+    "hero.caption": "V1 · concept render",
+    "feat.eyebrow": "REMLET V1 · Bluetooth",
+    "feat.title": "Everything you need to get up. Nothing you don't.",
+    "feat.sub": "Set alarms and reminders from your phone. The bracelet does the rest — silently.",
+    "feat.1t": "Silent wake-up alarm", "feat.1p": "A strong, quiet vibration wakes you — not your family, not your roommate. Tested to wake real sleepers.",
+    "feat.2t": "All-day reminders", "feat.2p": "Medication, training, the bus, the meeting — set named reminders in the app and feel them on your wrist.",
+    "feat.3t": "Find my bracelet", "feat.3p": "Lost it in the sofa again? Trigger a vibration burst from the app and follow the buzz.",
+    "feat.4t": "5+ day battery", "feat.4p": "Charge it once, forget it for a school week. USB charging included in the box.",
+    "feat.5t": "Private by design", "feat.5p": "No GPS, no SIM, no location servers. V1 connects only to your phone over Bluetooth — your data stays with you.",
+    "feat.6t": "Made for silence", "feat.6p": "Designed with the deaf and hard-of-hearing community in mind — alarms and alerts you feel, not hear. Splash-proof (IP65+).",
+    "col.eyebrow": "Colorways", "col.title": "One capsule. Your strap.",
+    "col.sub": "The launch batch ships with a matte black capsule and your choice of strap. Swap straps in seconds — extra 2-packs available at delivery.",
+    "col.note": "Launch batch straps: black, sand + one accent color. All six colors arrive as accessory strap 2-packs (€7).",
+    "res.eyebrow": "Reserve · V1", "res.title": "Reserve yours. Pay nothing today.",
+    "res.sub": "Reservations are free and non-binding. We hand-deliver or ship in Latvia from mid-October 2026 — you pay on delivery.",
+    "res.tag": "Early-bird reservation",
+    "res.b1": "REMLET bracelet, black capsule + strap of your choice",
+    "res.b2": "Charger, quick-start card and 2-year warranty in the box",
+    "res.b3": "Pay cash or by card on delivery — cancel any time",
+    "res.b4": "Extra strap 2-pack add-on for €7",
+    "res.name": "Name", "res.email": "E-mail", "res.strap": "Strap color",
+    "res.strap1": "Black", "res.strap2": "Sand", "res.strap3": "Accent (voted by reservers)",
+    "res.qty": "Quantity",
+    "res.consent": "I agree that REMLET stores my name and e-mail to manage this reservation, and only for that. No newsletters, no sharing. Delete any time — one e-mail is enough.",
+    "res.error": "Please fill in your name, a valid e-mail, and tick the consent box.",
+    "res.submit": "Reserve for €25",
+    "res.hint": "Takes 20 seconds. No payment details asked — ever, until delivery.",
+    "res.okT": "You're on the list! 🎉",
+    "res.okP": "We've saved your reservation. You'll get one e-mail to confirm it and one when your REMLET is ready for delivery in October. That's it.",
+    "v2.eyebrow": "Next · REMLET V2 · 2027",
+    "v2.title": "The same silence. Now it finds its way home.",
+    "v2.sub": "V2 is our funded next step: the bracelet families have asked for — location when it matters, still private by default.",
+    "v2.1t": "GPS + 4G location", "v2.1p": "Parents see where the bracelet is when they need to — school run, training, the way home.",
+    "v2.2t": "EU-hosted, GDPR-first", "v2.2p": "Location data stays on servers in the EU, visible only to the people you choose. Consent-first, always.",
+    "v2.3t": "Everything V1 does", "v2.3p": "Silent alarms, reminders, find-my-bracelet — plus a safe-zone alert when the bracelet leaves an area you set.",
+    "v2.cta": "Join the V2 waitlist with your reservation", "v2.chip": "2027 concept",
+    "rm.1w": "Now → October 2026", "rm.1t": "V1 · Bluetooth", "rm.1p": "Reservations open. Pilot batch of 40, hand-checked one by one, delivered across Latvia.",
+    "rm.2w": "Late 2026", "rm.2t": "Remlet app", "rm.2p": "Our own Android app: named reminders with distinct vibration patterns, silent alarms, find-my-bracelet.",
+    "rm.3w": "2027", "rm.3t": "V2 · GPS", "rm.3p": "Location for families, safe-zone alerts, EU-hosted backend. Funded by V1 sales, grants and crowdfunding.",
+    "faq.title": "Honest answers",
+    "faq.1q": "Does REMLET V1 have GPS?",
+    "faq.1a": "No — and that's on purpose. V1 has no GPS, no SIM card and no location servers: it connects only to your phone over Bluetooth, so there is simply no location data to leak, sell or subpoena. GPS arrives in V2 (2027) as an opt-in family feature with EU-hosted, consent-first infrastructure.",
+    "faq.2q": "How does a reservation work? Do I pay now?",
+    "faq.2a": "You pay nothing now. A reservation locks the €25 early-bird price and your place in the first batch. When your bracelet is ready — from mid-October 2026 — we contact you and you pay on delivery. You can cancel any time with one e-mail.",
+    "faq.3q": "Which app does it use?",
+    "faq.3a": "At launch, the bracelet pairs with a companion Android/iOS app for alarms and reminders — set-up takes about two minutes and the quick-start card in the box walks you through it. Our own Remlet app for Android follows shortly after launch, with named reminders and distinct vibration patterns.",
+    "faq.4q": "What about warranty and returns?",
+    "faq.4a": "EU consumer rules apply in full: a 2-year legal conformity warranty and a 14-day right of withdrawal for distance purchases. The bracelet is CE-marked (RED, RoHS) with skin-safe silicone, and we keep service stock from every batch for quick replacements.",
+    "faq.5q": "Who is behind REMLET?",
+    "faq.5a": "Three student founders from Mārupe, Latvia — Martins, Nikolass and Henrijs — running REMLET as a student mini-company (SMU) in the Junior Achievement Latvia program. Every bracelet in the first batch is tested and packed by us personally.",
+    "foot.tag": "Silent vibration wake-up bracelet. Designed in Mārupe, Latvia by a student mini-company (SMU, JA Latvia).",
+    "foot.legal": "© 2026 REMLET (SMU) · REMLET™ is an unregistered trademark · CE-marked product; dispose of electronics and batteries at collection points (WEEE) · Reservation data is stored with consent and used only to fulfil reservations."
+  },
+  lv: {
+    "nav.features": "Aproce", "nav.colors": "Krāsas", "nav.reserve": "Rezervēt", "nav.v2": "V2 · 2027", "nav.faq": "BUJ",
+    "hero.eyebrow": "Klusā modinātāja aproce · Latvijas skolēnu jaunuzņēmums",
+    "hero.title": "Pamosties bez skaņas.",
+    "hero.sub": "REMLET ir aproce bez ekrāna, kas tevi pamodina un atgādina svarīgo — ar klusu vibrāciju uz plaukstas locītavas. Bez trokšņa, bez ekrāna, bez izsekošanas.",
+    "hero.cta": "Rezervē savu — €25", "hero.cta2": "Skati, kas nāks",
+    "hero.note": "Bezmaksas rezervācija · maksā piegādes brīdī · pirmās piegādes 2026. gada oktobrī · agrā cena €25 (pēc tam €29)",
+    "hero.caption": "V1 · koncepta vizualizācija",
+    "feat.eyebrow": "REMLET V1 · Bluetooth",
+    "feat.title": "Viss, kas vajadzīgs, lai pieceltos. Nekā lieka.",
+    "feat.sub": "Iestati modinātājus un atgādinājumus telefonā. Pārējo aproce izdara — klusi.",
+    "feat.1t": "Klusais modinātājs", "feat.1p": "Spēcīga, klusa vibrācija pamodina tevi — ne ģimeni, ne istabas biedru. Pārbaudīta uz īstiem gulētājiem.",
+    "feat.2t": "Atgādinājumi visai dienai", "feat.2p": "Zāles, treniņš, autobuss, tikšanās — iestati nosauktus atgādinājumus lietotnē un sajūti tos uz rokas.",
+    "feat.3t": "Atrodi savu aproci", "feat.3p": "Atkal pazudusi dīvānā? Palaid vibrācijas signālu no lietotnes un seko sanoņai.",
+    "feat.4t": "5+ dienu baterija", "feat.4p": "Uzlādē vienreiz un aizmirsti uz visu skolas nedēļu. USB lādētājs komplektā.",
+    "feat.5t": "Privātums pēc noklusējuma", "feat.5p": "Bez GPS, bez SIM, bez atrašanās vietas serveriem. V1 savienojas tikai ar tavu telefonu caur Bluetooth — tavi dati paliek pie tevis.",
+    "feat.6t": "Radīta klusumam", "feat.6p": "Veidota, domājot par nedzirdīgo un vājdzirdīgo kopienu — signāli, ko sajūt, nevis dzird. Aizsargāta pret šļakatām (IP65+).",
+    "col.eyebrow": "Krāsu varianti", "col.title": "Viena kapsula. Tava siksniņa.",
+    "col.sub": "Pirmā partija nāk ar matētu melnu kapsulu un tavu izvēlētu siksniņu. Siksniņas nomaināmas dažās sekundēs — papildu komplekti pieejami piegādes brīdī.",
+    "col.note": "Pirmās partijas siksniņas: melna, smilšu + viena akcenta krāsa. Visas sešas krāsas pieejamas kā siksniņu 2 gab. komplekti (€7).",
+    "res.eyebrow": "Rezervē · V1", "res.title": "Rezervē savu. Šodien nemaksā neko.",
+    "res.sub": "Rezervācija ir bez maksas un nesaistoša. Piegādājam personīgi vai sūtām pa Latviju no 2026. gada oktobra vidus — maksā saņemšanas brīdī.",
+    "res.tag": "Agrās rezervācijas cena",
+    "res.b1": "REMLET aproce — melna kapsula + tava izvēlēta siksniņa",
+    "res.b2": "Lādētājs, ātrās uzsākšanas kartīte un 2 gadu garantija komplektā",
+    "res.b3": "Maksā skaidrā naudā vai ar karti piegādes brīdī — atcel jebkurā laikā",
+    "res.b4": "Papildu siksniņu 2 gab. komplekts par €7",
+    "res.name": "Vārds", "res.email": "E-pasts", "res.strap": "Siksniņas krāsa",
+    "res.strap1": "Melna", "res.strap2": "Smilšu", "res.strap3": "Akcenta (izvēlas rezervētāji)",
+    "res.qty": "Daudzums",
+    "res.consent": "Piekrītu, ka REMLET glabā manu vārdu un e-pastu tikai šīs rezervācijas apstrādei. Bez jaunumu vēstulēm, bez datu nodošanas. Dzēšana jebkurā brīdī — pietiek ar vienu e-pastu.",
+    "res.error": "Lūdzu, ievadi vārdu, derīgu e-pastu un atzīmē piekrišanas lauciņu.",
+    "res.submit": "Rezervēt par €25",
+    "res.hint": "Aizņem 20 sekundes. Maksājumu datus neprasām — nekad, līdz pat piegādei.",
+    "res.okT": "Tu esi sarakstā! 🎉",
+    "res.okP": "Tava rezervācija ir saglabāta. Saņemsi vienu e-pastu apstiprinājumam un vēl vienu, kad tavs REMLET būs gatavs piegādei oktobrī. Tas arī viss.",
+    "v2.eyebrow": "Nākamais · REMLET V2 · 2027",
+    "v2.title": "Tas pats klusums. Tagad tas atrod ceļu mājās.",
+    "v2.sub": "V2 ir mūsu nākamais solis: aproce, ko ģimenes ir prasījušas — atrašanās vieta tad, kad tas ir svarīgi, joprojām privāta pēc noklusējuma.",
+    "v2.1t": "GPS + 4G atrašanās vieta", "v2.1p": "Vecāki redz, kur atrodas aproce, kad tas nepieciešams — ceļš uz skolu, treniņš, ceļš mājās.",
+    "v2.2t": "ES serveri, GDPR pirmajā vietā", "v2.2p": "Atrašanās vietas dati glabājas serveros Eiropas Savienībā un redzami tikai taviem izvēlētajiem cilvēkiem. Vienmēr ar piekrišanu.",
+    "v2.3t": "Viss, ko dara V1", "v2.3p": "Klusie modinātāji, atgādinājumi, aproces meklēšana — plus drošās zonas brīdinājums, ja aproce pamet tevis noteiktu teritoriju.",
+    "v2.cta": "Pievienojies V2 gaidīšanas sarakstam ar savu rezervāciju", "v2.chip": "2027 koncepts",
+    "rm.1w": "Tagad → 2026. gada oktobris", "rm.1t": "V1 · Bluetooth", "rm.1p": "Rezervācijas atvērtas. Pilotpartija — 40 gab., katru pārbaudām personīgi, piegādājam visā Latvijā.",
+    "rm.2w": "2026. gada beigas", "rm.2t": "Remlet lietotne", "rm.2p": "Mūsu pašu Android lietotne: nosaukti atgādinājumi ar atšķirīgiem vibrācijas ritmiem, klusie modinātāji, aproces meklēšana.",
+    "rm.3w": "2027", "rm.3t": "V2 · GPS", "rm.3p": "Atrašanās vieta ģimenēm, drošo zonu brīdinājumi, ES serveri. Finansēts no V1 pārdošanas, grantiem un pūļa finansējuma.",
+    "faq.title": "Godīgas atbildes",
+    "faq.1q": "Vai REMLET V1 ir GPS?",
+    "faq.1a": "Nē — un tas ir apzināti. V1 nav ne GPS, ne SIM kartes, ne atrašanās vietas serveru: aproce savienojas tikai ar tavu telefonu caur Bluetooth, tāpēc atrašanās vietas datu, ko nopludināt vai pārdot, vienkārši nav. GPS parādīsies V2 (2027) kā brīvprātīga ģimenes funkcija ar ES serveriem un piekrišanu pirmajā vietā.",
+    "faq.2q": "Kā darbojas rezervācija? Vai jāmaksā tagad?",
+    "faq.2a": "Tagad nemaksā neko. Rezervācija nofiksē €25 agro cenu un tavu vietu pirmajā partijā. Kad aproce būs gatava — no 2026. gada oktobra vidus — mēs sazināsimies, un tu maksāsi saņemšanas brīdī. Atcelt var jebkurā laikā ar vienu e-pastu.",
+    "faq.3q": "Kādu lietotni tā izmanto?",
+    "faq.3a": "Sākumā aproce savienojas ar komplektā iekļauto Android/iOS lietotni modinātājiem un atgādinājumiem — uzstādīšana aizņem apmēram divas minūtes, un kastītē esošā kartīte visu paskaidro. Drīz pēc palaišanas sekos mūsu pašu Remlet lietotne Android ierīcēm ar nosauktiem atgādinājumiem un atšķirīgiem vibrācijas ritmiem.",
+    "faq.4q": "Kā ar garantiju un atgriešanu?",
+    "faq.4a": "Pilnībā spēkā ir ES patērētāju tiesības: 2 gadu likumiskā atbilstības garantija un 14 dienu atteikuma tiesības distances pirkumiem. Aprocei ir CE marķējums (RED, RoHS) un ādai droša silikona siksniņa, un no katras partijas glabājam rezerves eksemplārus ātrai apmaiņai.",
+    "faq.5q": "Kas stāv aiz REMLET?",
+    "faq.5a": "Trīs skolēni no Mārupes — Martins, Nikolass un Henrijs — kas vada REMLET kā skolēnu mācību uzņēmumu (SMU) Junior Achievement Latvia programmā. Katru pirmās partijas aproci mēs pārbaudām un iepakojam personīgi.",
+    "foot.tag": "Klusā vibrācijas modinātāja aproce. Radīta Mārupē, Latvijā, skolēnu mācību uzņēmumā (SMU, JA Latvia).",
+    "foot.legal": "© 2026 REMLET (SMU) · REMLET™ ir nereģistrēta preču zīme · CE marķēts produkts; elektroniku un baterijas nododiet šķirošanas punktos (WEEE) · Rezervāciju dati tiek glabāti ar piekrišanu un izmantoti tikai rezervāciju izpildei."
+  }
+};
+
+function setLang(lang) {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const t = I18N[lang][el.dataset.i18n];
+    if (t) el.textContent = t;
+  });
+  document.getElementById("lang-en").setAttribute("aria-pressed", String(lang === "en"));
+  document.getElementById("lang-lv").setAttribute("aria-pressed", String(lang === "lv"));
+  try { localStorage.setItem("remlet-lang", lang); } catch (e) {}
+  updateSwatchLabel();
+}
+document.getElementById("lang-en").addEventListener("click", () => setLang("en"));
+document.getElementById("lang-lv").addEventListener("click", () => setLang("lv"));
+let saved = null;
+try { saved = localStorage.getItem("remlet-lang"); } catch (e) {}
+setLang(saved === "lv" ? "lv" : "en");
+
+/* ============ strap picker ============ */
+let currentSwatch = document.querySelector(".swatch[aria-pressed='true']");
+function updateSwatchLabel() {
+  if (!currentSwatch) return;
+  const lang = document.documentElement.lang;
+  document.getElementById("swatch-label").textContent =
+    lang === "lv" ? currentSwatch.dataset.nameLv : currentSwatch.dataset.nameEn;
+}
+document.querySelectorAll(".swatch").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".swatch").forEach(b => b.setAttribute("aria-pressed", "false"));
+    btn.setAttribute("aria-pressed", "true");
+    currentSwatch = btn;
+    document.documentElement.style.setProperty("--strap", btn.dataset.color);
+    updateSwatchLabel();
+  });
+});
+
+/* ============ reservation form ============ */
+/* To collect reservations for real, point RESERVE_ENDPOINT at a form backend
+   (Formspree, Tally, a Google Apps Script, or your own API). While empty,
+   submissions are stored locally in the visitor's browser only. */
+const RESERVE_ENDPOINT = "";
+const form = document.getElementById("reserve-form");
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = document.getElementById("f-name").value.trim();
+  const email = document.getElementById("f-email").value.trim();
+  const consent = document.getElementById("f-consent").checked;
+  const err = document.getElementById("form-error");
+  const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  if (!name || !ok || !consent) { err.classList.add("show"); return; }
+  err.classList.remove("show");
+  const data = {
+    name, email,
+    strap: document.getElementById("f-strap").value,
+    qty: document.getElementById("f-qty").value,
+    lang: document.documentElement.lang,
+    at: new Date().toISOString()
+  };
+  if (RESERVE_ENDPOINT) {
+    try {
+      await fetch(RESERVE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+    } catch (e2) { /* fall through to local save */ }
+  }
+  try {
+    const list = JSON.parse(localStorage.getItem("remlet-reservations") || "[]");
+    list.push(data);
+    localStorage.setItem("remlet-reservations", JSON.stringify(list));
+  } catch (e3) {}
+  document.getElementById("form-success").classList.add("show");
+  form.querySelector(".form-actions").style.display = "none";
+});
+
+/* ============ reveal on scroll ============ */
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (!reduce && "IntersectionObserver" in window) {
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+} else {
+  document.querySelectorAll(".reveal").forEach(el => el.classList.add("in"));
+}
+</script>
+</body>
+</html>
