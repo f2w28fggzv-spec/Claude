@@ -220,15 +220,6 @@ button { font: inherit; cursor: pointer; }
 /* ============ colorways ============ */
 .color-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 48px; align-items: center; }
 @media (max-width: 860px) { .color-grid { grid-template-columns: 1fr; } }
-.swatches { display: flex; gap: 14px; flex-wrap: wrap; }
-.swatch {
-  width: 44px; height: 44px; border-radius: 50%;
-  border: 2px solid var(--line); padding: 0;
-  transition: transform .15s ease, border-color .15s ease;
-}
-.swatch:hover { transform: scale(1.1); }
-.swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.swatch-label { margin-top: 14px; font-size: .9rem; color: var(--muted); min-height: 1.4em; }
 .color-note {
   margin-top: 26px; padding: 16px 18px; border-radius: var(--radius);
   background: var(--sand-soft); border: 1px solid color-mix(in srgb, var(--sand) 40%, transparent);
@@ -349,7 +340,7 @@ footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
     <a class="logo" href="#top">REMLET<sup>™</sup></a>
     <nav class="nav-links" aria-label="Main">
       <a href="#features" data-i18n="nav.features">The bracelet</a>
-      <a href="#colors" data-i18n="nav.colors">Colors</a>
+      <a href="#design" data-i18n="nav.design">Design</a>
       <a href="#reserve" data-i18n="nav.reserve">Reserve</a>
       <a href="#v2" data-i18n="nav.v2">V2 · 2027</a>
       <a href="#faq" data-i18n="nav.faq">FAQ</a>
@@ -378,27 +369,44 @@ footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
       </div>
       <div class="stage" aria-hidden="true">
         <div class="rings"><span class="ring"></span><span class="ring"></span><span class="ring"></span></div>
-        <!-- Replace this concept SVG with product render photos when final -->
-        <svg class="bracelet" id="bracelet-svg" width="220" height="440" viewBox="0 0 220 440" role="img" aria-label="REMLET bracelet">
+        <!-- Concept render of the updated design: slim black strap, angular glossy capsule, speckle panel -->
+        <svg class="bracelet" id="bracelet-svg" width="220" height="440" viewBox="0 0 220 440" role="img" aria-label="REMLET bracelet — black">
           <defs>
             <linearGradient id="capShine" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stop-color="#ffffff" stop-opacity=".14"/>
-              <stop offset=".5" stop-color="#ffffff" stop-opacity="0"/>
-              <stop offset="1" stop-color="#000000" stop-opacity=".18"/>
+              <stop offset="0" stop-color="#ffffff" stop-opacity=".2"/>
+              <stop offset=".45" stop-color="#ffffff" stop-opacity="0"/>
+              <stop offset="1" stop-color="#000000" stop-opacity=".3"/>
+            </linearGradient>
+            <linearGradient id="capBody" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#2A2D33"/>
+              <stop offset=".5" stop-color="#101216"/>
+              <stop offset="1" stop-color="#1B1E24"/>
             </linearGradient>
           </defs>
           <!-- strap -->
-          <rect x="76" y="10" width="68" height="420" rx="34" fill="var(--strap)"/>
-          <rect x="76" y="10" width="68" height="420" rx="34" fill="url(#capShine)"/>
-          <!-- keeper holes -->
-          <circle cx="110" cy="356" r="4" fill="#000" opacity=".28"/>
-          <circle cx="110" cy="378" r="4" fill="#000" opacity=".28"/>
-          <circle cx="110" cy="400" r="4" fill="#000" opacity=".28"/>
-          <!-- capsule -->
-          <rect x="64" y="140" width="92" height="160" rx="46" fill="var(--capsule)"/>
-          <rect x="64" y="140" width="92" height="160" rx="46" fill="url(#capShine)"/>
+          <rect x="86" y="8" width="48" height="424" rx="24" fill="#1E2126"/>
+          <rect x="86" y="8" width="48" height="424" rx="24" fill="url(#capShine)" opacity=".5"/>
+          <!-- buckle holes -->
+          <circle cx="110" cy="352" r="3.4" fill="#000" opacity=".5"/>
+          <circle cx="110" cy="376" r="3.4" fill="#000" opacity=".5"/>
+          <circle cx="110" cy="400" r="3.4" fill="#000" opacity=".5"/>
+          <!-- capsule: angular chamfered glass-black -->
+          <path d="M74 150 Q74 132 92 130 L128 130 Q146 132 146 150 L146 290 Q146 308 128 310 L92 310 Q74 308 74 290 Z" fill="url(#capBody)"/>
+          <path d="M74 150 Q74 132 92 130 L128 130 Q146 132 146 150 L146 290 Q146 308 128 310 L92 310 Q74 308 74 290 Z" fill="url(#capShine)"/>
+          <text x="110" y="156" text-anchor="middle" font-size="8.5" letter-spacing="2.5" fill="#7E858D" style="font-family:var(--font-display)">REMLET</text>
+          <!-- speckle accent panel -->
+          <rect x="84" y="246" width="52" height="46" rx="8" fill="#07080B"/>
+          <g fill="#CFD6DD">
+            <circle cx="92" cy="254" r="1.2" opacity=".7"/><circle cx="101" cy="260" r="1.4" opacity=".5"/>
+            <circle cx="112" cy="251" r="1.1" opacity=".8"/><circle cx="122" cy="257" r="1.3" opacity=".55"/>
+            <circle cx="130" cy="264" r="1.1" opacity=".7"/><circle cx="96" cy="268" r="1.4" opacity=".6"/>
+            <circle cx="108" cy="271" r="1.2" opacity=".85"/><circle cx="118" cy="268" r="1.1" opacity=".5"/>
+            <circle cx="127" cy="276" r="1.3" opacity=".65"/><circle cx="90" cy="280" r="1.1" opacity=".55"/>
+            <circle cx="103" cy="283" r="1.4" opacity=".75"/><circle cx="116" cy="286" r="1.2" opacity=".6"/>
+            <circle cx="128" cy="284" r="1.1" opacity=".8"/><circle cx="97" cy="289" r="1.1" opacity=".5"/>
+          </g>
           <!-- status LED -->
-          <circle cx="110" cy="220" r="5" fill="var(--accent)">
+          <circle cx="110" cy="212" r="4" fill="var(--accent)">
             <animate attributeName="opacity" values="1;.25;1" dur="2.6s" repeatCount="indefinite"/>
           </circle>
         </svg>
@@ -450,34 +458,37 @@ footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
     </div>
   </section>
 
-  <!-- ============ COLORWAYS ============ -->
-  <section class="section" id="colors">
+  <!-- ============ DESIGN ============ -->
+  <section class="section" id="design">
     <div class="wrap color-grid">
       <div class="reveal">
         <div class="section-head" style="margin-bottom:28px">
-          <span class="eyebrow" data-i18n="col.eyebrow">Colorways</span>
-          <h2 data-i18n="col.title">One capsule. Your strap.</h2>
-          <p data-i18n="col.sub">The launch batch ships with a matte black capsule and your choice of strap. Swap straps in seconds — extra 2-packs available at delivery.</p>
+          <span class="eyebrow" data-i18n="design.eyebrow">The design</span>
+          <h2 data-i18n="design.title">One color. Black. That's the point.</h2>
+          <p data-i18n="design.sub">An angular gloss-black capsule with a speckled accent panel, on a slim black strap with a classic pin buckle. No screen to glow at night, no choices to agonize over — every bracelet in the first batch is exactly this one.</p>
         </div>
-        <div class="swatches" role="group" aria-label="Strap colors">
-          <button class="swatch" type="button" data-color="#17191E" data-name-en="Black" data-name-lv="Melna" style="background:#17191E" aria-pressed="true" aria-label="Black"></button>
-          <button class="swatch" type="button" data-color="#D9C6A0" data-name-en="Sand" data-name-lv="Smilšu" style="background:#D9C6A0" aria-pressed="false" aria-label="Sand"></button>
-          <button class="swatch" type="button" data-color="#8FA391" data-name-en="Sage" data-name-lv="Salvijas" style="background:#8FA391" aria-pressed="false" aria-label="Sage"></button>
-          <button class="swatch" type="button" data-color="#2A3A55" data-name-en="Navy" data-name-lv="Tumši zila" style="background:#2A3A55" aria-pressed="false" aria-label="Navy"></button>
-          <button class="swatch" type="button" data-color="#D9A0AC" data-name-en="Pink" data-name-lv="Rozā" style="background:#D9A0AC" aria-pressed="false" aria-label="Pink"></button>
-          <button class="swatch" type="button" data-color="#1F4E48" data-name-en="Dark teal" data-name-lv="Tumši zaļganzila" style="background:#1F4E48" aria-pressed="false" aria-label="Dark teal"></button>
-        </div>
-        <p class="swatch-label" id="swatch-label">Black</p>
-        <p class="color-note" data-i18n="col.note">Launch batch straps: black, sand + one accent color. All six colors arrive as accessory strap 2-packs (€7).</p>
+        <p class="color-note" data-i18n="design.note">We only show what we can deliver: the first batch is black on black. If a future batch earns more colors, reservation holders hear about it first.</p>
       </div>
       <div class="stage reveal" aria-hidden="true">
         <svg class="bracelet" width="200" height="400" viewBox="0 0 220 440">
-          <rect x="76" y="10" width="68" height="420" rx="34" fill="var(--strap)"/>
-          <circle cx="110" cy="356" r="4" fill="#000" opacity=".28"/>
-          <circle cx="110" cy="378" r="4" fill="#000" opacity=".28"/>
-          <circle cx="110" cy="400" r="4" fill="#000" opacity=".28"/>
-          <rect x="64" y="140" width="92" height="160" rx="46" fill="var(--capsule)"/>
-          <circle cx="110" cy="220" r="5" fill="var(--accent)"/>
+          <rect x="86" y="8" width="48" height="424" rx="24" fill="#1E2126"/>
+          <rect x="86" y="8" width="48" height="424" rx="24" fill="url(#capShine)" opacity=".5"/>
+          <circle cx="110" cy="352" r="3.4" fill="#000" opacity=".5"/>
+          <circle cx="110" cy="376" r="3.4" fill="#000" opacity=".5"/>
+          <circle cx="110" cy="400" r="3.4" fill="#000" opacity=".5"/>
+          <path d="M74 150 Q74 132 92 130 L128 130 Q146 132 146 150 L146 290 Q146 308 128 310 L92 310 Q74 308 74 290 Z" fill="url(#capBody)"/>
+          <path d="M74 150 Q74 132 92 130 L128 130 Q146 132 146 150 L146 290 Q146 308 128 310 L92 310 Q74 308 74 290 Z" fill="url(#capShine)"/>
+          <text x="110" y="156" text-anchor="middle" font-size="8.5" letter-spacing="2.5" fill="#7E858D" style="font-family:var(--font-display)">REMLET</text>
+          <rect x="84" y="246" width="52" height="46" rx="8" fill="#07080B"/>
+          <g fill="#CFD6DD">
+            <circle cx="92" cy="254" r="1.2" opacity=".7"/><circle cx="101" cy="260" r="1.4" opacity=".5"/>
+            <circle cx="112" cy="251" r="1.1" opacity=".8"/><circle cx="122" cy="257" r="1.3" opacity=".55"/>
+            <circle cx="130" cy="264" r="1.1" opacity=".7"/><circle cx="96" cy="268" r="1.4" opacity=".6"/>
+            <circle cx="108" cy="271" r="1.2" opacity=".85"/><circle cx="118" cy="268" r="1.1" opacity=".5"/>
+            <circle cx="127" cy="276" r="1.3" opacity=".65"/><circle cx="90" cy="280" r="1.1" opacity=".55"/>
+            <circle cx="103" cy="283" r="1.4" opacity=".75"/><circle cx="116" cy="286" r="1.2" opacity=".6"/>
+          </g>
+          <circle cx="110" cy="212" r="4" fill="var(--accent)"/>
         </svg>
       </div>
     </div>
@@ -499,10 +510,9 @@ footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
             <span class="price-was">€29</span>
           </div>
           <ul class="price-list">
-            <li data-i18n="res.b1">REMLET bracelet, black capsule + strap of your choice</li>
+            <li data-i18n="res.b1">REMLET bracelet — gloss-black capsule, black strap</li>
             <li data-i18n="res.b2">Charger, quick-start card and 2-year warranty in the box</li>
             <li data-i18n="res.b3">Pay cash or by card on delivery — cancel any time</li>
-            <li data-i18n="res.b4">Extra strap 2-pack add-on for €7</li>
           </ul>
         </aside>
         <form class="reserve-form reveal" id="reserve-form" novalidate>
@@ -513,14 +523,6 @@ footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
           <div class="field">
             <label for="f-email" data-i18n="res.email">E-mail</label>
             <input id="f-email" name="email" type="email" autocomplete="email" required>
-          </div>
-          <div class="field">
-            <label for="f-strap" data-i18n="res.strap">Strap color</label>
-            <select id="f-strap" name="strap">
-              <option value="black" data-i18n="res.strap1">Black</option>
-              <option value="sand" data-i18n="res.strap2">Sand</option>
-              <option value="accent" data-i18n="res.strap3">Accent (voted by reservers)</option>
-            </select>
           </div>
           <div class="field">
             <label for="f-qty" data-i18n="res.qty">Quantity</label>
@@ -587,11 +589,11 @@ footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
           <span class="concept-chip" data-i18n="v2.chip">2027 concept</span>
           <div class="rings"><span class="ring"></span><span class="ring"></span><span class="ring"></span></div>
           <svg class="bracelet" width="210" height="420" viewBox="0 0 220 440">
-            <rect x="72" y="10" width="76" height="420" rx="38" fill="#20242C"/>
-            <circle cx="110" cy="356" r="4" fill="#000" opacity=".35"/>
-            <circle cx="110" cy="378" r="4" fill="#000" opacity=".35"/>
-            <circle cx="110" cy="400" r="4" fill="#000" opacity=".35"/>
-            <rect x="58" y="132" width="104" height="176" rx="52" fill="#0E1116"/>
+            <rect x="82" y="8" width="56" height="424" rx="28" fill="#20242C"/>
+            <circle cx="110" cy="356" r="3.6" fill="#000" opacity=".45"/>
+            <circle cx="110" cy="378" r="3.6" fill="#000" opacity=".45"/>
+            <circle cx="110" cy="400" r="3.6" fill="#000" opacity=".45"/>
+            <path d="M66 152 Q66 132 86 130 L134 130 Q154 132 154 152 L154 288 Q154 308 134 310 L86 310 Q66 308 66 288 Z" fill="#0E1116"/>
             <!-- V2: second microphone/antenna line + pin glyph etched -->
             <path d="M110 196s-13-10.5-13-21a13 13 0 0 1 26 0c0 10.5-13 21-13 21Z" fill="none" stroke="#74BFAD" stroke-width="2"/>
             <circle cx="110" cy="174" r="4" fill="#74BFAD"/>
@@ -676,7 +678,7 @@ footer { border-top: 1px solid var(--line); padding: 48px 0 64px; }
 /* ============ i18n ============ */
 const I18N = {
   en: {
-    "nav.features": "The bracelet", "nav.colors": "Colors", "nav.reserve": "Reserve", "nav.v2": "V2 · 2027", "nav.faq": "FAQ",
+    "nav.features": "The bracelet", "nav.design": "Design", "nav.reserve": "Reserve", "nav.v2": "V2 · 2027", "nav.faq": "FAQ",
     "hero.eyebrow": "Silent wake-up bracelet · Made by a Latvian student startup",
     "hero.title": "Wake up without a sound.",
     "hero.sub": "REMLET is a screenless bracelet that wakes you and reminds you of what matters — with quiet vibration on your wrist. No noise, no screen, no tracking.",
@@ -692,18 +694,16 @@ const I18N = {
     "feat.4t": "5+ day battery", "feat.4p": "Charge it once, forget it for a school week. USB charging included in the box.",
     "feat.5t": "Private by design", "feat.5p": "No GPS, no SIM, no location servers. V1 connects only to your phone over Bluetooth — your data stays with you.",
     "feat.6t": "Made for silence", "feat.6p": "Designed with the deaf and hard-of-hearing community in mind — alarms and alerts you feel, not hear. Splash-proof (IP65+).",
-    "col.eyebrow": "Colorways", "col.title": "One capsule. Your strap.",
-    "col.sub": "The launch batch ships with a matte black capsule and your choice of strap. Swap straps in seconds — extra 2-packs available at delivery.",
-    "col.note": "Launch batch straps: black, sand + one accent color. All six colors arrive as accessory strap 2-packs (€7).",
+    "design.eyebrow": "The design", "design.title": "One color. Black. That's the point.",
+    "design.sub": "An angular gloss-black capsule with a speckled accent panel, on a slim black strap with a classic pin buckle. No screen to glow at night, no choices to agonize over — every bracelet in the first batch is exactly this one.",
+    "design.note": "We only show what we can deliver: the first batch is black on black. If a future batch earns more colors, reservation holders hear about it first.",
     "res.eyebrow": "Reserve · V1", "res.title": "Reserve yours. Pay nothing today.",
     "res.sub": "Reservations are free and non-binding. We hand-deliver or ship in Latvia from mid-October 2026 — you pay on delivery.",
     "res.tag": "Early-bird reservation",
-    "res.b1": "REMLET bracelet, black capsule + strap of your choice",
+    "res.b1": "REMLET bracelet — gloss-black capsule, black strap",
     "res.b2": "Charger, quick-start card and 2-year warranty in the box",
     "res.b3": "Pay cash or by card on delivery — cancel any time",
-    "res.b4": "Extra strap 2-pack add-on for €7",
-    "res.name": "Name", "res.email": "E-mail", "res.strap": "Strap color",
-    "res.strap1": "Black", "res.strap2": "Sand", "res.strap3": "Accent (voted by reservers)",
+    "res.name": "Name", "res.email": "E-mail",
     "res.qty": "Quantity",
     "res.consent": "I agree that REMLET stores my name and e-mail to manage this reservation, and only for that. No newsletters, no sharing. Delete any time — one e-mail is enough.",
     "res.error": "Please fill in your name, a valid e-mail, and tick the consent box.",
@@ -736,7 +736,7 @@ const I18N = {
     "foot.legal": "© 2026 REMLET (SMU) · REMLET™ is an unregistered trademark · CE-marked product; dispose of electronics and batteries at collection points (WEEE) · Reservation data is stored with consent and used only to fulfil reservations."
   },
   lv: {
-    "nav.features": "Aproce", "nav.colors": "Krāsas", "nav.reserve": "Rezervēt", "nav.v2": "V2 · 2027", "nav.faq": "BUJ",
+    "nav.features": "Aproce", "nav.design": "Dizains", "nav.reserve": "Rezervēt", "nav.v2": "V2 · 2027", "nav.faq": "BUJ",
     "hero.eyebrow": "Klusā modinātāja aproce · Latvijas skolēnu jaunuzņēmums",
     "hero.title": "Pamosties bez skaņas.",
     "hero.sub": "REMLET ir aproce bez ekrāna, kas tevi pamodina un atgādina svarīgo — ar klusu vibrāciju uz plaukstas locītavas. Bez trokšņa, bez ekrāna, bez izsekošanas.",
@@ -752,18 +752,16 @@ const I18N = {
     "feat.4t": "5+ dienu baterija", "feat.4p": "Uzlādē vienreiz un aizmirsti uz visu skolas nedēļu. USB lādētājs komplektā.",
     "feat.5t": "Privātums pēc noklusējuma", "feat.5p": "Bez GPS, bez SIM, bez atrašanās vietas serveriem. V1 savienojas tikai ar tavu telefonu caur Bluetooth — tavi dati paliek pie tevis.",
     "feat.6t": "Radīta klusumam", "feat.6p": "Veidota, domājot par nedzirdīgo un vājdzirdīgo kopienu — signāli, ko sajūt, nevis dzird. Aizsargāta pret šļakatām (IP65+).",
-    "col.eyebrow": "Krāsu varianti", "col.title": "Viena kapsula. Tava siksniņa.",
-    "col.sub": "Pirmā partija nāk ar matētu melnu kapsulu un tavu izvēlētu siksniņu. Siksniņas nomaināmas dažās sekundēs — papildu komplekti pieejami piegādes brīdī.",
-    "col.note": "Pirmās partijas siksniņas: melna, smilšu + viena akcenta krāsa. Visas sešas krāsas pieejamas kā siksniņu 2 gab. komplekti (€7).",
+    "design.eyebrow": "Dizains", "design.title": "Viena krāsa. Melna. Tā ir doma.",
+    "design.sub": "Stūraina, spīdīgi melna kapsula ar dzirkstošu akcenta paneli uz plānas melnas siksniņas ar klasisku adatas sprādzi. Nav ekrāna, kas spīd naktī, nav izvēļu, par kurām lauzīt galvu — katra pirmās partijas aproce ir tieši šī.",
+    "design.note": "Mēs rādām tikai to, ko varam piegādāt: pirmā partija ir melna uz melna. Ja kāda nākamā partija nopelnīs vairāk krāsu, rezervāciju īpašnieki to uzzinās pirmie.",
     "res.eyebrow": "Rezervē · V1", "res.title": "Rezervē savu. Šodien nemaksā neko.",
     "res.sub": "Rezervācija ir bez maksas un nesaistoša. Piegādājam personīgi vai sūtām pa Latviju no 2026. gada oktobra vidus — maksā saņemšanas brīdī.",
     "res.tag": "Agrās rezervācijas cena",
-    "res.b1": "REMLET aproce — melna kapsula + tava izvēlēta siksniņa",
+    "res.b1": "REMLET aproce — spīdīgi melna kapsula, melna siksniņa",
     "res.b2": "Lādētājs, ātrās uzsākšanas kartīte un 2 gadu garantija komplektā",
     "res.b3": "Maksā skaidrā naudā vai ar karti piegādes brīdī — atcel jebkurā laikā",
-    "res.b4": "Papildu siksniņu 2 gab. komplekts par €7",
-    "res.name": "Vārds", "res.email": "E-pasts", "res.strap": "Siksniņas krāsa",
-    "res.strap1": "Melna", "res.strap2": "Smilšu", "res.strap3": "Akcenta (izvēlas rezervētāji)",
+    "res.name": "Vārds", "res.email": "E-pasts",
     "res.qty": "Daudzums",
     "res.consent": "Piekrītu, ka REMLET glabā manu vārdu un e-pastu tikai šīs rezervācijas apstrādei. Bez jaunumu vēstulēm, bez datu nodošanas. Dzēšana jebkurā brīdī — pietiek ar vienu e-pastu.",
     "res.error": "Lūdzu, ievadi vārdu, derīgu e-pastu un atzīmē piekrišanas lauciņu.",
@@ -806,30 +804,12 @@ function setLang(lang) {
   document.getElementById("lang-en").setAttribute("aria-pressed", String(lang === "en"));
   document.getElementById("lang-lv").setAttribute("aria-pressed", String(lang === "lv"));
   try { localStorage.setItem("remlet-lang", lang); } catch (e) {}
-  updateSwatchLabel();
 }
 document.getElementById("lang-en").addEventListener("click", () => setLang("en"));
 document.getElementById("lang-lv").addEventListener("click", () => setLang("lv"));
 let saved = null;
 try { saved = localStorage.getItem("remlet-lang"); } catch (e) {}
 setLang(saved === "lv" ? "lv" : "en");
-
-/* ============ strap picker ============ */
-function updateSwatchLabel() {
-  const btn = document.querySelector(".swatch[aria-pressed='true']");
-  if (!btn) return;
-  const lang = document.documentElement.lang;
-  document.getElementById("swatch-label").textContent =
-    lang === "lv" ? btn.dataset.nameLv : btn.dataset.nameEn;
-}
-document.querySelectorAll(".swatch").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".swatch").forEach(b => b.setAttribute("aria-pressed", "false"));
-    btn.setAttribute("aria-pressed", "true");
-    document.documentElement.style.setProperty("--strap", btn.dataset.color);
-    updateSwatchLabel();
-  });
-});
 
 /* ============ reservation form ============ */
 /* To collect reservations for real, point RESERVE_ENDPOINT at a form backend
@@ -848,7 +828,7 @@ form.addEventListener("submit", async (e) => {
   err.classList.remove("show");
   const data = {
     name, email,
-    strap: document.getElementById("f-strap").value,
+    strap: "black",
     qty: document.getElementById("f-qty").value,
     lang: document.documentElement.lang,
     at: new Date().toISOString()
