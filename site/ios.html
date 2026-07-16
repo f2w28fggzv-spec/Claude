@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>phoneOS — a web phone simulation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --sf: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: radial-gradient(1200px 800px at 30% 20%, #1c2740, #0b0f1a 70%);
+    font-family: var(--sf);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .stage { transform-origin: center center; }
+
+  /* ---------- Phone hardware ---------- */
+  .phone {
+    width: 390px; height: 844px;
+    background: #000;
+    border-radius: 56px;
+    padding: 6px;
+    box-shadow:
+      0 0 0 2px #3a3a3c,
+      0 0 0 5px #111,
+      0 40px 90px rgba(0,0,0,.75),
+      inset 0 0 8px rgba(255,255,255,.06);
+    position: relative;
+  }
+  .side-btn { position: absolute; background: #2c2c2e; border-radius: 3px; }
+  .side-btn.power  { right: -7px; top: 220px; width: 4px; height: 90px; }
+  .side-btn.vol-up { left: -7px; top: 180px; width: 4px; height: 55px; }
+  .side-btn.vol-dn { left: -7px; top: 245px; width: 4px; height: 55px; }
+  .side-btn.mute   { left: -7px; top: 130px; width: 4px; height: 30px; }
+
+  .screen {
+    width: 100%; height: 100%;
+    border-radius: 50px;
+    overflow: hidden;
+    position: relative;
+    background: #000;
+    /* theme variables (light default) */
+    --bg: #f2f2f7; --card: #ffffff; --text: #000; --text2: #6e6e73;
+    --sep: rgba(60,60,67,.15); --tint: #0a84ff;
+  }
+  .screen.dark {
+    --bg: #000; --card: #1c1c1e; --text: #fff; --text2: #98989e;
+    --sep: rgba(84,84,88,.4);
+  }
+
+  .wallpaper {
+    position: absolute; inset: 0;
+    background: linear-gradient(160deg, #ff9a9e 0%, #a18cd1 35%, #5b7fff 70%, #1e3c72 100%);
+    transition: background .5s;
+  }
+  .screen.dark .wallpaper.wp-default,
+  .wallpaper.wp-midnight { background: linear-gradient(160deg, #232526 0%, #1a2a4a 50%, #0f0c29 100%); }
+  .wallpaper.wp-sunset   { background: linear-gradient(160deg, #f83600 0%, #f9d423 100%); }
+  .wallpaper.wp-ocean    { background: linear-gradient(160deg, #43cea2 0%, #185a9d 100%); }
+
+  .island {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    width: 122px; height: 35px; background: #000; border-radius: 20px;
+    z-index: 60; pointer-events: none;
+  }
+  .island::after {
+    content: ""; position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+    width: 9px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #1e2a4a, #000 70%);
+  }
+
+  /* ---------- Status bar ---------- */
+  .statusbar {
+    position: absolute; top: 0; left: 0; right: 0; height: 58px;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 34px 0;
+    color: #fff; font-size: 16px; font-weight: 600;
+    z-index: 50; cursor: pointer;
+    text-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  .statusbar .right { display: flex; gap: 7px; align-items: center; }
+  .statusbar svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
+
+  /* ---------- Lock screen ---------- */
+  .lockscreen {
+    position: absolute; inset: 0; z-index: 40;
+    display: flex; flex-direction: column; align-items: center;
+    color: #fff; text-align: center;
+    background: rgba(40,40,60,.25);
+    backdrop-filter: blur(40px) saturate(1.3);
+    -webkit-backdrop-filter: blur(40px) saturate(1.3);
+    transition: transform .45s cubic-bezier(.32,.72,.25,1), opacity .4s;
+  }
+  .lockscreen.unlocked { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+  .lock-date { margin-top: 110px; font-size: 21px; font-weight: 600; text-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  .lock-time { font-size: 88px; font-weight: 700; letter-spacing: -2px; line-height: 1; margin-top: 4px; text-shadow: 0 2px 14px rgba(0,0,0,.35); }
+  .lock-hint {
+    margin-top: auto; margin-bottom: 40px; font-size: 15px; font-weight: 500; opacity: .9;
+    animation: bob 2.2s ease-in-out infinite; cursor: pointer; padding: 14px 30px;
+  }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .lock-icons { display: flex; justify-content: space-between; width: 100%; padding: 0 44px; margin-bottom: 26px; }
+  .lock-icons .circle {
+    width: 50px; height: 50px; border-radius: 50%;
+    background: rgba(30,30,30,.55); backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+
+  /* ---------- Home screen ---------- */
+  .homescreen {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column;
+    padding: 74px 12px 8px;
+  }
+  .icon-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    row-gap: 22px; padding: 6px 10px;
+  }
+  .app-icon { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  .app-icon .glyph {
+    width: 62px; height: 62px; border-radius: 15px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+    box-shadow: 0 4px 10px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.25);
+    transition: transform .12s;
+  }
+  .app-icon:active .glyph { transform: scale(.88); filter: brightness(.85); }
+  .app-icon .label {
+    font-size: 12px; font-weight: 500; color: #fff;
+    text-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
+  .dock {
+    margin-top: auto;
+    background: rgba(255,255,255,.22); backdrop-filter: blur(24px);
+    border-radius: 32px; padding: 14px 8px 12px;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+  }
+  .dock .label { display: none; }
+  .dock .app-icon { gap: 0; }
+
+  /* glyph palettes */
+  .g-calc     { background: linear-gradient(145deg,#3a3a3c,#1c1c1e); }
+  .g-notes    { background: linear-gradient(145deg,#ffe8a3,#f7ce46); }
+  .g-clock    { background: #000; }
+  .g-settings { background: linear-gradient(145deg,#8e8e93,#48484a); }
+  .g-weather  { background: linear-gradient(160deg,#4facfe,#2f6fed); }
+  .g-photos   { background: #fff; }
+  .g-camera   { background: linear-gradient(145deg,#48484a,#1c1c1e); }
+  .g-messages { background: linear-gradient(145deg,#5cf777,#0bc121); }
+  .g-phone    { background: linear-gradient(145deg,#5cf777,#0bc121); }
+  .g-browser  { background: #fff; }
+  .g-mail     { background: linear-gradient(160deg,#4facfe,#1a5fd0); }
+  .g-music    { background: linear-gradient(145deg,#fc5c7d,#e42c58); }
+  .g-maps     { background: linear-gradient(145deg,#a8e063,#56ab2f); }
+  .g-stocks   { background: #000; }
+  .g-wallet   { background: linear-gradient(145deg,#2c2c2e,#000); }
+  .g-fitness  { background: linear-gradient(145deg,#2c2c2e,#000); }
+
+  /* ---------- App shell ---------- */
+  .app {
+    position: absolute; inset: 0; z-index: 20;
+    background: var(--bg); color: var(--text);
+    display: none; flex-direction: column;
+    padding-top: 58px;
+    transform-origin: center 70%;
+  }
+  .app.open { display: flex; animation: appIn .32s cubic-bezier(.25,.9,.35,1); }
+  @keyframes appIn { from { transform: scale(.35); opacity: 0; border-radius: 60px; } to { transform: scale(1); opacity: 1; } }
+  .app .statusbar-tint { position: absolute; top: 0; left: 0; right: 0; height: 58px; }
+  .app.light-status ~ .statusbar { color: #fff; }
+
+  .home-indicator {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    width: 140px; height: 5px; border-radius: 3px;
+    background: rgba(255,255,255,.85); mix-blend-mode: difference;
+    z-index: 55; cursor: pointer; padding: 0;
+  }
+  .home-indicator::before { content: ""; position: absolute; inset: -14px -30px; }
+
+  .nav-title { font-size: 17px; font-weight: 600; text-align: center; padding: 6px 0 12px; }
+
+  /* ---------- Calculator ---------- */
+  #app-calc { background: #000; color: #fff; }
+  .calc-display {
+    flex: 1; display: flex; align-items: flex-end; justify-content: flex-end;
+    padding: 0 28px 10px; font-size: 78px; font-weight: 300;
+    overflow: hidden; white-space: nowrap;
+  }
+  .calc-pad { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 0 16px 40px; }
+  .calc-btn {
+    aspect-ratio: 1; border: none; border-radius: 50%;
+    font-size: 30px; font-family: inherit; color: #fff; cursor: pointer;
+    background: #333; transition: filter .1s;
+  }
+  .calc-btn:active { filter: brightness(1.6); }
+  .calc-btn.fn { background: #a5a5a5; color: #000; }
+  .calc-btn.op { background: #ff9f0a; font-size: 36px; }
+  .calc-btn.op.active { background: #fff; color: #ff9f0a; }
+  .calc-btn.zero { aspect-ratio: auto; grid-column: span 2; border-radius: 44px; text-align: left; padding-left: 32px; }
+
+  /* ---------- Notes ---------- */
+  #app-notes .nav-title { color: var(--text); }
+  .notes-list { flex: 1; overflow-y: auto; padding: 0 16px; }
+  .notes-group { background: var(--card); border-radius: 12px; overflow: hidden; }
+  .note-row { padding: 12px 16px; border-bottom: 1px solid var(--sep); cursor: pointer; }
+  .note-row:last-child { border-bottom: none; }
+  .note-row .t { font-weight: 600; font-size: 16px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note-row .p { font-size: 14px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .notes-toolbar { display: flex; justify-content: flex-end; padding: 10px 20px 26px; }
+  .notes-toolbar button, .note-back {
+    background: none; border: none; color: #e5b840; font-size: 24px; cursor: pointer; font-family: inherit;
+  }
+  #note-editor { position: absolute; inset: 0; padding-top: 58px; background: var(--bg); display: none; flex-direction: column; }
+  #note-editor.open { display: flex; }
+  #note-editor header { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 10px; }
+  #note-editor .note-back { font-size: 17px; }
+  #note-text {
+    flex: 1; border: none; outline: none; resize: none;
+    background: transparent; color: var(--text);
+    font-family: inherit; font-size: 17px; line-height: 1.5; padding: 8px 20px 20px;
+  }
+
+  /* ---------- Clock ---------- */
+  #app-clock { background: #000; color: #fff; }
+  .clock-big { text-align: center; font-size: 64px; font-weight: 200; margin: 30px 0 4px; font-variant-numeric: tabular-nums; }
+  .clock-sub { text-align: center; color: #98989e; font-size: 15px; margin-bottom: 24px; }
+  .world-list { padding: 0 20px; }
+  .world-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid rgba(84,84,88,.4); }
+  .world-row .city { font-size: 22px; font-weight: 400; }
+  .world-row .zone { font-size: 13px; color: #98989e; }
+  .world-row .wtime { font-size: 34px; font-weight: 200; font-variant-numeric: tabular-nums; }
+  .stopwatch { text-align: center; margin-top: 28px; }
+  .sw-time { font-size: 54px; font-weight: 200; font-variant-numeric: tabular-nums; }
+  .sw-btns { display: flex; justify-content: space-between; padding: 20px 30px; }
+  .sw-btn {
+    width: 84px; height: 84px; border-radius: 50%; border: none; cursor: pointer;
+    font-size: 16px; font-family: inherit; font-weight: 500;
+  }
+  .sw-btn.reset { background: #333; color: #fff; }
+  .sw-btn.start { background: rgba(48,209,88,.25); color: #30d158; }
+  .sw-btn.start.running { background: rgba(255,69,58,.25); color: #ff453a; }
+
+  /* ---------- Settings ---------- */
+  .settings-list { flex: 1; overflow-y: auto; padding: 0 16px 30px; }
+  .settings-group { background: var(--card); border-radius: 12px; margin-bottom: 22px; overflow: hidden; }
+  .set-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px; border-bottom: 1px solid var(--sep);
+    font-size: 16px;
+  }
+  .set-row:last-child { border-bottom: none; }
+  .set-row .mini {
+    width: 30px; height: 30px; border-radius: 7px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 17px; color: #fff;
+  }
+  .set-row .grow { flex: 1; }
+  .set-row .value { color: var(--text2); font-size: 15px; }
+  .toggle {
+    width: 51px; height: 31px; border-radius: 16px; border: none;
+    background: rgba(120,120,128,.32); position: relative; cursor: pointer; transition: background .2s;
+    flex-shrink: 0;
+  }
+  .toggle::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 27px; height: 27px; border-radius: 50%; background: #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,.3); transition: left .2s;
+  }
+  .toggle.on { background: #30d158; }
+  .toggle.on::after { left: 22px; }
+  .wp-swatches { display: flex; gap: 12px; padding: 12px 14px; }
+  .wp-swatch { width: 52px; height: 88px; border-radius: 10px; cursor: pointer; border: 3px solid transparent; }
+  .wp-swatch.selected { border-color: var(--tint); }
+  .wp-swatch[data-wp="wp-default"]  { background: linear-gradient(160deg,#ff9a9e,#a18cd1,#5b7fff); }
+  .wp-swatch[data-wp="wp-midnight"] { background: linear-gradient(160deg,#232526,#0f0c29); }
+  .wp-swatch[data-wp="wp-sunset"]   { background: linear-gradient(160deg,#f83600,#f9d423); }
+  .wp-swatch[data-wp="wp-ocean"]    { background: linear-gradient(160deg,#43cea2,#185a9d); }
+
+  /* ---------- Weather ---------- */
+  #app-weather { background: linear-gradient(180deg,#2f6fed 0%,#4facfe 60%,#6fbdfb 100%); color: #fff; }
+  .wx-head { text-align: center; margin-top: 24px; }
+  .wx-city { font-size: 32px; font-weight: 400; }
+  .wx-temp { font-size: 92px; font-weight: 200; margin-left: 18px; }
+  .wx-cond { font-size: 19px; opacity: .95; }
+  .wx-hilo { font-size: 18px; margin-top: 2px; }
+  .wx-card {
+    margin: 18px 16px 0; padding: 12px 14px;
+    background: rgba(255,255,255,.14); backdrop-filter: blur(10px);
+    border-radius: 14px; font-size: 14px;
+  }
+  .wx-hourly { display: flex; justify-content: space-between; margin-top: 8px; }
+  .wx-hour { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 15px; }
+  .wx-hour .e { font-size: 22px; }
+  .wx-day { display: flex; align-items: center; padding: 9px 2px; border-bottom: 1px solid rgba(255,255,255,.22); font-size: 17px; }
+  .wx-day:last-child { border-bottom: none; }
+  .wx-day .d { width: 90px; }
+  .wx-day .e { width: 40px; text-align: center; }
+  .wx-day .lo { opacity: .7; margin-left: auto; }
+  .wx-day .hi { width: 44px; text-align: right; }
+
+  /* ---------- Photos ---------- */
+  .photos-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; padding: 2px; align-content: start; }
+  .photo { aspect-ratio: 1; cursor: pointer; }
+  #photo-viewer {
+    position: absolute; inset: 0; z-index: 30; background: #000;
+    display: none; align-items: center; justify-content: center;
+  }
+  #photo-viewer.open { display: flex; }
+  #photo-viewer .big { width: 100%; aspect-ratio: 3/4; }
+
+  /* ---------- Placeholder app ---------- */
+  #app-generic { align-items: center; justify-content: center; gap: 14px; text-align: center; }
+  #app-generic .glyph { width: 90px; height: 90px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 46px; box-shadow: 0 8px 22px rgba(0,0,0,.25); }
+  #app-generic h2 { font-size: 22px; font-weight: 600; }
+  #app-generic p { color: var(--text2); font-size: 15px; padding: 0 40px; }
+
+  /* ---------- Control Center ---------- */
+  .control-center {
+    position: absolute; inset: 0; z-index: 45;
+    background: rgba(20,20,25,.45); backdrop-filter: blur(28px);
+    padding: 74px 20px 0;
+    transform: translateY(-100%); transition: transform .38s cubic-bezier(.32,.72,.25,1);
+  }
+  .control-center.open { transform: translateY(0); }
+  .cc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .cc-tile {
+    background: rgba(120,120,128,.28); border-radius: 20px; padding: 14px;
+    color: #fff; display: flex; flex-direction: column; gap: 8px;
+  }
+  .cc-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cc-btn {
+    width: 52px; height: 52px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(120,120,128,.5); color: #fff; font-size: 22px;
+    display: flex; align-items: center; justify-content: center; transition: background .2s;
+  }
+  .cc-btn.on { background: #0a84ff; }
+  .cc-label { font-size: 13px; font-weight: 500; }
+  .cc-slider-tile {
+    background: rgba(120,120,128,.28); border-radius: 20px; height: 160px; width: 100%;
+    position: relative; overflow: hidden; cursor: pointer;
+  }
+  .cc-slider-fill { position: absolute; bottom: 0; left: 0; right: 0; background: #fff; }
+  .cc-slider-tile .icon { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 20px; z-index: 2; mix-blend-mode: difference; color: #fff; }
+  .cc-hint { text-align: center; color: rgba(255,255,255,.75); font-size: 13px; margin-top: 18px; }
+
+  .dim-overlay { position: absolute; inset: 0; background: #000; pointer-events: none; z-index: 58; opacity: 0; }
+
+  .toast {
+    position: absolute; top: 66px; left: 50%; transform: translate(-50%,-20px);
+    background: rgba(30,30,32,.92); color: #fff; font-size: 14px; font-weight: 500;
+    padding: 10px 18px; border-radius: 20px; z-index: 70; opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .25s; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%,0); }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <div class="phone">
+    <div class="side-btn mute"></div>
+    <div class="side-btn vol-up"></div>
+    <div class="side-btn vol-dn"></div>
+    <div class="side-btn power"></div>
+
+    <div class="screen" id="screen">
+      <div class="wallpaper wp-default" id="wallpaper"></div>
+      <div class="island"></div>
+
+      <!-- Home screen -->
+      <div class="homescreen" id="homescreen">
+        <div class="icon-grid" id="icon-grid"></div>
+        <div class="dock" id="dock"></div>
+      </div>
+
+      <!-- Apps -->
+      <div class="app" id="app-calc">
+        <div class="calc-display" id="calc-display">0</div>
+        <div class="calc-pad" id="calc-pad"></div>
+      </div>
+
+      <div class="app" id="app-notes">
+        <div class="nav-title">Notes</div>
+        <div class="notes-list"><div class="notes-group" id="notes-group"></div></div>
+        <div class="notes-toolbar"><button id="note-new" title="New note">&#x270D;&#xFE0F;</button></div>
+        <div id="note-editor">
+          <header>
+            <button class="note-back" id="note-back">&#8249; Notes</button>
+            <button class="note-back" id="note-delete">&#128465;&#xFE0F;</button>
+          </header>
+          <textarea id="note-text" placeholder="Start writing…"></textarea>
+        </div>
+      </div>
+
+      <div class="app" id="app-clock">
+        <div class="clock-big" id="clock-big">--:--:--</div>
+        <div class="clock-sub" id="clock-sub"></div>
+        <div class="world-list" id="world-list"></div>
+        <div class="stopwatch">
+          <div class="sw-time" id="sw-time">00:00.00</div>
+          <div class="sw-btns">
+            <button class="sw-btn reset" id="sw-reset">Reset</button>
+            <button class="sw-btn start" id="sw-start">Start</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="app" id="app-settings">
+        <div class="nav-title">Settings</div>
+        <div class="settings-list">
+          <div class="settings-group">
+            <div class="set-row">
+              <div class="mini" style="background:#ff9f0a">&#9992;&#xFE0F;</div>
+              <div class="grow">Airplane Mode</div>
+              <button class="toggle" id="tg-airplane"></button>
+            </div>
+            <div class="set-row">
+              <div class="mini" style="background:#0a84ff">&#128246;</div>
+              <div class="grow">Wi-Fi</div>
+              <span class="value" id="wifi-value">HomeNet</span>
+              <button class="toggle on" id="tg-wifi"></button>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="set-row">
+              <div class="mini" style="background:#5e5ce6">&#127769;</div>
+              <div class="grow">Dark Mode</div>
+              <button class="toggle" id="tg-dark"></button>
+            </div>
+            <div class="set-row" style="flex-direction:column;align-items:flex-start;gap:2px">
+              <div style="display:flex;gap:12px;align-items:center"><div class="mini" style="background:#32ade6">&#127748;</div>Wallpaper</div>
+              <div class="wp-swatches" id="wp-swatches">
+                <div class="wp-swatch selected" data-wp="wp-default"></div>
+                <div class="wp-swatch" data-wp="wp-midnight"></div>
+                <div class="wp-swatch" data-wp="wp-sunset"></div>
+                <div class="wp-swatch" data-wp="wp-ocean"></div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="set-row"><div class="mini" style="background:#8e8e93">&#9881;&#xFE0F;</div><div class="grow">Software</div><span class="value">phoneOS 1.0</span></div>
+            <div class="set-row"><div class="mini" style="background:#8e8e93">&#128241;</div><div class="grow">Model</div><span class="value">webPhone (1 file)</span></div>
+            <div class="set-row"><div class="mini" style="background:#8e8e93">&#129302;</div><div class="grow">Assembled by</div><span class="value">Claude, on request</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="app" id="app-weather">
+        <div class="wx-head">
+          <div class="wx-city">Cupertino-ish</div>
+          <div class="wx-temp" id="wx-temp">21°</div>
+          <div class="wx-cond" id="wx-cond">Mostly Sunny</div>
+          <div class="wx-hilo" id="wx-hilo">H:24°  L:14°</div>
+        </div>
+        <div class="wx-card">
+          <div>Forecast generated locally in your browser — pleasantly random, refreshingly unaccountable.</div>
+          <div class="wx-hourly" id="wx-hourly"></div>
+        </div>
+        <div class="wx-card" id="wx-week"></div>
+      </div>
+
+      <div class="app" id="app-photos">
+        <div class="nav-title">Photos</div>
+        <div class="photos-grid" id="photos-grid"></div>
+        <div id="photo-viewer"><div class="big" id="photo-big"></div></div>
+      </div>
+
+      <div class="app" id="app-generic">
+        <div class="glyph" id="generic-glyph"></div>
+        <h2 id="generic-name">App</h2>
+        <p>This one didn't make the cut for a single HTML file. Calculator, Notes, Clock, Weather, Photos and Settings are fully working.</p>
+      </div>
+
+      <!-- Control Center -->
+      <div class="control-center" id="control-center">
+        <div class="cc-grid">
+          <div class="cc-tile">
+            <div class="cc-toggles">
+              <button class="cc-btn" id="cc-airplane" title="Airplane mode">&#9992;&#xFE0F;</button>
+              <button class="cc-btn on" id="cc-wifi" title="Wi-Fi">&#128246;</button>
+              <button class="cc-btn on" id="cc-cell" title="Cellular">&#128225;</button>
+              <button class="cc-btn" id="cc-dark" title="Dark mode">&#127769;</button>
+            </div>
+            <div class="cc-label">Connectivity</div>
+          </div>
+          <div class="cc-tile" style="padding:0">
+            <div class="cc-slider-tile" id="cc-brightness">
+              <div class="cc-slider-fill" id="cc-brightness-fill" style="height:100%"></div>
+              <div class="icon">&#9728;&#xFE0F;</div>
+            </div>
+          </div>
+        </div>
+        <div class="cc-hint">Tap the status bar to close</div>
+      </div>
+
+      <div class="dim-overlay" id="dim-overlay"></div>
+
+      <!-- Lock screen -->
+      <div class="lockscreen" id="lockscreen">
+        <div class="lock-date" id="lock-date"></div>
+        <div class="lock-time" id="lock-time"></div>
+        <div class="lock-hint" id="lock-hint">Swipe up (or tap here) to unlock</div>
+        <div class="lock-icons">
+          <div class="circle">&#128294;</div>
+          <div class="circle">&#128247;</div>
+        </div>
+      </div>
+
+      <!-- Status bar -->
+      <div class="statusbar" id="statusbar">
+        <span id="sb-time">9:41</span>
+        <div class="right">
+          <svg id="sb-signal" width="18" height="12" viewBox="0 0 18 12" fill="currentColor">
+            <rect x="0"  y="8" width="3" height="4"  rx="1"/>
+            <rect x="5"  y="5" width="3" height="7"  rx="1"/>
+            <rect x="10" y="2" width="3" height="10" rx="1"/>
+            <rect x="15" y="0" width="3" height="12" rx="1" opacity=".35"/>
+          </svg>
+          <svg id="sb-wifi" width="17" height="12" viewBox="0 0 17 12" fill="currentColor">
+            <path d="M8.5 12l2.5-3a3.8 3.8 0 0 0-5 0l2.5 3z"/>
+            <path d="M8.5 7.2c1.6 0 3 .6 4.1 1.6l1.7-2A8.6 8.6 0 0 0 8.5 4.5c-2.2 0-4.2.9-5.8 2.3l1.7 2a6 6 0 0 1 4.1-1.6z" opacity=".9"/>
+            <path d="M8.5 2.2c2.8 0 5.4 1.1 7.3 2.9L17 3.4A11.4 11.4 0 0 0 8.5 0 11.4 11.4 0 0 0 0 3.4l1.2 1.7A10.7 10.7 0 0 1 8.5 2.2z" opacity=".8"/>
+          </svg>
+          <svg width="27" height="13" viewBox="0 0 27 13" fill="none">
+            <rect x=".5" y=".5" width="23" height="12" rx="3.5" stroke="currentColor" opacity=".5"/>
+            <rect x="2" y="2" width="17" height="9" rx="2" fill="currentColor"/>
+            <path d="M25 4.5v4a2.2 2.2 0 0 0 0-4z" fill="currentColor" opacity=".5"/>
+          </svg>
+        </div>
+      </div>
+
+      <button class="home-indicator" id="home-indicator" title="Go home"></button>
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var screen = $("screen");
+
+  /* ---------- scale phone to fit viewport ---------- */
+  function fit() {
+    var s = Math.min(1, (window.innerHeight - 30) / 844, (window.innerWidth - 20) / 390);
+    $("stage").style.transform = "scale(" + s + ")";
+  }
+  window.addEventListener("resize", fit);
+  fit();
+
+  /* ---------- toast ---------- */
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1600);
+  }
+
+  /* ---------- clocks ---------- */
+  function two(n) { return (n < 10 ? "0" : "") + n; }
+  function fmtClock(d) {
+    var h = d.getHours() % 12; if (h === 0) h = 12;
+    return h + ":" + two(d.getMinutes());
+  }
+  function tick() {
+    var d = new Date();
+    $("sb-time").textContent = fmtClock(d);
+    $("lock-time").textContent = fmtClock(d);
+    $("lock-date").textContent = d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    $("clock-big").textContent = fmtClock(d) + ":" + two(d.getSeconds());
+    $("clock-sub").textContent = d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) + " — local time";
+    var cities = [["Tokyo", 9], ["London", 1], ["New York", -4], ["Sydney", 10]];
+    var rows = document.querySelectorAll("#world-list .wtime");
+    for (var i = 0; i < rows.length; i++) {
+      var utc = d.getTime() + d.getTimezoneOffset() * 60000;
+      rows[i].textContent = fmtClock(new Date(utc + cities[i][1] * 3600000));
+    }
+  }
+  var worldHTML = "";
+  [["Tokyo", "JST"], ["London", "BST"], ["New York", "EDT"], ["Sydney", "AEST"]].forEach(function (c) {
+    worldHTML += '<div class="world-row"><div><div class="city">' + c[0] + '</div><div class="zone">' + c[1] + " (approx.)</div></div><div class=\"wtime\">--:--</div></div>";
+  });
+  $("world-list").innerHTML = worldHTML;
+  setInterval(tick, 1000);
+  tick();
+
+  /* ---------- lock screen ---------- */
+  var lock = $("lockscreen");
+  function unlock() { lock.classList.add("unlocked"); }
+  $("lock-hint").addEventListener("click", unlock);
+  var touchStartY = null;
+  lock.addEventListener("pointerdown", function (e) { touchStartY = e.clientY; });
+  lock.addEventListener("pointerup", function (e) {
+    if (touchStartY !== null && touchStartY - e.clientY > 60) unlock();
+    touchStartY = null;
+  });
+
+  /* ---------- app switching ---------- */
+  var currentApp = null;
+  function openApp(id) {
+    closeApp();
+    var el = $("app-" + id);
+    if (!el) return;
+    el.classList.add("open");
+    currentApp = el;
+  }
+  function closeApp() {
+    if (currentApp) currentApp.classList.remove("open");
+    currentApp = null;
+    $("photo-viewer").classList.remove("open");
+    $("note-editor").classList.remove("open");
+  }
+  $("home-indicator").addEventListener("click", function () {
+    if ($("control-center").classList.contains("open")) {
+      $("control-center").classList.remove("open");
+    } else if (currentApp) {
+      closeApp();
+    } else if (!lock.classList.contains("unlocked")) {
+      unlock();
+    }
+  });
+
+  /* ---------- home screen icons ---------- */
+  var APPS = [
+    ["calc",     "Calculator", "g-calc",     "&#128290;"],
+    ["notes",    "Notes",      "g-notes",    "&#128221;"],
+    ["clock",    "Clock",      "g-clock",    "<svg width='42' height='42' viewBox='0 0 42 42'><circle cx='21' cy='21' r='18' fill='#fff'/><line x1='21' y1='21' x2='21' y2='9' stroke='#000' stroke-width='2.4' stroke-linecap='round'/><line x1='21' y1='21' x2='30' y2='25' stroke='#000' stroke-width='2.4' stroke-linecap='round'/><line x1='21' y1='21' x2='14' y2='31' stroke='#ff9f0a' stroke-width='1.6' stroke-linecap='round'/><circle cx='21' cy='21' r='1.8' fill='#000'/></svg>"],
+    ["weather",  "Weather",    "g-weather",  "&#9925;"],
+    ["photos",   "Photos",     "g-photos",   "&#127752;"],
+    ["settings", "Settings",   "g-settings", "&#9881;&#xFE0F;"],
+    ["camera",   "Camera",     "g-camera",   "&#128247;"],
+    ["mail",     "Mail",       "g-mail",     "&#9993;&#xFE0F;"],
+    ["maps",     "Maps",       "g-maps",     "&#128506;&#xFE0F;"],
+    ["music",    "Music",      "g-music",    "&#127925;"],
+    ["stocks",   "Stocks",     "g-stocks",   "&#128200;"],
+    ["wallet",   "Wallet",     "g-wallet",   "&#128179;"],
+    ["fitness",  "Fitness",    "g-fitness",  "&#127939;"],
+    ["mailbox",  "Files",      "g-mail",     "&#128193;"],
+    ["podcasts", "Podcasts",   "g-music",    "&#127908;"],
+    ["books",    "Books",      "g-notes",    "&#128218;"]
+  ];
+  var DOCK = [
+    ["phone",    "Phone",      "g-phone",    "&#128222;"],
+    ["browser",  "Browser",    "g-browser",  "&#129517;"],
+    ["messages", "Messages",   "g-messages", "&#128172;"],
+    ["music",    "Music",      "g-music",    "&#127925;"]
+  ];
+  var REAL = { calc: 1, notes: 1, clock: 1, weather: 1, photos: 1, settings: 1 };
+
+  function iconHTML(a) {
+    return '<div class="app-icon" data-app="' + a[0] + '" data-name="' + a[1] + '" data-glyphclass="' + a[2] + '" data-glyph="' + a[3] + '">' +
+      '<div class="glyph ' + a[2] + '">' + a[3] + "</div>" +
+      '<div class="label">' + a[1] + "</div></div>";
+  }
+  $("icon-grid").innerHTML = APPS.map(iconHTML).join("");
+  $("dock").innerHTML = DOCK.map(iconHTML).join("");
+
+  document.querySelectorAll(".app-icon").forEach(function (icon) {
+    icon.addEventListener("click", function () {
+      var id = icon.getAttribute("data-app");
+      if (REAL[id]) {
+        openApp(id);
+      } else {
+        $("generic-glyph").className = "glyph " + icon.getAttribute("data-glyphclass");
+        $("generic-glyph").innerHTML = icon.getAttribute("data-glyph");
+        $("generic-name").textContent = icon.getAttribute("data-name");
+        openApp("generic");
+      }
+    });
+  });
+
+  /* ---------- Calculator ---------- */
+  var calc = { cur: "0", prev: null, op: null, fresh: true };
+  var OPS = {
+    "+": function (a, b) { return a + b; },
+    "-": function (a, b) { return a - b; },
+    "×": function (a, b) { return a * b; },
+    "÷": function (a, b) { return b === 0 ? NaN : a / b; }
+  };
+  function calcRender() {
+    var v = calc.cur;
+    if (v === "NaN" || v === "Infinity" || v === "-Infinity") v = "Error";
+    if (v.replace("-", "").replace(".", "").length > 9 && v.indexOf("e") === -1) {
+      var n = parseFloat(v);
+      v = String(parseFloat(n.toPrecision(9)));
+    }
+    var d = $("calc-display");
+    d.textContent = v;
+    d.style.fontSize = v.length > 7 ? Math.max(34, 78 - (v.length - 7) * 7) + "px" : "78px";
+    document.querySelectorAll(".calc-btn.op").forEach(function (b) {
+      b.classList.toggle("active", calc.op === b.textContent && calc.fresh);
+    });
+  }
+  function calcEval() {
+    if (calc.op !== null && calc.prev !== null) {
+      var r = OPS[calc.op](calc.prev, parseFloat(calc.cur));
+      calc.cur = String(parseFloat(r.toPrecision(12)));
+    }
+    calc.prev = null; calc.op = null; calc.fresh = true;
+  }
+  function calcPress(k) {
+    if (k >= "0" && k <= "9") {
+      if (calc.fresh) { calc.cur = k; calc.fresh = false; }
+      else if (calc.cur.replace("-", "").replace(".", "").length < 9) {
+        calc.cur = calc.cur === "0" ? k : calc.cur + k;
+      }
+    } else if (k === ".") {
+      if (calc.fresh) { calc.cur = "0."; calc.fresh = false; }
+      else if (calc.cur.indexOf(".") === -1) calc.cur += ".";
+    } else if (k === "AC") {
+      calc.cur = "0"; calc.prev = null; calc.op = null; calc.fresh = true;
+    } else if (k === "±") {
+      calc.cur = calc.cur.charAt(0) === "-" ? calc.cur.slice(1) : (calc.cur === "0" ? "0" : "-" + calc.cur);
+    } else if (k === "%") {
+      calc.cur = String(parseFloat(calc.cur) / 100);
+    } else if (k === "=") {
+      calcEval();
+    } else { /* operator */
+      if (calc.op !== null && calc.prev !== null && !calc.fresh) calcEval();
+      calc.prev = parseFloat(calc.cur);
+      calc.op = k;
+      calc.fresh = true;
+    }
+    calcRender();
+  }
+  var padKeys = [
+    ["AC", "fn"], ["±", "fn"], ["%", "fn"], ["÷", "op"],
+    ["7", ""], ["8", ""], ["9", ""], ["×", "op"],
+    ["4", ""], ["5", ""], ["6", ""], ["-", "op"],
+    ["1", ""], ["2", ""], ["3", ""], ["+", "op"],
+    ["0", "zero"], [".", ""], ["=", "op"]
+  ];
+  $("calc-pad").innerHTML = padKeys.map(function (k) {
+    return '<button class="calc-btn ' + k[1] + '">' + k[0] + "</button>";
+  }).join("");
+  $("calc-pad").addEventListener("click", function (e) {
+    if (e.target.classList.contains("calc-btn")) calcPress(e.target.textContent);
+  });
+  calcRender();
+
+  /* ---------- Notes ---------- */
+  var NOTES_KEY = "phoneos.notes";
+  var notes;
+  try { notes = JSON.parse(localStorage.getItem(NOTES_KEY)) || null; } catch (e) { notes = null; }
+  if (!notes || !notes.length) {
+    notes = [{ id: 1, text: "Welcome to Notes\nEverything you type here is saved in your browser (localStorage). Tap the pencil to add a note." }];
+  }
+  var editingId = null;
+  function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch (e) {} }
+  function renderNotes() {
+    $("notes-group").innerHTML = notes.map(function (n) {
+      var lines = n.text.split("\n");
+      var title = (lines[0] || "New Note").slice(0, 40) || "New Note";
+      var preview = (lines.slice(1).join(" ").trim() || "No additional text").slice(0, 60);
+      return '<div class="note-row" data-id="' + n.id + '"><div class="t"></div><div class="p"></div></div>'
+        .replace('<div class="t"></div>', '<div class="t">' + escapeHTML(title) + "</div>")
+        .replace('<div class="p"></div>', '<div class="p">' + escapeHTML(preview) + "</div>");
+    }).join("");
+  }
+  function escapeHTML(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function openNote(id) {
+    var n = notes.filter(function (x) { return x.id === id; })[0];
+    if (!n) return;
+    editingId = id;
+    $("note-text").value = n.text;
+    $("note-editor").classList.add("open");
+  }
+  $("notes-group").addEventListener("click", function (e) {
+    var row = e.target.closest(".note-row");
+    if (row) openNote(parseInt(row.getAttribute("data-id"), 10));
+  });
+  $("note-new").addEventListener("click", function () {
+    var id = Date.now();
+    notes.unshift({ id: id, text: "" });
+    saveNotes(); renderNotes(); openNote(id);
+    $("note-text").focus();
+  });
+  $("note-text").addEventListener("input", function () {
+    var n = notes.filter(function (x) { return x.id === editingId; })[0];
+    if (n) { n.text = $("note-text").value; saveNotes(); renderNotes(); }
+  });
+  $("note-back").addEventListener("click", function () {
+    notes = notes.filter(function (n) { return n.text.trim() !== ""; });
+    if (!notes.length) notes = [{ id: Date.now(), text: "" }];
+    saveNotes(); renderNotes();
+    $("note-editor").classList.remove("open");
+  });
+  $("note-delete").addEventListener("click", function () {
+    notes = notes.filter(function (n) { return n.id !== editingId; });
+    saveNotes(); renderNotes();
+    $("note-editor").classList.remove("open");
+    toast("Note deleted");
+  });
+  renderNotes();
+
+  /* ---------- Stopwatch ---------- */
+  var sw = { running: false, base: 0, acc: 0, timer: null };
+  function swRender() {
+    var ms = sw.acc + (sw.running ? Date.now() - sw.base : 0);
+    var m = Math.floor(ms / 60000), s = Math.floor(ms / 1000) % 60, cs = Math.floor(ms / 10) % 100;
+    $("sw-time").textContent = two(m) + ":" + two(s) + "." + two(cs);
+  }
+  $("sw-start").addEventListener("click", function () {
+    if (sw.running) {
+      sw.acc += Date.now() - sw.base;
+      sw.running = false;
+      clearInterval(sw.timer);
+      this.textContent = "Start"; this.classList.remove("running");
+    } else {
+      sw.base = Date.now();
+      sw.running = true;
+      sw.timer = setInterval(swRender, 33);
+      this.textContent = "Stop"; this.classList.add("running");
+    }
+    swRender();
+  });
+  $("sw-reset").addEventListener("click", function () {
+    sw.acc = 0; sw.base = Date.now();
+    swRender();
+  });
+
+  /* ---------- Weather (locally generated) ---------- */
+  var EMOJI = ["☀️", "⛅", "☁️", "🌧️", "⛈️"];
+  var COND = ["Sunny", "Partly Cloudy", "Cloudy", "Rain", "Thunderstorms"];
+  function rnd(seed) { var x = Math.sin(seed) * 10000; return x - Math.floor(x); }
+  var seed = new Date().getDate();
+  var baseT = 16 + Math.round(rnd(seed) * 12);
+  var ci = Math.floor(rnd(seed * 3) * EMOJI.length);
+  $("wx-temp").textContent = baseT + "°";
+  $("wx-cond").textContent = COND[ci];
+  $("wx-hilo").textContent = "H:" + (baseT + 3) + "°  L:" + (baseT - 6) + "°";
+  var hourly = "", nowH = new Date().getHours();
+  for (var h = 0; h < 6; h++) {
+    var hh = (nowH + h) % 24;
+    var t = baseT + Math.round(rnd(seed + h) * 5) - 2;
+    hourly += '<div class="wx-hour"><div>' + (h === 0 ? "Now" : hh + ":00") + '</div><div class="e">' + EMOJI[Math.floor(rnd(seed * 7 + h) * EMOJI.length)] + "</div><div>" + t + "°</div></div>";
+  }
+  $("wx-hourly").innerHTML = hourly;
+  var days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  var week = '<div style="opacity:.8;font-size:13px;margin-bottom:4px">7-DAY FORECAST</div>';
+  var today = new Date().getDay();
+  for (var d = 0; d < 7; d++) {
+    var name = d === 0 ? "Today" : days[(today + d + 6) % 7];
+    var hi = baseT + Math.round(rnd(seed * 11 + d) * 8) - 2;
+    week += '<div class="wx-day"><div class="d">' + name + '</div><div class="e">' + EMOJI[Math.floor(rnd(seed * 13 + d) * EMOJI.length)] + '</div><div class="lo">' + (hi - 8) + '°</div><div class="hi">' + hi + "°</div></div>";
+  }
+  $("wx-week").innerHTML = week;
+
+  /* ---------- Photos ---------- */
+  var grid = "";
+  for (var p = 0; p < 24; p++) {
+    var h1 = Math.floor(rnd(p + 1) * 360), h2 = (h1 + 40 + Math.floor(rnd(p + 99) * 80)) % 360;
+    grid += '<div class="photo" style="background:linear-gradient(' + Math.floor(rnd(p + 7) * 360) + "deg,hsl(" + h1 + ",70%,60%),hsl(" + h2 + ',70%,45%))"></div>';
+  }
+  $("photos-grid").innerHTML = grid;
+  $("photos-grid").addEventListener("click", function (e) {
+    if (e.target.classList.contains("photo")) {
+      $("photo-big").style.background = e.target.style.background;
+      $("photo-viewer").classList.add("open");
+    }
+  });
+  $("photo-viewer").addEventListener("click", function () {
+    this.classList.remove("open");
+  });
+
+  /* ---------- Settings + Control Center (shared state) ---------- */
+  var state = { dark: false, airplane: false, wifi: true };
+  function syncState() {
+    screen.classList.toggle("dark", state.dark);
+    $("tg-dark").classList.toggle("on", state.dark);
+    $("cc-dark").classList.toggle("on", state.dark);
+    $("tg-airplane").classList.toggle("on", state.airplane);
+    $("cc-airplane").classList.toggle("on", state.airplane);
+    $("tg-wifi").classList.toggle("on", state.wifi);
+    $("cc-wifi").classList.toggle("on", state.wifi);
+    $("sb-signal").style.opacity = state.airplane ? .25 : 1;
+    $("sb-wifi").style.opacity = (state.wifi && !state.airplane) ? 1 : .25;
+    $("wifi-value").textContent = (state.wifi && !state.airplane) ? "HomeNet" : "Off";
+  }
+  function bindToggle(id, key, msgOn, msgOff) {
+    $(id).addEventListener("click", function () {
+      state[key] = !state[key];
+      syncState();
+      toast(state[key] ? msgOn : msgOff);
+    });
+  }
+  bindToggle("tg-dark", "dark", "Dark Mode on", "Dark Mode off");
+  bindToggle("cc-dark", "dark", "Dark Mode on", "Dark Mode off");
+  bindToggle("tg-airplane", "airplane", "Airplane Mode on", "Airplane Mode off");
+  bindToggle("cc-airplane", "airplane", "Airplane Mode on", "Airplane Mode off");
+  bindToggle("tg-wifi", "wifi", "Wi-Fi on", "Wi-Fi off");
+  bindToggle("cc-wifi", "wifi", "Wi-Fi on", "Wi-Fi off");
+  $("cc-cell").addEventListener("click", function () { this.classList.toggle("on"); });
+  syncState();
+
+  $("wp-swatches").addEventListener("click", function (e) {
+    var sw = e.target.closest(".wp-swatch");
+    if (!sw) return;
+    document.querySelectorAll(".wp-swatch").forEach(function (x) { x.classList.remove("selected"); });
+    sw.classList.add("selected");
+    $("wallpaper").className = "wallpaper " + sw.getAttribute("data-wp");
+  });
+
+  /* brightness slider */
+  var bright = 1;
+  function setBright(v) {
+    bright = Math.min(1, Math.max(.15, v));
+    $("cc-brightness-fill").style.height = (bright * 100) + "%";
+    $("dim-overlay").style.opacity = (1 - bright) * .75;
+  }
+  var brightTile = $("cc-brightness");
+  function brightFromEvent(e) {
+    var r = brightTile.getBoundingClientRect();
+    setBright(1 - (e.clientY - r.top) / r.height);
+  }
+  var dragging = false;
+  brightTile.addEventListener("pointerdown", function (e) { dragging = true; brightFromEvent(e); brightTile.setPointerCapture(e.pointerId); });
+  brightTile.addEventListener("pointermove", function (e) { if (dragging) brightFromEvent(e); });
+  brightTile.addEventListener("pointerup", function () { dragging = false; });
+
+  /* control center open/close via status bar */
+  $("statusbar").addEventListener("click", function () {
+    if (lock.classList.contains("unlocked")) {
+      $("control-center").classList.toggle("open");
+    }
+  });
+})();
+</script>
+</body>
+</html>
