@@ -815,18 +815,17 @@ try { saved = localStorage.getItem("remlet-lang"); } catch (e) {}
 setLang(saved === "lv" ? "lv" : "en");
 
 /* ============ strap picker ============ */
-let currentSwatch = document.querySelector(".swatch[aria-pressed='true']");
 function updateSwatchLabel() {
-  if (!currentSwatch) return;
+  const btn = document.querySelector(".swatch[aria-pressed='true']");
+  if (!btn) return;
   const lang = document.documentElement.lang;
   document.getElementById("swatch-label").textContent =
-    lang === "lv" ? currentSwatch.dataset.nameLv : currentSwatch.dataset.nameEn;
+    lang === "lv" ? btn.dataset.nameLv : btn.dataset.nameEn;
 }
 document.querySelectorAll(".swatch").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".swatch").forEach(b => b.setAttribute("aria-pressed", "false"));
     btn.setAttribute("aria-pressed", "true");
-    currentSwatch = btn;
     document.documentElement.style.setProperty("--strap", btn.dataset.color);
     updateSwatchLabel();
   });
