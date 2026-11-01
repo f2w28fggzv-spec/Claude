@@ -6,6 +6,7 @@ import type {
   Fault,
   Joint,
   JointAngle,
+  PersonalizationRule,
   Placement,
   RepPosition,
 } from './types';
@@ -149,7 +150,12 @@ export const C = {
     fault,
     status: U,
   }),
-  torso: (at: RepPosition, range: { minDeg?: number; maxDeg?: number }, fault: string, label: string): Check => ({
+  torso: (
+    at: RepPosition,
+    range: { minDeg?: number; maxDeg?: number; personalize?: PersonalizationRule },
+    fault: string,
+    label: string,
+  ): Check => ({
     id: `torso-${at}`,
     type: 'torsoAngle',
     label,
