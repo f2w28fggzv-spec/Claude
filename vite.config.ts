@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import preact from '@preact/preset-vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // Relative base so the build works at https://<user>.github.io/<repo>/.
@@ -6,7 +7,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 // same Wi-Fi can open the camera (getUserMedia requires a secure context).
 export default defineConfig({
   base: './',
-  plugins: [basicSsl()],
+  plugins: [preact(), basicSsl()],
   server: { host: true },
   build: { target: 'es2022' },
 });
