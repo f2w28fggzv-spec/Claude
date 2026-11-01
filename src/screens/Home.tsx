@@ -1,63 +1,79 @@
-import { loadGroups, loadPrograms } from '../storage';
-import { MUSCLE_LABELS } from '../data/types';
-import { PRIVACY } from './Layout';
+import { useState } from 'preact/hooks';
+import { MUSCLE_GROUPS } from '../data/types';
+import { deleteProgram, loadPrograms } from '../storage';
+import { Icon, MuscleIcon } from './icons';
+import { PRIVACY, Screen } from './Layout';
+import { PlanDays, planSubtitle } from './ProgramView';
 
+/** Plan tab: your newest plan, or a single way to create one. */
 export function Home() {
-  const groups = loadGroups();
+  const [, refresh] = useState(0);
   const programs = loadPrograms();
-  return (
-    <main>
-      <header class="top">
-        <h1>Form Check</h1>
-      </header>
-      <p class="privacy">{PRIVACY}</p>
+  const [current, ...older] = programs;
 
-      <section class="card">
-        <h2>Your muscle groups</h2>
-        {groups.length === 0 ? (
-          <p class="muted">Pick the muscle groups you want to train. They decide your program and which exercises you see.</p>
-        ) : (
-          <div class="chips static">
-            {groups.map((g) => (
-              <span class="chip on">{MUSCLE_LABELS[g]}</span>
+  if (!current) {
+    return (
+      <Screen title="Form Check" tab="plan">
+        <section class="hero">
+          <div class="hero-icons" aria-hidden="true">
+            {MUSCLE_GROUPS.slice(0, 5).map((g) => (
+              <MuscleIcon group={g} size={44} />
             ))}
           </div>
-        )}
-        <a class="button" href="#/groups">
-          {groups.length === 0 ? 'Choose muscle groups' : 'Change muscle groups'}
-        </a>
-      </section>
+          <h2>Train smarter with your phone camera</h2>
+          <p class="muted">Pick the muscles you want to train, get a weekly plan, and get technique feedback on every exercise.</p>
+          <a class="button big" href="#/groups">
+            Create my plan
+          </a>
+          <a class="link center" href="#/library">
+            Or browse exercises
+          </a>
+        </section>
+        <p class="privacy small center">{PRIVACY}</p>
+      </Screen>
+    );
+  }
 
-      <nav class="stack">
-        <a class={`button ${groups.length ? '' : 'disabled'}`} href={groups.length ? '#/build' : undefined}>
-          Build a program
-        </a>
-        <a class="button secondary" href="#/library">
-          Exercise library
-        </a>
-      </nav>
-
-      {programs.length > 0 && (
-        <section>
-          <h2>Saved programs</h2>
-          <ul class="list">
-            {programs.map((p) => (
+  return (
+    <Screen title="Your plan" subtitle={planSubtitle(current)} tab="plan">
+      <PlanDays program={current} />
+      <a class="button secondary" href="#/groups">
+        <Icon name="plus" size={18} /> New plan
+      </a>
+      {older.length > 0 && (
+        <details class="more">
+          <summary>Earlier plans ({older.length})</summary>
+          <ul class="rows">
+            {older.map((p) => (
               <li>
                 <a href={`#/program/${p.id}`}>
-                  <strong>{p.name}</strong>
-                  <span class="muted">
-                    {p.inputs.level} · {p.days.length} days · {new Date(p.createdAt).toLocaleDateString()}
+                  <span class="row-main">
+                    <strong>{p.name}</strong>
+                    <small>{new Date(p.createdAt).toLocaleDateString()}</small>
                   </span>
+                  <Icon name="chevron" size={18} />
                 </a>
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       )}
-
-      <p class="footer">
-        <a href="#/camera">Camera test (live pose overlay)</a>
+      <p class="footer small">
+        <button
+          type="button"
+          class="link"
+          onClick={() => {
+            if (confirm('Delete your current plan?')) {
+              deleteProgram(current.id);
+              refresh((n) => n + 1);
+            }
+          }}
+        >
+          Delete plan
+        </button>
+        {' · '}
+        <a href="#/camera">Camera test</a>
       </p>
-    </main>
+    </Screen>
   );
 }

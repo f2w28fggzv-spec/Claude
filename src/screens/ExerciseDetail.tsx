@@ -1,82 +1,60 @@
 import { getExercise } from '../data/exercises';
-import { equipmentText, musclesText, placementLines, secondaryText } from '../data/describe';
-import { Screen } from './Layout';
+import { EQUIPMENT_LABELS, MUSCLE_LABELS } from '../data/types';
+import { Icon, MuscleIcon } from './icons';
 import { ExerciseDemo } from './ExerciseDemo';
+import { Screen } from './Layout';
 
 export function ExerciseDetail({ id }: { id: string }) {
   const e = getExercise(id);
   if (!e) {
     return (
-      <Screen title="Exercise not found" back="library">
-        <p>No exercise with that name.</p>
+      <Screen title="Exercise not found" back="library" tab="exercises">
+        <p class="muted">No exercise with that name.</p>
       </Screen>
     );
   }
-  const checkedFaults = new Set(e.checks.map((c) => c.fault));
-
   return (
-    <Screen title={e.name} back="library">
+    <Screen title={e.name} back="library" tab="exercises">
       <ExerciseDemo exercise={e} />
-      <p>{e.summary}</p>
-      <dl class="facts">
-        <dt>Muscles</dt>
-        <dd>{musclesText(e)}</dd>
-        {e.secondary.length > 0 && (
-          <>
-            <dt>Also works</dt>
-            <dd>{secondaryText(e)}</dd>
-          </>
-        )}
-        <dt>Equipment</dt>
-        <dd>{equipmentText(e)}</dd>
-        <dt>Technique feedback</dt>
-        <dd>
-          <span class={`badge ${e.analysis}`}>{e.analysis === 'full' ? 'Full analysis' : 'Basic analysis'}</span>
-          {e.analysis === 'basic' && <small class="muted"> Placement, rep counting and range of motion</small>}
-        </dd>
-      </dl>
+      <div class="tags">
+        {e.primary.map((g) => (
+          <span class="tag strong">
+            <MuscleIcon group={g} size={16} />
+            {MUSCLE_LABELS[g]}
+          </span>
+        ))}
+        {e.equipment.map((q) => (
+          <span class="tag">{EQUIPMENT_LABELS[q]}</span>
+        ))}
+      </div>
+      <a class="button big" href={`#/analyze/${e.id}`}>
+        <Icon name="camera" size={22} /> Check my technique
+      </a>
+      <p class="lead">{e.summary}</p>
 
-      <section class="card">
-        <h2>Camera placement</h2>
-        <ul>
-          {placementLines(e.placement).map((l) => (
-            <li>{l}</li>
-          ))}
-        </ul>
-        <a class="button" href={`#/analyze/${e.id}`}>
-          Check my technique
-        </a>
-      </section>
-
-      <section>
-        <h2>What gets checked</h2>
-        <p class="muted small">Thresholds are early drafts and haven’t been calibrated yet.</p>
-        <ul class="list plain">
-          {e.tracking.kind === 'hold' ? <li>Hold time</li> : <li>Rep count</li>}
-          {e.checks.map((c) => (
-            <li>{c.label}</li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <h2>Common faults</h2>
-        <ul class="list plain faults">
-          {e.faults.map((f) => {
-            const corrective = getExercise(f.corrective);
-            return (
-              <li>
-                <strong>{f.label}</strong>
-                <span>{f.cue}</span>
-                <span class="muted small">
-                  Corrective: <a href={`#/exercise/${f.corrective}`}>{corrective?.name ?? f.corrective}</a>
-                  {!checkedFaults.has(f.id) && ' · Coaching tip only; the camera does not detect this'}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <h2>Tips</h2>
+      <ul class="tips">
+        {e.faults.map((f) => {
+          const corrective = getExercise(f.corrective);
+          return (
+            <li>
+              <Icon name="tip" size={20} />
+              <span>
+                {f.cue}
+                {corrective && (
+                  <small>
+                    {' '}
+                    Practice with <a href={`#/exercise/${f.corrective}`}>{corrective.name.toLowerCase()}</a>.
+                  </small>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {e.secondary.length > 0 && (
+        <p class="muted small">Also works {e.secondary.map((g) => MUSCLE_LABELS[g].toLowerCase()).join(', ')}.</p>
+      )}
     </Screen>
   );
 }

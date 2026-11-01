@@ -1,66 +1,62 @@
 import { useState } from 'preact/hooks';
 import { EXERCISES } from '../data/exercises';
 import { equipmentText } from '../data/describe';
-import { LEVELS, MUSCLE_GROUPS, MUSCLE_LABELS } from '../data/types';
-import { EQUIPMENT_SETTING_LABELS, availableExercises, type EquipmentSetting } from '../program/builder';
+import { MUSCLE_GROUPS, MUSCLE_LABELS, type MuscleGroup } from '../data/types';
 import { loadGroups } from '../storage';
+import { Icon, MuscleIcon } from './icons';
 import { Screen } from './Layout';
 
+/** Exercises tab: search plus one row of muscle filters. */
 export function Library() {
-  const selected = loadGroups();
-  const [mine, setMine] = useState(selected.length > 0);
+  const mine = loadGroups();
+  const [filter, setFilter] = useState<MuscleGroup | 'all'>('all');
   const [query, setQuery] = useState('');
-  const [equipment, setEquipment] = useState<EquipmentSetting | 'any'>('any');
-
-  const allowed =
-    equipment === 'any' ? null : new Set(availableExercises(equipment, LEVELS[LEVELS.length - 1]).map((e) => e.id));
   const q = query.trim().toLowerCase();
-  const groups = mine ? selected : [...MUSCLE_GROUPS];
-  const visible = EXERCISES.filter(
-    (e) => (!allowed || allowed.has(e.id)) && (!q || e.name.toLowerCase().includes(q)),
+
+  // Your own muscle groups first in the filter row.
+  const order = [...mine, ...MUSCLE_GROUPS.filter((g) => !mine.includes(g))];
+  const matches = EXERCISES.filter(
+    (e) => (filter === 'all' || e.primary.includes(filter)) && (!q || e.name.toLowerCase().includes(q)),
   );
+  // Each exercise once, under its main muscle.
+  const sections = (filter === 'all' ? order : [filter])
+    .map((g) => ({ g, list: matches.filter((e) => (filter === 'all' ? e.primary[0] === g : true)) }))
+    .filter((s) => s.list.length);
 
   return (
-    <Screen title="Exercise library" back="">
-      <div class="filters">
-        <input type="search" placeholder="Search exercises" value={query} onInput={(e) => setQuery(e.currentTarget.value)} />
-        <select value={equipment} onChange={(e) => setEquipment(e.currentTarget.value as EquipmentSetting | 'any')}>
-          <option value="any">Any equipment</option>
-          {(Object.keys(EQUIPMENT_SETTING_LABELS) as EquipmentSetting[]).map((k) => (
-            <option value={k}>{EQUIPMENT_SETTING_LABELS[k]}</option>
-          ))}
-        </select>
-        {selected.length > 0 && (
-          <label class="toggle">
-            <input type="checkbox" checked={mine} onChange={(e) => setMine(e.currentTarget.checked)} />
-            Only my muscle groups
-          </label>
-        )}
+    <Screen title="Exercises" tab="exercises">
+      <input class="search" type="search" placeholder="Search exercises" value={query} onInput={(e) => setQuery(e.currentTarget.value)} />
+      <div class="filter-row" role="group" aria-label="Filter by muscle">
+        <button type="button" class={`filter ${filter === 'all' ? 'on' : ''}`} aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
+          All
+        </button>
+        {order.map((g) => (
+          <button type="button" class={`filter ${filter === g ? 'on' : ''}`} aria-pressed={filter === g} onClick={() => setFilter(g)}>
+            <MuscleIcon group={g} size={18} />
+            {MUSCLE_LABELS[g]}
+          </button>
+        ))}
       </div>
 
-      {groups.map((g) => {
-        const list = visible.filter((e) => e.primary.includes(g));
-        if (list.length === 0) return null;
-        return (
-          <section>
-            <h2>{MUSCLE_LABELS[g]}</h2>
-            <ul class="list">
-              {list.map((e) => (
-                <li>
-                  <a href={`#/exercise/${e.id}`}>
+      {sections.map(({ g, list }) => (
+        <section class="lib-section">
+          <h2>{MUSCLE_LABELS[g]}</h2>
+          <ul class="rows card">
+            {list.map((e) => (
+              <li>
+                <a href={`#/exercise/${e.id}`}>
+                  <span class="row-main">
                     <strong>{e.name}</strong>
-                    <span class="muted small">
-                      {equipmentText(e)}
-                      <span class={`badge ${e.analysis}`}>{e.analysis === 'full' ? 'Full analysis' : 'Basic analysis'}</span>
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
-      {visible.length === 0 && <p class="muted">No exercises match.</p>}
+                    <small>{equipmentText(e)}</small>
+                  </span>
+                  <Icon name="chevron" size={18} />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+      {matches.length === 0 && <p class="muted center">No exercises match.</p>}
     </Screen>
   );
 }

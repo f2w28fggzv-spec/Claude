@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { getExercise } from '../data/exercises';
-import { placementLines } from '../data/describe';
-import type { Exercise } from '../data/types';
+import type { Exercise, Placement } from '../data/types';
 import { analyze } from '../engine/analyze';
 import { point, type Reader } from '../engine/landmarks';
 import { ProportionMeter, mergeProportions } from '../engine/personalize';
@@ -14,9 +13,10 @@ import { grabFrames, landmarksFromVideo, withVideoFile, type FileProgress } from
 import { SnapshotKeeper } from '../analysis/snapshots';
 import { usePoseCamera, type LiveFrame } from '../analysis/usePoseCamera';
 import { loadHandsFree, loadProportions, saveHandsFree, saveProportions } from '../storage';
-import { CameraStage, ModelPicker } from './CameraStage';
+import { CameraStage } from './CameraStage';
 import { Results } from './Results';
-import { Screen } from './Layout';
+import { PRIVACY, Screen } from './Layout';
+import { Icon, type IconName } from './icons';
 import { ExerciseDemo } from './ExerciseDemo';
 
 type Stage =
@@ -272,7 +272,7 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
 
   if (stage.kind === 'results') {
     return (
-      <Screen title={title} back={`exercise/${exercise.id}`}>
+      <Screen title={title} subtitle="Technique check" back={`exercise/${exercise.id}`}>
         <Results exercise={exercise} seq={stage.seq} shots={stage.shots} onAgain={() => setStage({ kind: 'intro' })} />
       </Screen>
     );
@@ -282,7 +282,7 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
     const p = stage.progress;
     const pct = p ? Math.round((p.done / p.total) * 100) : 0;
     return (
-      <Screen title={title} back={`exercise/${exercise.id}`}>
+      <Screen title={title} subtitle="Technique check" back={`exercise/${exercise.id}`}>
         <section class="card">
           <h2>Analyzing your video…</h2>
           <progress max={100} value={pct} />
@@ -297,45 +297,36 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
 
   const inLive = stage.kind === 'live';
   return (
-    <Screen title={title} back={`exercise/${exercise.id}`}>
+    <Screen title={title} subtitle="Technique check" back={`exercise/${exercise.id}`}>
       {!inLive && (
         <>
-          <section class="card">
-            <h2>Set up your camera</h2>
-            <ExerciseDemo exercise={exercise} compact />
-            <ul>
-              {placementLines(exercise.placement).map((l) => (
-                <li>{l}</li>
-              ))}
-            </ul>
-            <p class="muted small">
-              {exercise.analysis === 'full' ? 'Full analysis: ' : 'Basic analysis: '}
-              {exercise.tracking.kind === 'hold' ? 'hold time' : 'rep count'}
-              {exercise.checks.length ? `, ${exercise.checks.map((c) => c.label.toLowerCase()).join(', ')}` : ''}.
-            </p>
-          </section>
-          <label class="toggle">
+          <ExerciseDemo exercise={exercise} compact />
+          <h2>Set up your phone</h2>
+          <PlacementTiles exercise={exercise} />
+          {exercise.placement.notes && <p class="muted small">{exercise.placement.notes}</p>}
+          <label class="switch-row">
+            <span>
+              <strong>Hands-free</strong>
+              <small>Starts when you’re in position, stops when you finish</small>
+            </span>
             <input
               type="checkbox"
+              role="switch"
               checked={handsFree}
               onChange={(e) => {
                 setHandsFree(e.currentTarget.checked);
                 saveHandsFree(e.currentTarget.checked);
               }}
             />
-            Hands-free: start recording 3 seconds after you’re in position, stop when you finish
           </label>
-          <div class="stack">
-            <button type="button" disabled={!cam.ready} onClick={startCamera}>
-              {cam.ready ? 'Start camera' : 'Loading pose model…'}
-            </button>
-            <button type="button" class="secondary" disabled={!cam.ready} onClick={pickFile}>
-              Analyze a video from this phone
-            </button>
-          </div>
+          <button type="button" class="big" disabled={!cam.ready} onClick={startCamera}>
+            <Icon name="camera" size={22} /> {cam.ready ? 'Start camera' : 'Loading…'}
+          </button>
+          <button type="button" class="link center" disabled={!cam.ready} onClick={pickFile}>
+            <Icon name="video" size={18} /> Use a video instead
+          </button>
           <input ref={fileInput} type="file" accept="video/*" hidden onChange={(e) => void onFile(e.currentTarget.files?.[0])} />
-          <ModelPicker cam={cam} />
-          <p class="privacy small">Video is analyzed on this phone and never uploaded or saved.</p>
+          <p class="privacy small center">{PRIVACY}</p>
         </>
       )}
 
@@ -399,5 +390,33 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
 
       {(error || cam.error) && <p class="error">{error || cam.error}</p>}
     </Screen>
+  );
+}
+
+const HEIGHT_TEXT: Record<Placement['phoneHeight'], string> = {
+  floor: 'On the floor',
+  knee: 'Knee height',
+  hip: 'Hip height',
+  chest: 'Chest height',
+};
+
+/** Camera placement as four glanceable tiles. */
+function PlacementTiles({ exercise }: { exercise: Exercise }) {
+  const p = exercise.placement;
+  const tiles: [IconName, string][] = [
+    [p.view === 'side' ? 'side' : 'front', p.view === 'side' ? 'Film from the side' : 'Face the camera'],
+    ['height', HEIGHT_TEXT[p.phoneHeight]],
+    ['distance', `${p.distanceM[0]}–${p.distanceM[1]} m away`],
+    [p.orientation === 'portrait' ? 'phone' : 'phoneSideways', p.orientation === 'portrait' ? 'Phone upright, 1x' : 'Phone sideways, 1x'],
+  ];
+  return (
+    <div class="place-grid">
+      {tiles.map(([icon, text]) => (
+        <div class="place">
+          <Icon name={icon} size={26} />
+          <span>{text}</span>
+        </div>
+      ))}
+    </div>
   );
 }
