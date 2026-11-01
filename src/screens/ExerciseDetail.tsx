@@ -1,6 +1,7 @@
 import { getExercise } from '../data/exercises';
 import { equipmentText, musclesText, placementLines, secondaryText } from '../data/describe';
 import { Screen } from './Layout';
+import { ExerciseDemo } from './ExerciseDemo';
 
 export function ExerciseDetail({ id }: { id: string }) {
   const e = getExercise(id);
@@ -15,6 +16,7 @@ export function ExerciseDetail({ id }: { id: string }) {
 
   return (
     <Screen title={e.name} back="library">
+      <ExerciseDemo exercise={e} />
       <p>{e.summary}</p>
       <dl class="facts">
         <dt>Muscles</dt>

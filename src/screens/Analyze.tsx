@@ -17,6 +17,7 @@ import { loadHandsFree, loadProportions, saveHandsFree, saveProportions } from '
 import { CameraStage, ModelPicker } from './CameraStage';
 import { Results } from './Results';
 import { Screen } from './Layout';
+import { ExerciseDemo } from './ExerciseDemo';
 
 type Stage =
   | { kind: 'intro' }
@@ -301,6 +302,7 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
         <>
           <section class="card">
             <h2>Set up your camera</h2>
+            <ExerciseDemo exercise={exercise} compact />
             <ul>
               {placementLines(exercise.placement).map((l) => (
                 <li>{l}</li>

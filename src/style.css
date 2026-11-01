@@ -147,3 +147,38 @@ input[type='search'], select {
 .slider { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
 .slider input[type='range'] { width: 100%; accent-color: var(--accent); }
 progress { width: 100%; height: 10px; accent-color: var(--accent); margin: 8px 0; }
+
+.demo { margin: 0 0 12px; }
+.demo svg { display: block; width: 100%; height: auto; max-height: 300px; }
+.demo.compact svg { max-height: 200px; }
+.demo-stage {
+  position: relative; display: block; width: 100%; padding: 8px; background: var(--card);
+  border: 0; border-radius: 14px; cursor: pointer;
+}
+.card .demo-stage { background: #0f1216; }
+.demo-paused {
+  position: absolute; right: 10px; top: 10px; font-size: 0.75rem; color: var(--muted);
+  background: var(--raised); padding: 2px 8px; border-radius: 999px;
+}
+.demo figcaption { margin-top: 6px; }
+.demo-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; }
+.demo svg polyline, .demo svg line, .dev-cell svg polyline, .dev-cell svg line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+svg .near { stroke: #e8ecf1; }
+svg .far { stroke: #6b7685; }
+svg .body { stroke: #e8ecf1; stroke-linecap: round; }
+svg .trunk { fill: #e8ecf1; stroke: #e8ecf1; stroke-width: 0.03; stroke-linejoin: round; }
+svg .head { fill: #e8ecf1; }
+svg .nose { fill: #e8ecf1; }
+svg .floor { stroke: #3a4350; }
+svg .equip { stroke: #8a96a6; }
+svg .box { fill: #2a313b; stroke: #8a96a6; stroke-width: 0.01; }
+svg .plate { fill: #2a313b; fill-opacity: 0.55; stroke: #8a96a6; }
+svg .hub { fill: #8a96a6; stroke: none; }
+svg .weight { fill: #8a96a6; }
+svg .handle { stroke: #8a96a6; }
+svg .padc { fill: #5a6573; stroke: none; }
+svg .cable { stroke: #8a96a6; }
+svg .band { stroke: #3ddc84; stroke-dasharray: 0.02 0.015; }
+.dev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.dev-cell { background: var(--card); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.dev-cell svg { width: 100%; height: 110px; }

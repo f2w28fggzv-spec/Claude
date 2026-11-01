@@ -7,6 +7,7 @@ import { Library } from './screens/Library';
 import { ExerciseDetail } from './screens/ExerciseDetail';
 import { Camera } from './screens/Camera';
 import { Analyze } from './screens/Analyze';
+import { DevDemos } from './screens/DevDemos';
 
 export function App() {
   const { path, query } = useRoute();
@@ -22,6 +23,9 @@ export function App() {
       return <Library />;
     case 'exercise':
       return <ExerciseDetail id={id ?? ''} />;
+    case 'dev':
+      if (id === 'demos') return <DevDemos still={query.has('still')} />;
+      return <Home />;
     case 'analyze':
       return <Analyze id={id ?? ''} />;
     case 'camera':

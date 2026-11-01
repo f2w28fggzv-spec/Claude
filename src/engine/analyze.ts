@@ -1,5 +1,5 @@
 // Entry point: runs an exercise's config on a recorded pose sequence.
-import type { Check, Exercise, HoldAlignmentCheck } from '../data/types';
+import type { Check, Exercise, HoldAlignmentCheck, Joint } from '../data/types';
 import { dist } from './geometry';
 import { JUDGE_VISIBILITY, MIN_VISIBILITY, nearSide, point, sidedPoint, type Reader } from './landmarks';
 import { evaluateHoldCheck, evaluateRepCheck, angleIn, type CheckContext } from './checks';
@@ -52,6 +52,18 @@ export function torsoLength(seq: PoseSequence, reader: Reader): number {
     return sh && hip && sh.v >= JUDGE_VISIBILITY && hip.v >= JUDGE_VISIBILITY ? dist(sh, hip) : NaN;
   });
   return median(lengths);
+}
+
+/** The side whose tracked joint travels further during the rep. */
+function workingSide(seq: PoseSequence, joint: Joint, frames: number[], reader: Reader): 'left' | 'right' {
+  const travel = (side: 'left' | 'right') => {
+    const ys = frames
+      .map((i) => sidedPoint(seq.frames[i], joint, side, reader))
+      .filter((p) => p && p.v >= MIN_VISIBILITY)
+      .map((p) => p!.y);
+    return ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
+  };
+  return travel('left') >= travel('right') ? 'left' : 'right';
 }
 
 /** Longest stretch in position for a hold, allowing short tracking gaps. */
@@ -161,6 +173,9 @@ export function analyze(exercise: Exercise, seq: PoseSequence, opts: AnalyzeOpti
     const frames: number[] = [];
     for (let i = rep.startFrame; i <= rep.endFrame; i++) frames.push(i);
     const c = ctx(tracked, frames);
+    if (view === 'front' && exercise.unilateral && exercise.tracking.kind === 'reps') {
+      c.workingSide = workingSide(seq, exercise.tracking.joint, frames, reader);
+    }
     return {
       ...rep,
       index,
