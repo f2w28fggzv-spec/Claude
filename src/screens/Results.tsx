@@ -8,6 +8,7 @@ import type { AnalysisResult, CheckResult, PoseSequence } from '../engine/types'
 import { drawSkeleton } from '../draw';
 import { nearestShot } from '../analysis/snapshots';
 import { loadOverrides, loadProportions, saveOverride } from '../storage';
+import { Icon } from './icons';
 
 interface Props {
   exercise: Exercise;
@@ -45,20 +46,25 @@ export function Results({ exercise, seq, shots, onAgain }: Props) {
 
       {faultsSeen.size > 0 && (
         <section class="card">
-          <h2>Technique feedback</h2>
-          <ul class="list plain faults">
+          <h2>What to work on</h2>
+          <ul class="tips">
             {[...faultsSeen].map(([id, n]) => {
               const f = exercise.faults.find((x) => x.id === id);
               if (!f) return null;
               const corrective = getExercise(f.corrective);
               return (
                 <li>
-                  <strong>
-                    {f.label} <span class="muted small">({n}×)</span>
-                  </strong>
-                  <span>{f.cue}</span>
-                  <span class="muted small">
-                    Corrective: <a href={`#/exercise/${f.corrective}`}>{corrective?.name ?? f.corrective}</a>
+                  <Icon name="tip" size={20} />
+                  <span>
+                    <strong>{f.label}</strong> <span class="muted small">· {n} rep{n === 1 ? '' : 's'}</span>
+                    <br />
+                    {f.cue}
+                    {corrective && (
+                      <small>
+                        {' '}
+                        Practice with <a href={`#/exercise/${f.corrective}`}>{corrective.name.toLowerCase()}</a>.
+                      </small>
+                    )}
                   </span>
                 </li>
               );
@@ -79,7 +85,7 @@ export function Results({ exercise, seq, shots, onAgain }: Props) {
             checks={result.hold.checks}
             side={result.side}
           />
-          <CheckList checks={result.hold.checks} />
+          <RepChecks checks={result.hold.checks} />
         </section>
       )}
 
@@ -98,13 +104,13 @@ export function Results({ exercise, seq, shots, onAgain }: Props) {
             side={result.side}
             caption={`${far} of the rep`}
           />
-          <CheckList checks={rep.checks} />
+          <RepChecks checks={rep.checks} />
         </section>
       ))}
 
       {depthChecks.length > 0 && result.reps.length > 0 && (
-        <section class="card">
-          <h2>Tune depth</h2>
+        <details class="more">
+          <summary>Adjust depth strictness</summary>
           {depthChecks.map((c) => {
             const value = overrides[exercise.id]?.[c.id]?.margin ?? c.margin;
             return (
@@ -129,13 +135,10 @@ export function Results({ exercise, seq, shots, onAgain }: Props) {
               </label>
             );
           })}
-        </section>
+        </details>
       )}
 
-      <p class="muted small">
-        Thresholds are early drafts and haven’t been calibrated yet, so treat this as a guide. Pictures are deleted when you leave
-        this screen.
-      </p>
+      <p class="muted small center">Feedback is still being tuned, so treat it as a guide. Pictures are deleted when you leave.</p>
       <div class="stack">
         <button type="button" onClick={onAgain}>
           Record another set
@@ -190,10 +193,11 @@ function Summary({ exercise, result }: { exercise: Exercise; result: AnalysisRes
         rep{n === 1 ? '' : 's'}
         {n > 0 && exercise.checks.length > 0 && ` · ${clean} of ${n} with no faults`}
       </div>
-      {n > 0 && perCheck.length > 0 && (
+      {n > 0 && perCheck.length > 0 && perCheck.every((c) => c.pass === n) && <p class="all-good">Every check passed on every rep</p>}
+      {n > 0 && perCheck.some((c) => c.pass < n) && (
         <table class="volume">
           <tbody>
-            {perCheck.map(({ check, pass, unknown }) => (
+            {perCheck.filter((c) => c.pass < n).map(({ check, pass, unknown }) => (
               <tr>
                 <th>{check.label}</th>
                 <td>
@@ -206,6 +210,26 @@ function Summary({ exercise, result }: { exercise: Exercise; result: AnalysisRes
         </table>
       )}
     </section>
+  );
+}
+
+/** Only what needs attention; everything else behind "Show all checks". */
+function RepChecks({ checks }: { checks: CheckResult[] }) {
+  const issues = checks.filter((c) => c.status !== 'pass');
+  return (
+    <>
+      {issues.length === 0 ? (
+        checks.length > 0 && <p class="all-good">All checks passed</p>
+      ) : (
+        <CheckList checks={issues} />
+      )}
+      {checks.length > issues.length && (
+        <details class="more small">
+          <summary>Show all checks</summary>
+          <CheckList checks={checks} />
+        </details>
+      )}
+    </>
   );
 }
 

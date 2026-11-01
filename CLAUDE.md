@@ -49,7 +49,8 @@ After each phase: open a PR, wait for the user's "merge it", then confirm the Pa
 - `src/data/exercises.ts` — the library: one `ex({...})` entry per exercise. Add exercises here only.
 - `src/data/helpers.ts` — builders for checks (`C.*`), faults (`F.*`), placements and joint angles
 - `src/program/builder.ts` — rule-based program builder (evidence sources in its header comment)
-- `src/screens/` — Preact screens; `src/router.ts` hash routes (`#/groups`, `#/build`, `#/program/:id`, `#/library`, `#/exercise/:id`, `#/camera?exercise=id`)
+- `src/screens/` — Preact screens; `src/router.ts` hash routes: `#/` (Plan tab: newest plan, or "Create my plan"), `#/groups` (step 1: muscle tiles), `#/build` (step 2: days, experience, equipment), `#/program/:id` (an earlier plan), `#/library` (Exercises tab), `#/exercise/:id`, `#/analyze/:id` (technique check), `#/camera` (camera test, linked from the Plan tab footer)
+- `src/screens/Layout.tsx` — `Screen` (header with back button, optional bottom tab bar `tab`, optional pinned `action` button); `src/screens/icons.tsx` — inline SVG icons: `MuscleIcon` (body pictogram with the muscle highlighted), line icons, `LevelIcon`
 - `src/storage.ts` — localStorage wrapper
 - `src/pose.ts`, `src/camera.ts`, `src/draw.ts` — MediaPipe, camera and skeleton overlay
 - `src/engine/` — analysis engine, pure TypeScript with no DOM: `analyze.ts` (entry), `reps.ts` + `zigzag.ts` (rep segmentation), `checks.ts` (one evaluator per check type), `setup.ts` (live setup check), `personalize.ts` (limb proportions), `landmarks.ts`, `geometry.ts`, `signal.ts`, `types.ts` (PoseSequence format)
@@ -75,7 +76,8 @@ After each phase: open a PR, wait for the user's "merge it", then confirm the Pa
 - Personalization: `ProportionMeter` measures thigh/shin/upper arm/forearm ÷ torso while standing side-on during setup (saved on device, numbers only). Rules are named in config (`personalize: 'squatTorsoLean'`), based on Winter (2009) reference proportions and a bar-over-mid-foot model, capped at ±12°.
 - Recording: the live camera computes landmarks as it goes; no video is recorded or buffered. Hands-free mode (default on) starts 3 s after the setup check holds and stops when the lifter stays still at the start position for 3 s after a rep, leaves the frame for 2 s, or after 3 minutes. Picked video files are read locally via an object URL at 20 fps, then released.
 - Results pictures: small JPEGs of each rep's turnaround frame kept in memory only and cleared when the results screen closes. Live recordings capture them at the online turning points; files seek back to the exact frames after analysis.
-- User-tuned depth margin (results screen) is stored as a threshold override in localStorage.
+- User-tuned depth margin (results screen, under "Adjust depth strictness") is stored as a threshold override in localStorage.
+- UI: keep it simple. Two tabs (Plan, Exercises); one primary action per screen; plan creation is two steps with large tappable tiles; details (weekly volume, all checks, depth tuning) go behind `<details>`. Icons are inline SVG (no icon fonts or external assets). The pose-model picker only appears on the camera test page (default: full model).
 - How-to demos are animated figures, not videos (user's choice): drawn from the same camera angle as the exercise's placement, correct form by construction, no copyright or network requests, respects reduced motion. Demos must pass their own exercise's checks (tests/demo.test.ts); when thresholds change in Phase 3/4, fix the demo or the threshold, whichever is wrong.
 - Front-view one-sided exercises (e.g. side-lying hip abduction, cable lateral raise) read angles from the working side (the side whose tracked joint travels further) instead of averaging both sides.
 - Dumbbell fly has no range-of-motion check: from a side-on camera the arms move toward and away from the lens, so the shoulder angle can't be measured. Reps are still counted.
