@@ -4,46 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0d10" />
-    <title>Squat Depth Check</title>
+    <title>Form Check</title>
   </head>
   <body>
-    <main>
-      <header>
-        <h1>Squat Depth Check</h1>
-        <p class="privacy">Runs entirely on this phone. Video is never uploaded or saved.</p>
-      </header>
-
-      <section id="intro" class="card">
-        <h2>Camera placement</h2>
-        <ul>
-          <li>Film from the <strong>side</strong> (side-on to the camera)</li>
-          <li>Phone at about <strong>hip height</strong>, upright, not tilted</li>
-          <li>Use the <strong>1x lens</strong> (no zoom or ultra-wide)</li>
-          <li>Whole body in frame, head to feet</li>
-        </ul>
-        <button id="start" type="button" disabled>Loading pose model…</button>
-        <p id="error" class="error" hidden></p>
-      </section>
-
-      <section id="live" hidden>
-        <div class="stage" id="stage">
-          <video id="video" playsinline muted autoplay></video>
-          <canvas id="overlay"></canvas>
-        </div>
-        <div class="controls">
-          <button id="flip" type="button" class="secondary">Flip camera</button>
-          <label>
-            Model
-            <select id="model">
-              <option value="lite">Lite (faster)</option>
-              <option value="full" selected>Full (more accurate)</option>
-            </select>
-          </label>
-          <button id="stop" type="button" class="secondary">Stop</button>
-        </div>
-        <pre id="debug" class="debug"></pre>
-      </section>
-    </main>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
