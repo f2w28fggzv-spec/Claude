@@ -6,6 +6,7 @@ import { ProgramView } from './screens/ProgramView';
 import { Library } from './screens/Library';
 import { ExerciseDetail } from './screens/ExerciseDetail';
 import { Camera } from './screens/Camera';
+import { Analyze } from './screens/Analyze';
 
 export function App() {
   const { path, query } = useRoute();
@@ -21,6 +22,8 @@ export function App() {
       return <Library />;
     case 'exercise':
       return <ExerciseDetail id={id ?? ''} />;
+    case 'analyze':
+      return <Analyze id={id ?? ''} />;
     case 'camera':
       return <Camera exerciseId={query.get('exercise') ?? undefined} />;
     default:

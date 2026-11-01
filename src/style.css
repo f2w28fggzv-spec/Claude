@@ -101,8 +101,10 @@ input[type='search'], select {
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; }
 
+.stage-wrap { position: relative; margin: 0 auto 12px; }
+.stage-wrap[hidden] { display: none; }
 .stage {
-  position: relative; width: 100%; max-height: 70vh; margin: 0 auto 12px;
+  position: relative; width: 100%; max-height: 70vh; margin: 0 auto;
   aspect-ratio: 9 / 16; background: #000; border-radius: 14px; overflow: hidden;
 }
 .stage[hidden] { display: none; }
@@ -113,3 +115,35 @@ input[type='search'], select {
   font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--muted);
   background: var(--card); padding: 12px; border-radius: 10px; overflow-x: auto; margin: 0;
 }
+
+.stage-badge {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: calc(100% - 24px);
+  background: rgba(11, 13, 16, 0.82); color: var(--text); padding: 8px 14px; border-radius: 999px;
+  font-weight: 600; text-align: center; font-size: 0.95rem; backdrop-filter: blur(6px);
+}
+.stage-badge.recording { color: var(--danger); }
+.stage-badge.countdown { top: 50%; transform: translate(-50%, -50%); padding: 12px 28px; }
+.stage-badge .count { font-size: 3.5rem; line-height: 1; color: var(--accent); }
+
+.checks { list-style: none; padding: 0; margin: 8px 0; }
+.checks li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.checks li > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.checks .icon {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 0.8rem; font-weight: 700; background: var(--raised); color: var(--muted);
+}
+.checks .pass .icon { background: #133524; color: var(--accent); }
+.checks .fail .icon { background: #3a1717; color: var(--danger); }
+.checks .unknown .icon { background: #2b2414; color: var(--warn); }
+.checks.setup li { padding: 6px 0; }
+
+.summary { text-align: center; margin: 8px 0 16px; }
+.summary .big { font-size: 3rem; font-weight: 700; line-height: 1; }
+.summary .volume { margin-top: 12px; text-align: left; }
+.rep h2 { margin-bottom: 8px; }
+.shot { margin: 0 0 8px; }
+.shot canvas { width: 100%; height: auto; border-radius: 10px; display: block; background: #000; }
+.shot figcaption { margin-top: 4px; }
+.slider { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.slider input[type='range'] { width: 100%; accent-color: var(--accent); }
+progress { width: 100%; height: 10px; accent-color: var(--accent); margin: 8px 0; }

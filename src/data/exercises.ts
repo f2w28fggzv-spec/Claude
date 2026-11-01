@@ -7,8 +7,27 @@
 import { C, F, PLACEMENTS as P, ex } from './helpers';
 import type { Exercise, Joint, RepTracking } from './types';
 
-const down = (joint: Joint): RepTracking => ({ kind: 'reps', joint, firstMove: 'down' });
-const up = (joint: Joint): RepTracking => ({ kind: 'reps', joint, firstMove: 'up' });
+type Phase = 'eccentric' | 'concentric';
+interface TrackOpts {
+  phase?: Phase;
+  minAmplitude?: number;
+}
+// Moving down first is usually the lowering phase (squat, bench); moving up
+// first is usually the lifting phase (deadlift, curl). Exceptions pass `phase`.
+const down = (joint: Joint, o: TrackOpts = {}): RepTracking => ({
+  kind: 'reps',
+  joint,
+  firstMove: 'down',
+  firstPhase: o.phase ?? 'eccentric',
+  ...(o.minAmplitude !== undefined && { minAmplitude: o.minAmplitude }),
+});
+const up = (joint: Joint, o: TrackOpts = {}): RepTracking => ({
+  kind: 'reps',
+  joint,
+  firstMove: 'up',
+  firstPhase: o.phase ?? 'concentric',
+  ...(o.minAmplitude !== undefined && { minAmplitude: o.minAmplitude }),
+});
 const hold: RepTracking = { kind: 'hold' };
 
 export const EXERCISES: Exercise[] = [
@@ -27,7 +46,7 @@ export const EXERCISES: Exercise[] = [
     requiredLandmarks: ['nose', 'ankle'],
     checks: [
       C.depth(0),
-      C.torso('bottom', { maxDeg: 50 }, 'forwardLean', 'Torso lean at the bottom'),
+      C.torso('bottom', { maxDeg: 50, personalize: 'squatTorsoLean' }, 'forwardLean', 'Torso lean at the bottom'),
       C.lockout('knee', 165),
       C.lockout('hip', 165),
       C.path('hip', 0.6, 'pathDrift', 'Hips staying over the feet'),
@@ -212,7 +231,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['machine'],
     role: 'compound',
     placement: P.sideMachine,
-    tracking: up('knee'),
+    tracking: up('knee', { phase: 'eccentric' }),
     checks: [C.rom('knee', 60)],
     faults: [F.partialRange('goblet-squat', 'Lower the sled until your knees reach about 90 degrees.')],
   }),
@@ -405,7 +424,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['machine'],
     role: 'isolation',
     placement: P.sideMachine,
-    tracking: down('ankle'),
+    tracking: down('ankle', { phase: 'concentric' }),
     checks: [C.rom('knee', 70)],
     faults: [F.partialRange('slider-leg-curl', 'Curl all the way and return to straight legs.')],
   }),
@@ -516,7 +535,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['dumbbell'],
     role: 'isolation',
     placement: P.sideLow,
-    tracking: up('heel'),
+    tracking: up('heel', { minAmplitude: 0.05 }),
     requiredLandmarks: ['toe'],
     checks: [C.rom('ankle', 20)],
     faults: [F.partialRange('single-leg-calf-raise', 'Rise all the way up and pause at the top.')],
@@ -530,7 +549,7 @@ export const EXERCISES: Exercise[] = [
     role: 'isolation',
     unilateral: true,
     placement: P.sideLow,
-    tracking: up('heel'),
+    tracking: up('heel', { minAmplitude: 0.05 }),
     checks: [C.rom('ankle', 20)],
     faults: [F.partialRange('bodyweight-calf-raise', 'Rise all the way up and pause at the top.')],
   }),
@@ -542,7 +561,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['bodyweight'],
     role: 'isolation',
     placement: P.sideLow,
-    tracking: up('heel'),
+    tracking: up('heel', { minAmplitude: 0.05 }),
     checks: [C.rom('ankle', 20)],
     faults: [F.partialRange('single-leg-calf-raise', 'Rise all the way up and pause at the top.')],
   }),
@@ -554,7 +573,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['dumbbell', 'bench'],
     role: 'isolation',
     placement: P.sideLow,
-    tracking: up('knee'),
+    tracking: up('knee', { minAmplitude: 0.05 }),
     checks: [C.rom('ankle', 20)],
     faults: [F.partialRange('bodyweight-calf-raise', 'Use the full range: heels low, then high.')],
   }),
@@ -566,7 +585,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['machine'],
     role: 'isolation',
     placement: P.sideLow,
-    tracking: up('heel'),
+    tracking: up('heel', { minAmplitude: 0.05 }),
     checks: [C.rom('ankle', 20)],
     faults: [F.partialRange('single-leg-calf-raise', 'Drop the heels low, then rise all the way.')],
   }),
@@ -840,7 +859,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['pullupBar'],
     role: 'isolation',
     placement: P.sideHanging,
-    tracking: up('shoulder'),
+    tracking: up('shoulder', { minAmplitude: 0.05 }),
     checks: [C.rom('shoulder', 10)],
     faults: [F.partialRange('negative-pull-up', 'Let your shoulders rise fully, then pull them all the way down.'), F.shrugging('negative-pull-up')],
   }),
@@ -866,7 +885,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['cable'],
     role: 'compound',
     placement: P.sideSeated,
-    tracking: down('wrist'),
+    tracking: down('wrist', { phase: 'concentric' }),
     checks: [C.rom('elbow', 70)],
     faults: [F.partialRange('scapular-pull-up', 'Pull the bar to your upper chest and let your arms straighten at the top.'), F.swinging('scapular-pull-up', 'Stay upright; do not lean back to pull.')],
   }),
@@ -878,7 +897,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['cable'],
     role: 'isolation',
     placement: P.sideStanding,
-    tracking: down('wrist'),
+    tracking: down('wrist', { phase: 'concentric' }),
     checks: [C.rom('shoulder', 50)],
     faults: [F.partialRange('scapular-pull-up', 'Sweep all the way down to your thighs.')],
   }),
@@ -1228,7 +1247,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['cable'],
     role: 'isolation',
     placement: P.sideStanding,
-    tracking: down('wrist'),
+    tracking: down('wrist', { phase: 'concentric' }),
     checks: [C.rom('elbow', 70)],
     faults: [F.partialRange('band-pushdown', 'Let your forearms rise to about 90 degrees, then straighten fully.'), F.elbowDrift('triceps-kickback', 'Pin your elbows to your sides.')],
   }),
@@ -1253,7 +1272,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['band'],
     role: 'isolation',
     placement: P.sideStanding,
-    tracking: down('wrist'),
+    tracking: down('wrist', { phase: 'concentric' }),
     checks: [C.rom('elbow', 70)],
     faults: [F.partialRange('triceps-kickback', 'Straighten your arms fully at the bottom.'), F.elbowDrift('triceps-kickback', 'Pin your elbows to your sides.')],
   }),
@@ -1309,7 +1328,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['bodyweight'],
     role: 'isolation',
     placement: P.sideFloor,
-    tracking: down('ankle'),
+    tracking: down('ankle', { phase: 'concentric' }),
     checks: [C.rom('knee', 45)],
     faults: [F.partialRange('crunch', 'Extend the leg until it is nearly straight and just off the floor.'), F.overArching('plank')],
   }),
@@ -1321,7 +1340,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['bodyweight'],
     role: 'isolation',
     placement: P.sideFloor,
-    tracking: up('shoulder'),
+    tracking: up('shoulder', { minAmplitude: 0.08 }),
     checks: [C.rom('hip', 15)],
     faults: [F.partialRange('dead-bug', 'Curl until your shoulder blades leave the floor.')],
   }),
@@ -1358,7 +1377,7 @@ export const EXERCISES: Exercise[] = [
     equipment: ['cable'],
     role: 'isolation',
     placement: P.sideFloor,
-    tracking: down('shoulder'),
+    tracking: down('shoulder', { phase: 'concentric', minAmplitude: 0.1 }),
     checks: [C.rom('hip', 25)],
     faults: [F.partialRange('crunch', 'Curl your ribs toward your hips; do not just hinge.')],
   }),

@@ -30,7 +30,7 @@ export function ExerciseDetail({ id }: { id: string }) {
         <dt>Technique feedback</dt>
         <dd>
           <span class={`badge ${e.analysis}`}>{e.analysis === 'full' ? 'Full analysis' : 'Basic analysis'}</span>
-          {e.analysis === 'basic' && <small class="muted"> Rep counting and range of motion</small>}
+          {e.analysis === 'basic' && <small class="muted"> Placement, rep counting and range of motion</small>}
         </dd>
       </dl>
 
@@ -41,14 +41,14 @@ export function ExerciseDetail({ id }: { id: string }) {
             <li>{l}</li>
           ))}
         </ul>
-        <a class="button" href={`#/camera?exercise=${e.id}`}>
-          Open camera preview
+        <a class="button" href={`#/analyze/${e.id}`}>
+          Check my technique
         </a>
       </section>
 
       <section>
         <h2>What gets checked</h2>
-        <p class="muted small">Thresholds are early drafts and will be tuned before analysis goes live.</p>
+        <p class="muted small">Thresholds are early drafts and haven’t been calibrated yet.</p>
         <ul class="list plain">
           {e.tracking.kind === 'hold' ? <li>Hold time</li> : <li>Rep count</li>}
           {e.checks.map((c) => (

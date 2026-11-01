@@ -1,8 +1,9 @@
 # Form Check
 
-Mobile web app: pick muscle groups, get a workout program, and (from Phase 2)
-technique feedback from your phone camera. All pose detection runs on the
-phone with MediaPipe; video never leaves the device.
+Mobile web app: pick muscle groups, get a workout program, and get technique
+feedback from your phone camera. All pose detection runs on the phone with
+MediaPipe; video never leaves the device, and the app blocks every request to
+other websites.
 See [CLAUDE.md](CLAUDE.md) for the full brief.
 
 ## Run locally

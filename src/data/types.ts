@@ -98,6 +98,10 @@ export interface Placement {
 /**
  * Which position in a rep a check is evaluated at: where the tracked joint
  * (Exercise.tracking.joint) is highest on screen ('top') or lowest ('bottom').
+ * The far position is the turnaround of the rep. The start position is taken
+ * at the end of the rep when the first move is down (finishing the squat
+ * standing tall), and at the start when the first move is up (the deadlift
+ * set-up position).
  */
 export type RepPosition = 'top' | 'bottom';
 
@@ -151,6 +155,8 @@ export interface TorsoAngleCheck extends CheckBase {
   at: RepPosition;
   minDeg?: number;
   maxDeg?: number;
+  /** Shift the limits for the user's limb proportions. */
+  personalize?: PersonalizationRule;
 }
 
 /**
@@ -229,8 +235,26 @@ export type RepTracking =
       joint: Joint;
       /** Which way the tracked joint moves first from the start position. */
       firstMove: 'down' | 'up';
+      /**
+       * Whether that first movement is the lowering (eccentric) or lifting
+       * (concentric) phase. Squat: eccentric. Lat pulldown: concentric.
+       */
+      firstPhase: 'eccentric' | 'concentric';
+      /**
+       * Smallest movement of the tracked joint that counts as a rep, as a
+       * fraction of torso length. Default DEFAULT_MIN_AMPLITUDE.
+       */
+      minAmplitude?: number;
     }
   | { kind: 'hold' };
+
+export const DEFAULT_MIN_AMPLITUDE = 0.15;
+
+/**
+ * Named, biomechanically motivated threshold adjustments based on the user's
+ * measured limb proportions (see src/engine/personalize.ts).
+ */
+export type PersonalizationRule = 'squatTorsoLean';
 
 /**
  * 'full': all check types the camera view supports.
