@@ -37,7 +37,7 @@ export function Groups() {
                   <Icon name="check" size={16} />
                 </span>
               )}
-              <MuscleIcon group={g} size={84} />
+              <MuscleIcon group={g} size={66} />
               <span class="label">{MUSCLE_LABELS[g]}</span>
             </button>
           );

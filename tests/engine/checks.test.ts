@@ -56,9 +56,9 @@ describe('torsoAngle', () => {
   it('fails too much forward lean in a squat', () => {
     expect(statuses(run('back-squat', 'squat-lean'), 'torso-bottom')).toEqual(['pass', 'fail', 'pass', 'fail']);
   });
-  it('fails hips shooting high at the deadlift start', () => {
-    expect(statuses(run('deadlift', 'deadlift-good'), 'torso-bottom')).toEqual(Array(4).fill('pass'));
-    expect(statuses(run('deadlift', 'deadlift-hips-high'), 'torso-bottom')).toEqual(Array(3).fill('fail'));
+  it('fails a deadlift set-up with the hips above the shoulders', () => {
+    expect(statuses(run('deadlift', 'deadlift-good'), 'hips-start')).toEqual(Array(4).fill('pass'));
+    expect(statuses(run('deadlift', 'deadlift-hips-high'), 'hips-start')).toEqual(Array(3).fill('fail'));
   });
   it('fails a row where the torso swings up', () => {
     expect(statuses(run('barbell-row', 'row-swinging'), 'torso-top')).toEqual(['pass', 'pass', 'fail', 'fail']);
@@ -69,11 +69,14 @@ describe('torsoAngle', () => {
   });
 });
 
-describe('jointAngle', () => {
+describe('relativeHeight (bench depth: elbows to shoulder level)', () => {
   it('fails bench reps that stop short of the chest', () => {
-    expect(statuses(run('bench-press', 'bench-good'), 'angle-elbow-bottom')).toEqual(Array(4).fill('pass'));
-    expect(statuses(run('bench-press', 'bench-partial'), 'angle-elbow-bottom')).toEqual(['pass', 'fail', 'pass', 'fail']);
+    expect(statuses(run('bench-press', 'bench-good'), 'depth')).toEqual(Array(4).fill('pass'));
+    expect(statuses(run('bench-press', 'bench-partial'), 'depth')).toEqual(['pass', 'fail', 'pass', 'fail']);
   });
+});
+
+describe('jointAngle', () => {
   it('fails a Romanian deadlift that turns into a squat', () => {
     expect(statuses(run('romanian-deadlift', 'rdl-squatting'), 'angle-knee-bottom')).toEqual(['pass', 'pass', 'fail', 'fail']);
   });
@@ -183,7 +186,7 @@ describe('camera angle', () => {
   it("can't judge geometry checks when a side-view lift is filmed from the front", () => {
     const r = run('back-squat', 'squat-front');
     expect(r.reps).toHaveLength(4);
-    for (const id of ['depth', 'torso-bottom', 'lockout-knee', 'path-hip']) {
+    for (const id of ['depth', 'torso-bottom', 'lockout-knee', 'lockout-hip']) {
       expect(statuses(r, id), id).toEqual(Array(4).fill('unknown'));
     }
     expect(r.reps[0].checks[0].reason).toMatch(/side-on/);

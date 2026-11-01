@@ -66,8 +66,8 @@ describe('ProportionMeter', () => {
 
 describe('personalized torso check', () => {
   const squat = getExercise('back-squat')!;
-  // Leans 56° at the bottom: over the 50° limit for average proportions.
-  const seq = S.squat({ seed: 12, lean: 56 });
+  // Leans 66° at the bottom: over the 60° limit for average proportions.
+  const seq = S.squat({ seed: 12, lean: 66 });
   const lean = (r: ReturnType<typeof analyze>) => r.reps.map((rep) => rep.checks.find((c) => c.checkId === 'torso-bottom')!);
 
   it('fails without proportions', () => {
@@ -78,7 +78,7 @@ describe('personalized torso check', () => {
     const checks = lean(r);
     expect(checks.map((c) => c.status)).toEqual(Array(4).fill('pass'));
     expect(checks[0].adjustment).toMatch(/^Allows \d+° more lean/);
-    expect(checks[0].target).toMatch(/at most 6\d° from vertical/);
+    expect(checks[0].target).toMatch(/at most 7\d° from vertical/);
   });
   it('expects less lean for short thighs', () => {
     const r = analyze(squat, fixture('squat-good'), { proportions: { thigh: 0.65, shin: 0.95, measuredAt: at } });

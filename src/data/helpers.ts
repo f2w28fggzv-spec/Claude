@@ -10,6 +10,7 @@ import type {
   Placement,
   RepPosition,
 } from './types';
+import { basicRangeSource } from './sources';
 
 /** Common joint angles (vertex in the middle). */
 export const ANGLES = {
@@ -322,7 +323,9 @@ function jointsOf(check: Check): Joint[] {
  * reference for distances).
  */
 export function ex(d: Draft): Exercise {
-  const checks = d.checks ?? [];
+  const analysis = d.analysis ?? 'basic';
+  // Basic-analysis checks without a published standard say so in their source.
+  const checks = (d.checks ?? []).map((c) => (c.source || analysis !== 'basic' ? c : { ...c, source: basicRangeSource(c) }));
   const joints = new Set<Joint>(['shoulder', 'hip']);
   if (d.tracking.kind === 'reps') joints.add(d.tracking.joint);
   for (const c of checks) for (const j of jointsOf(c)) joints.add(j);
@@ -330,7 +333,7 @@ export function ex(d: Draft): Exercise {
   return {
     ...d,
     secondary: d.secondary ?? [],
-    analysis: d.analysis ?? 'basic',
+    analysis,
     minLevel: d.minLevel ?? 'beginner',
     checks,
     requiredLandmarks: [...joints],

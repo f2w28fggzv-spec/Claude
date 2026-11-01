@@ -53,10 +53,11 @@ svg.icon { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: 
 svg.level rect { stroke: none; }
 svg.level .on { fill: currentColor; }
 svg.level .off { fill: var(--line); }
-.muscle-icon .mi-body circle, .muscle-icon .mi-body path, .muscle-icon .mi-body rect { fill: #3d4552; }
-.muscle-icon .mi-limbs polyline { fill: none; stroke: #3d4552; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
-.muscle-icon .mi-detail { fill: none; stroke: var(--card); stroke-width: 2; stroke-linecap: round; }
-.muscle-icon .mi-region { fill: var(--accent); opacity: 0.75; }
+.muscle-icon .mi-body path, .muscle-icon .mi-body ellipse { fill: #2f3640; stroke: #444d59; stroke-width: 0.7; }
+.muscle-icon .mi-body .mi-hair { fill: #1f242b; stroke: none; }
+.muscle-icon .mi-body .mi-ear { stroke: none; }
+.muscle-icon .mi-off path { fill: #3f4855; stroke: #2a3039; stroke-width: 0.5; }
+.muscle-icon .mi-on path { fill: var(--accent); stroke: #1d6b41; stroke-width: 0.5; }
 
 /* Buttons */
 button, .button {
@@ -94,20 +95,16 @@ button.link.danger { color: var(--danger); margin-top: 20px; }
 
 /* Muscle picker */
 .muscle-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.muscle-tile .muscle-icon { width: 84px; height: auto; max-width: 60%; }
+.muscle-tile .muscle-icon { width: 66px; height: auto; }
 .muscle-tile {
   position: relative; flex-direction: column; gap: 8px; min-height: 0; padding: 16px 8px 14px;
   background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 20px;
 }
 .muscle-tile .label { font-size: 1.05rem; font-weight: 650; }
-.muscle-tile .muscle-icon .mi-region { opacity: 0.55; }
+.muscle-tile .muscle-icon .mi-on path { fill: #2fae69; }
 .muscle-tile.on { border-color: var(--accent); background: var(--accent-soft); }
-.muscle-tile.on .muscle-icon .mi-region { opacity: 1; }
-.muscle-tile.on .muscle-icon .mi-body circle,
-.muscle-tile.on .muscle-icon .mi-body path,
-.muscle-tile.on .muscle-icon .mi-body rect { fill: #4f5a68; }
-.muscle-tile.on .muscle-icon .mi-limbs polyline { stroke: #4f5a68; }
-.muscle-tile.on .muscle-icon .mi-detail { stroke: var(--accent-soft); }
+.muscle-tile.on .muscle-icon .mi-on path { fill: var(--accent); }
+.muscle-tile.on .muscle-icon .mi-body path, .muscle-tile.on .muscle-icon .mi-body ellipse { fill: #36404b; }
 .tick {
   position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 50%;
   display: grid; place-items: center; background: var(--accent); color: var(--accent-ink);
@@ -175,7 +172,49 @@ details.more.small summary { font-size: 0.85rem; padding: 6px 0; }
   background: var(--raised); color: var(--text); font-weight: 600; font-size: 0.92rem; white-space: nowrap;
 }
 .filter.on { background: var(--accent); color: var(--accent-ink); }
-.filter.on .muscle-icon .mi-region { fill: var(--accent-ink); opacity: 1; }
+.filter.on .muscle-icon .mi-on path { fill: var(--accent-ink); stroke: none; }
+.filter.on .muscle-icon .mi-body path, .filter.on .muscle-icon .mi-body ellipse { fill: #1b7a46; stroke: none; }
+.filter.on .muscle-icon .mi-off path { fill: #27a35f; stroke: none; }
+.search-row { display: flex; gap: 8px; }
+.search-row .search { flex: 1; min-width: 0; }
+.filters-btn {
+  flex: none; width: auto; min-height: 50px; padding: 0 14px; gap: 6px; border-radius: 14px;
+  background: var(--card); color: var(--text); border: 1px solid var(--line); font-weight: 600;
+}
+.filters-btn.on { border-color: var(--accent); color: var(--accent); }
+.filters-btn .count {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: var(--accent); color: var(--accent-ink); font-size: 0.75rem;
+}
+.active-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 0; }
+.active-chip {
+  width: auto; min-height: 32px; padding: 4px 12px; border-radius: 999px; font-size: 0.85rem; font-weight: 600;
+  background: var(--accent-soft); color: var(--accent); border: 1px solid #1d6b41;
+}
+.active-filters .link { min-height: 32px; font-size: 0.85rem; }
+.full-dot { color: var(--accent); }
+.empty { padding: 24px 0; }
+body.no-scroll { overflow: hidden; }
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: flex-end; justify-content: center; animation: fade 0.15s ease-out;
+}
+.sheet {
+  width: 100%; max-width: 640px; max-height: 88vh; overflow-y: auto; background: var(--card);
+  border-radius: 22px 22px 0 0; padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+  animation: rise 0.2s ease-out;
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; }
+.sheet-head h2 { margin: 0; font-size: 1.25rem; }
+.sheet h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 20px 0 10px; }
+.chip-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+.sheet .switch-row { background: var(--raised); }
+.sheet input[role='switch']:not(:checked) { background: #3d4652; }
+.sheet .filter { background: var(--raised); }
+.sheet .filter.on { background: var(--accent); }
+@keyframes rise { from { transform: translateY(24px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet, .sheet-backdrop { animation: none; } }
 .lib-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 20px 0 8px; }
 
 /* Exercise page */
@@ -185,6 +224,11 @@ details.more.small summary { font-size: 0.85rem; padding: 6px 0; }
   background: var(--raised); font-size: 0.9rem; font-weight: 500;
 }
 .tag.strong { background: var(--accent-soft); color: var(--accent); }
+.tag.full { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
+.judged { list-style: none; padding: 0; margin: 4px 0 0; }
+.judged li { display: flex; flex-direction: column; gap: 3px; padding: 10px 0; }
+.judged li + li { border-top: 1px solid var(--line); }
+.judged small { color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
 .tips { list-style: none; padding: 0; margin: 0; }
 .tips li { display: flex; gap: 12px; padding: 12px 0; line-height: 1.45; }
 .tips li + li { border-top: 1px solid var(--line); }

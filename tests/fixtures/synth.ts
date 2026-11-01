@@ -354,7 +354,7 @@ export function deadlift(o: GenOptions & { drift?: number; startTorso?: number; 
     (s) => {
       // s: 0 = set-up at the floor, 1 = lockout (inverted below).
       const k = 1 - s.s * (o.lockout ?? 1);
-      const torso = (s.fault ? (o.hipsHighTorso ?? 82) : (o.startTorso ?? 55)) * k;
+      const torso = (s.fault ? (o.hipsHighTorso ?? 100) : (o.startTorso ?? 55)) * k;
       const body = legsAndTorso(ankle, 20 * k, (s.fault ? 45 : 70) * k, torso);
       const barX = ankle.x + 20 + (o.drift ?? 0) * Math.sin(Math.PI * s.s);
       const wy = lerp(body.knee!.y + 60, body.hip!.y + 150, s.s);
@@ -411,7 +411,7 @@ export function barbellRow(o: GenOptions = {}) {
   return render(
     profile(reps, fps, 1.2, 1.2, o.endAtTurn),
     (s) => {
-      const torso = s.fault ? lerp(55, 20, s.s) : 55;
+      const torso = s.fault ? lerp(70, 30, s.s) : 70;
       const body = legsAndTorso(ankle, 12, 25, torso);
       const sh = body.shoulder!;
       const hang = { x: sh.x, y: sh.y + 335 };
