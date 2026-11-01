@@ -25,6 +25,12 @@ export interface CheckContext {
   proportions?: BodyProportions;
   /** False when the camera wasn't at the configured angle for this rep. */
   viewOk: boolean;
+  /**
+   * Front view, one-sided exercise: the side doing the work this rep. Angles
+   * are read from that side instead of averaging both (which would halve
+   * the movement).
+   */
+  workingSide?: 'left' | 'right';
 }
 
 /** Share of a rep's frames that must be readable for whole-rep checks. */
@@ -49,6 +55,7 @@ const inRange = (v: number, min?: number, max?: number) =>
 function angleIn(ctx: CheckContext, frameIndex: number, a: JointAngle): number {
   const f = ctx.seq.frames[frameIndex];
   if (ctx.reader.view === 'front') {
+    if (ctx.workingSide) return sidedAngle(ctx, frameIndex, a, ctx.workingSide);
     const both = (['left', 'right'] as const).map((side) => sidedAngle(ctx, frameIndex, a, side));
     return both.every(Number.isFinite) ? (both[0] + both[1]) / 2 : NaN;
   }

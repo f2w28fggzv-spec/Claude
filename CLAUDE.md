@@ -56,6 +56,9 @@ After each phase: open a PR, wait for the user's "merge it", then confirm the Pa
 - `src/analysis/` — browser side: `runner.ts` (shared model, monotonic timestamps), `usePoseCamera.ts` (live loop + overlay), `fileSource.ts` (video files), `snapshots.ts` (in-memory JPEGs for results), `feedback.ts` (beeps, wake lock)
 - `src/screens/Analyze.tsx` (setup → countdown → recording / file → results), `Results.tsx`
 - `src/privacy.ts` — network guard
+- `src/demo/` — animated how-to demos: `figure.ts` (2D body, segment lengths from Winter 2009, forward kinematics + two-link IK), `patterns.ts` (movement patterns: squat, lunge, hinge, deadlift, presses, rows, pull-ups, curls, planks…), `timeline.ts` (rep timing), `attach.ts` (props on joints), `types.ts`. Rendered by `src/screens/ExerciseDemo.tsx`; every exercise's `demo` field picks a pattern with parameters.
+- Hidden page `#/dev/demos` shows every demo (`?still` for start / middle / turnaround frames).
+- `tests/demo.test.ts` — every demo is well-formed and, run through the engine as a recording (`tests/fixtures/demoSeq.ts`), counts its reps and passes all its exercise's checks.
 - `tests/` — library and builder rules; `tests/engine/` engine tests; `tests/fixtures/` landmark fixtures (`synth.ts` generates them, `npm run fixtures` writes `*.json.gz`, `load.ts` reads `.json` or `.json.gz`)
 
 ## Decisions
@@ -73,6 +76,9 @@ After each phase: open a PR, wait for the user's "merge it", then confirm the Pa
 - Recording: the live camera computes landmarks as it goes; no video is recorded or buffered. Hands-free mode (default on) starts 3 s after the setup check holds and stops when the lifter stays still at the start position for 3 s after a rep, leaves the frame for 2 s, or after 3 minutes. Picked video files are read locally via an object URL at 20 fps, then released.
 - Results pictures: small JPEGs of each rep's turnaround frame kept in memory only and cleared when the results screen closes. Live recordings capture them at the online turning points; files seek back to the exact frames after analysis.
 - User-tuned depth margin (results screen) is stored as a threshold override in localStorage.
+- How-to demos are animated figures, not videos (user's choice): drawn from the same camera angle as the exercise's placement, correct form by construction, no copyright or network requests, respects reduced motion. Demos must pass their own exercise's checks (tests/demo.test.ts); when thresholds change in Phase 3/4, fix the demo or the threshold, whichever is wrong.
+- Front-view one-sided exercises (e.g. side-lying hip abduction, cable lateral raise) read angles from the working side (the side whose tracked joint travels further) instead of averaging both sides.
+- Dumbbell fly has no range-of-motion check: from a side-on camera the arms move toward and away from the lens, so the shoulder angle can't be measured. Reps are still counted.
 
 ## Implementation notes
 

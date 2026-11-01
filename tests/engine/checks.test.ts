@@ -8,6 +8,7 @@ import { analyze, withOverrides } from '../../src/engine/analyze';
 import type { AnalysisResult, CheckStatus } from '../../src/engine/types';
 import { fixture } from '../fixtures/load';
 import * as S from '../fixtures/synth';
+import { demoSequence } from '../fixtures/demoSeq';
 
 const ex = (id: string) => getExercise(id)!;
 /** Status of one check across all reps. */
@@ -86,6 +87,19 @@ describe('rangeOfMotion', () => {
   it("can't judge when the joints are hidden for most of the rep", () => {
     const seq = S.squat({ seed: 3, dropouts: [{ joints: ['ankle'], fromMs: 0, toMs: 60000 }] });
     expect(statuses(analyze(ex('goblet-squat'), seq), 'rom-knee')).toEqual(Array(4).fill('unknown'));
+  });
+});
+
+describe('front view, one-sided exercises', () => {
+  it('reads angles from the working side instead of averaging both', () => {
+    // Cable lateral raise: one arm moves, the other hangs still.
+    const e = ex('cable-lateral-raise');
+    const r = analyze(e, demoSequence(e));
+    const rom = r.reps.map((rep) => rep.checks.find((c) => c.checkId === 'rom-shoulder')!);
+    for (const c of rom) {
+      expect(c.status).toBe('pass');
+      expect(c.value!).toBeGreaterThan(70); // averaging both arms would give about half
+    }
   });
 });
 

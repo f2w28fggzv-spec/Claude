@@ -1,6 +1,8 @@
 // Schema for exercise config entries. The Phase 2 analysis engine reads these
 // generically, so anything exercise-specific belongs in data, not code.
 
+import type { Demo } from '../demo/types';
+
 export const MUSCLE_GROUPS = [
   'chest',
   'back',
@@ -290,4 +292,6 @@ export interface Exercise {
   analysis: AnalysisLevel;
   /** Short description of the movement. */
   summary: string;
+  /** Animated how-to, drawn from the same camera angle as `placement`. */
+  demo: Demo;
 }
