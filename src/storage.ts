@@ -81,3 +81,8 @@ export function saveOverride(exerciseId: string, checkId: string, field: string,
 
 export const loadHandsFree = () => read<boolean>(KEY_HANDS_FREE, true) !== false;
 export const saveHandsFree = (on: boolean) => write(KEY_HANDS_FREE, on);
+
+const KEY_LIBRARY_FILTERS = 'formcheck.v1.libraryFilters';
+/** Exercises-tab filters (a per-device convenience). */
+export const loadLibraryFilters = (): unknown => read<unknown>(KEY_LIBRARY_FILTERS, null);
+export const saveLibraryFilters = (f: unknown) => write(KEY_LIBRARY_FILTERS, f);

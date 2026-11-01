@@ -1,11 +1,14 @@
 // Exercise library. One entry per exercise; add new ones here without touching
 // engine code. Schema: ./types.ts. Builders: ./helpers.ts.
 //
-// Every threshold is an unvalidated draft. Phase 3 replaces the values for the
-// six full-analysis lifts with sourced ones; Phase 4 calibrates them.
-// 'basic' entries only carry range-of-motion (or hold alignment) checks.
+// Thresholds for the six full-analysis lifts (back squat, bench press,
+// deadlift, overhead press, barbell row, Romanian deadlift) come from written
+// standards cited next to each check (sources in ./sources.ts). 'basic'
+// entries only carry range-of-motion (or hold alignment) checks with draft
+// values. Every threshold stays 'unvalidated' until Phase 4 calibration.
 import { C, F, PLACEMENTS as P, ex } from './helpers';
 import * as D from '../demo/patterns';
+import { LOCKOUT_DEG, MIN_ECCENTRIC_SEC, SRC, cite } from './sources';
 import type { Exercise, Joint, RepTracking } from './types';
 
 type Phase = 'eccentric' | 'concentric';
@@ -47,12 +50,22 @@ export const EXERCISES: Exercise[] = [
     tracking: down('hip'),
     requiredLandmarks: ['nose', 'ankle'],
     checks: [
-      C.depth(0),
-      C.torso('bottom', { maxDeg: 50, personalize: 'squatTorsoLean' }, 'forwardLean', 'Torso lean at the bottom'),
-      C.lockout('knee', 165),
-      C.lockout('hip', 165),
-      C.path('hip', 0.6, 'pathDrift', 'Hips staying over the feet'),
-      C.eccentric(1),
+      // NSCA: "Continue flexing the hips and knees until the thighs are
+      // parallel to the floor." Margin 0 = hip and knee joint centres level,
+      // i.e. thighs parallel. The IPF rule (hip crease below the top of the
+      // knee) is stricter; users can raise the margin on the results screen.
+      cite({ ...C.depth(0), label: 'Depth: thighs parallel or lower' }, `${SRC.nsca}; stricter competition standard: ${SRC.ipf}`),
+      // Larsen et al. 2021 measured torso angles of 46.0–46.7° (high bar) and
+      // 53.0–56.7° (low bar) from vertical at the lowest bar position in
+      // trained lifters. 60° allows low-bar technique plus measurement noise;
+      // personalised for thigh/shin/torso proportions.
+      cite(C.torso('bottom', { maxDeg: 60, personalize: 'squatTorsoLean' }, 'forwardLean', 'Torso lean at the bottom'), SRC.larsen2021),
+      // IPF: "recover at will to an upright position with the knees locked";
+      // NSCA: extend back to the standing start. 165° allows for 2D landmark error.
+      cite(C.lockout('knee', LOCKOUT_DEG), `${SRC.ipf}; ${SRC.nsca}; tolerance from ${SRC.wade2023}`),
+      cite(C.lockout('hip', LOCKOUT_DEG), `${SRC.ipf}; ${SRC.nsca}; tolerance from ${SRC.wade2023}`),
+      // NSCA: "Allow the hips and knees to slowly flex"; ACSM moderate tempo 1–2 s.
+      cite(C.eccentric(MIN_ECCENTRIC_SEC), `${SRC.nsca}; ${SRC.acsm2009}`),
     ],
     faults: [
       F.shallowDepth('box-squat'),
@@ -291,11 +304,19 @@ export const EXERCISES: Exercise[] = [
     placement: P.sideStanding,
     tracking: down('wrist'),
     checks: [
-      C.rom('hip', 50),
-      C.angle('knee', 'bottom', { min: 140 }, 'kneesBending', 'Knees stay softly bent, not squatting'),
-      C.lockout('hip', 165),
-      C.path('wrist', 0.3, 'pathDrift', 'Bar staying close to the legs'),
-      C.eccentric(1.5),
+      // NSCA (stiff-leg deadlift): lower the bar toward the floor "to a point
+      // just prior to where the knees extend or the back begins to round".
+      // 50° of hip movement flags shallow hinges.
+      cite(C.rom('hip', 50), `${SRC.nsca} (numeric limit derived, not published)`),
+      // NSCA: "Keep the knees slightly flexed." A knee angle under 140° (more
+      // than 40° of bend) is clearly more than slight: the lift has become a squat.
+      cite(C.angle('knee', 'bottom', { min: 140 }, 'kneesBending', 'Knees stay softly bent, not squatting'), `${SRC.nsca} (numeric limit derived, not published)`),
+      // NSCA: "Stand erect with the bar touching the front of the thighs".
+      cite(C.lockout('hip', LOCKOUT_DEG), `${SRC.nsca}; tolerance from ${SRC.wade2023}`),
+      // NSCA: bar starts against the thighs; no published numeric limit for drift.
+      cite(C.path('wrist', 0.3, 'pathDrift', 'Bar staying close to the legs'), `${SRC.nsca} (numeric limit derived, not published)`),
+      // NSCA: "Allow the torso to slowly flex forward"; ACSM moderate tempo 1–2 s.
+      cite(C.eccentric(MIN_ECCENTRIC_SEC), `${SRC.nsca}; ${SRC.acsm2009}`),
     ],
     faults: [
       F.partialRange('dumbbell-romanian-deadlift', 'Push your hips back until you feel a strong hamstring stretch.'),
@@ -353,11 +374,20 @@ export const EXERCISES: Exercise[] = [
     placement: P.sideStanding,
     tracking: up('wrist'),
     checks: [
-      C.lockout('hip', 165),
-      C.lockout('knee', 165),
-      C.path('wrist', 0.25, 'pathDrift', 'Bar staying over mid-foot'),
-      C.torso('bottom', { maxDeg: 75 }, 'hipsHigh', 'Hips not shooting up at the start'),
-      C.rom('hip', 60),
+      // IPF: knees "locked in a straight position", "stand erect with the
+      // shoulders back"; NSCA: "At full knee and hip extension, establish an
+      // erect body position". 165° allows for 2D landmark error.
+      cite(C.lockout('hip', LOCKOUT_DEG), `${SRC.ipf}; ${SRC.nsca}; tolerance from ${SRC.wade2023}`),
+      cite(C.lockout('knee', LOCKOUT_DEG), `${SRC.ipf}; ${SRC.nsca}; tolerance from ${SRC.wade2023}`),
+      // NSCA: "keep it as close to the shins as possible". No published
+      // numeric limit found; 0.25 × torso (about 12 cm for an average adult)
+      // is a starting value to calibrate.
+      cite(C.path('wrist', 0.25, 'pathDrift', 'Bar staying close to the legs'), `${SRC.nsca} (numeric limit derived, not published)`),
+      // NSCA set-up: "Squat down with the hips lower than the shoulders."
+      cite(C.height('hips-start', 'Hips below shoulders at the start', 'hip', 'shoulder', 'atOrBelow', 'bottom', 0, 'hipsHigh'), SRC.nsca),
+      // Schellenberg et al. 2013: peak hip flexion about 103° in the deadlift.
+      // 60° of hip movement flags reps that don't start near the floor.
+      cite(C.rom('hip', 60), SRC.schellenberg2013),
     ],
     faults: [
       F.noLockout('hip-thrust', 'Stand tall at the top: hips through, knees straight.'),
@@ -365,7 +395,7 @@ export const EXERCISES: Exercise[] = [
       {
         id: 'hipsHigh',
         label: 'Hips too high at the start',
-        cue: 'Set your hips a little lower and push the floor away with your legs.',
+        cue: 'Start with your hips lower than your shoulders, then push the floor away with your legs.',
         corrective: 'goblet-squat',
       },
       F.partialRange('romanian-deadlift', 'Lower the bar all the way to the floor each rep.'),
@@ -643,13 +673,24 @@ export const EXERCISES: Exercise[] = [
     placement: P.sideBench,
     tracking: down('wrist'),
     checks: [
-      C.angle('elbow', 'bottom', { max: 95 }, 'partialRange', 'Bar reaching the chest'),
-      C.lockout('elbow', 160),
-      C.path('wrist', 0.35, 'pathDrift', 'Bar path'),
-      C.eccentric(1),
+      // IPF 2026: lower the bar to the chest "whereby the underside of both
+      // elbow joints is lowered level with or below the top surface of each
+      // respective shoulder joint". Landmarks are joint centres, so the elbow
+      // centre may sit up to 10% of torso length above the shoulder centre.
+      // NSCA: "Lower the bar to touch the chest at approximately nipple level."
+      cite(C.height('depth', 'Depth: elbows down to shoulder level', 'elbow', 'shoulder', 'atOrBelow', 'bottom', -0.1, 'partialRange'), `${SRC.ipf}; ${SRC.nsca}`),
+      // NSCA: elbows fully extended at the start and finish; IPF: "straight arms'
+      // length elbows locked". 165° allows for 2D landmark error.
+      cite(C.lockout('elbow', LOCKOUT_DEG), `${SRC.nsca}; ${SRC.ipf}; tolerance from ${SRC.wade2023}`),
+      // Duffey & Challis 2005: maximal horizontal bar deviation from the
+      // shoulder 0.142 ± 0.027 m in recreational lifters. Mean + 2 SD ≈ 0.20 m
+      // ≈ 0.4 × an average adult torso (0.288 × 1.75 m ≈ 0.5 m).
+      cite(C.path('wrist', 0.4, 'pathDrift', 'Bar path'), SRC.duffey2005),
+      // Duffey & Challis 2005: lowering took 1.43 ± 0.54 s; ACSM moderate tempo 1–2 s.
+      cite(C.eccentric(MIN_ECCENTRIC_SEC), `${SRC.acsm2009}; ${SRC.duffey2005}`),
     ],
     faults: [
-      F.partialRange('dumbbell-bench-press', 'Lower the bar until it touches your chest.'),
+      F.partialRange('dumbbell-bench-press', 'Lower the bar to your chest until your elbows are level with your shoulders.'),
       F.noLockout('close-grip-bench-press', 'Press until your arms are straight.'),
       F.pathDrift('dumbbell-floor-press', 'Touch low on the chest and press back up over the shoulders.'),
       F.rushedLowering('dumbbell-floor-press'),
@@ -800,20 +841,27 @@ export const EXERCISES: Exercise[] = [
     equipment: ['barbell'],
     role: 'compound',
     analysis: 'full',
-    demo: D.row({ implement: 'barbell', torso: 58 }),
+    demo: D.row({ implement: 'barbell', torso: 70 }),
     placement: P.sideStanding,
     tracking: up('wrist'),
     checks: [
-      C.torso('bottom', { minDeg: 40 }, 'tooUpright', 'Torso hinged forward'),
-      C.torso('top', { minDeg: 35 }, 'swinging', 'Torso stays put while rowing'),
-      C.rom('elbow', 60),
-      C.eccentric(1),
+      // NSCA: "Flex the torso forward to be slightly above parallel to the
+      // floor" — read as within 30° of horizontal (≥ 60° from vertical).
+      cite(C.torso('bottom', { minDeg: 60 }, 'tooUpright', 'Torso hinged forward'), SRC.nsca),
+      // NSCA: "Keep the torso rigid … Do not jerk the torso for assistance."
+      // Allows about 10° of rise during the pull.
+      cite(C.torso('top', { minDeg: 50 }, 'swinging', 'Torso stays put while rowing'), `${SRC.nsca} (numeric limit derived, not published)`),
+      // NSCA: start with "elbows fully extended", finish with the bar touching
+      // the chest. 60° of elbow movement flags partial reps.
+      cite(C.rom('elbow', 60), `${SRC.nsca} (numeric limit derived, not published)`),
+      // NSCA: "Allow the elbows to slowly extend"; ACSM moderate tempo 1–2 s.
+      cite(C.eccentric(MIN_ECCENTRIC_SEC), `${SRC.nsca}; ${SRC.acsm2009}`),
     ],
     faults: [
       {
         id: 'tooUpright',
         label: 'Standing too upright',
-        cue: 'Hinge forward until your torso is well inclined before you row.',
+        cue: 'Hinge forward until your torso is just above parallel to the floor before you row.',
         corrective: 'one-arm-dumbbell-row',
       },
       F.swinging('chest-supported-dumbbell-row', 'Keep your torso angle fixed; pull with your arms and back.'),
@@ -994,11 +1042,22 @@ export const EXERCISES: Exercise[] = [
     tracking: up('wrist'),
     requiredLandmarks: ['ankle'],
     checks: [
-      C.lockout('elbow', 160),
-      C.angle('shoulder', 'top', { min: 150 }, 'noLockout', 'Arms finishing overhead'),
-      C.path('wrist', 0.3, 'pathDrift', 'Bar path'),
-      C.torso('top', { maxDeg: 15 }, 'overArching', 'Leaning back'),
-      C.rom('elbow', 70),
+      // NSCA: "Push the bar upward until the elbows are fully extended."
+      // 165° allows for 2D landmark error.
+      cite(C.lockout('elbow', LOCKOUT_DEG), `${SRC.nsca}; tolerance from ${SRC.wade2023}`),
+      // Arms overhead needs near-full shoulder flexion; normal adult shoulder
+      // flexion is 169–172° (Soucie et al.). 150° allows for reduced mobility
+      // and measurement error.
+      cite(C.angle('shoulder', 'top', { min: 150 }, 'noLockout', 'Arms finishing overhead'), `${SRC.nsca}; ${SRC.soucie2011}`),
+      // NSCA: the bar passes close to the face (neck extends slightly). No
+      // published numeric limit found; 0.3 × torso is a starting value.
+      cite(C.path('wrist', 0.3, 'pathDrift', 'Bar path'), `${SRC.nsca} (numeric limit derived, not published)`),
+      // No published numeric limit for leaning back found; 15° flags a clear
+      // layback beyond the slight lean needed to clear the face.
+      cite(C.torso('top', { maxDeg: 15 }, 'overArching', 'Leaning back'), 'Derived starting value (no published numeric limit found)'),
+      // NSCA: lower the bar "to touch the clavicles and anterior deltoids".
+      // 70° of elbow movement flags half reps.
+      cite(C.rom('elbow', 70), `${SRC.nsca} (numeric limit derived, not published)`),
     ],
     faults: [
       F.noLockout('dumbbell-shoulder-press', 'Press until your arms are straight and the bar is over your mid-foot.'),

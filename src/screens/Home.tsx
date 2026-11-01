@@ -17,7 +17,7 @@ export function Home() {
         <section class="hero">
           <div class="hero-icons" aria-hidden="true">
             {MUSCLE_GROUPS.slice(0, 5).map((g) => (
-              <MuscleIcon group={g} size={44} />
+              <MuscleIcon group={g} size={34} />
             ))}
           </div>
           <h2>Train smarter with your phone camera</h2>

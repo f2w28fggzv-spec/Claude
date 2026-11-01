@@ -64,6 +64,14 @@ describe('exercise library', () => {
         }
       });
 
+      it('cites a source for every threshold', () => {
+        for (const c of e.checks) {
+          expect(c.source, c.id).toBeTruthy();
+          // Full-analysis lifts use written standards, never the draft placeholder.
+          if (e.analysis === 'full') expect(c.source, c.id).not.toMatch(/^Draft minimum/);
+        }
+      });
+
       it('points every fault at a different exercise in the library', () => {
         for (const f of e.faults) {
           expect(f.cue).toBeTruthy();

@@ -1,5 +1,6 @@
 import { getExercise } from '../data/exercises';
 import { EQUIPMENT_LABELS, MUSCLE_LABELS } from '../data/types';
+import { describeTarget } from '../data/describe';
 import { Icon, MuscleIcon } from './icons';
 import { ExerciseDemo } from './ExerciseDemo';
 import { Screen } from './Layout';
@@ -19,13 +20,14 @@ export function ExerciseDetail({ id }: { id: string }) {
       <div class="tags">
         {e.primary.map((g) => (
           <span class="tag strong">
-            <MuscleIcon group={g} size={16} />
+            <MuscleIcon group={g} size={10} />
             {MUSCLE_LABELS[g]}
           </span>
         ))}
         {e.equipment.map((q) => (
           <span class="tag">{EQUIPMENT_LABELS[q]}</span>
         ))}
+        <span class={`tag ${e.analysis === 'full' ? 'full' : ''}`}>{e.analysis === 'full' ? 'Full analysis' : 'Basic analysis'}</span>
       </div>
       <a class="button big" href={`#/analyze/${e.id}`}>
         <Icon name="camera" size={22} /> Check my technique
@@ -55,6 +57,28 @@ export function ExerciseDetail({ id }: { id: string }) {
       {e.secondary.length > 0 && (
         <p class="muted small">Also works {e.secondary.map((g) => MUSCLE_LABELS[g].toLowerCase()).join(', ')}.</p>
       )}
+
+      <details class="more">
+        <summary>How we judge it</summary>
+        <p class="muted small">
+          {e.analysis === 'full'
+            ? 'Full analysis: these checks come from written coaching and competition standards.'
+            : 'Basic analysis: camera placement, rep counting and range of motion.'}{' '}
+          All values are starting points and haven’t been calibrated against recorded reps yet.
+        </p>
+        <ul class="judged">
+          <li>
+            <strong>{e.tracking.kind === 'hold' ? 'Hold time' : 'Rep count'}</strong>
+          </li>
+          {e.checks.map((c) => (
+            <li>
+              <strong>{c.label}</strong>
+              <span>{describeTarget(c)}</span>
+              {c.source && <small>Source: {c.source}</small>}
+            </li>
+          ))}
+        </ul>
+      </details>
     </Screen>
   );
 }
