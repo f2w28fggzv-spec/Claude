@@ -9,6 +9,7 @@
 // add the fault's corrective exercise (the Phase 5 rule in CLAUDE.md).
 import { getExercise } from '../data/exercises';
 import { isBodyweight } from '../data/filters';
+import { exerciseName } from './exercises';
 import { MUSCLE_LABELS, type Exercise, type MuscleGroup } from '../data/types';
 import type { Program, ProgramItem } from '../program/builder';
 import { exerciseHistory, finished, formatSet, fromUnit, muscleSets, toUnit, weekStart, type SessionSummary } from './stats';
@@ -193,7 +194,7 @@ export function insights(
       const cur = hist.find((h) => h.workoutId === latest.id);
       const before = hist.filter((h) => h.date < latest.startedAt);
       if (!cur || before.length === 0) continue;
-      const name = getExercise(e.exerciseId)?.name.toLowerCase() ?? e.exerciseId;
+      const name = exerciseName(e.exerciseId).toLowerCase();
       const prevBest = Math.max(...before.map((h) => h.bestE1rm));
       let note = '';
       if (cur.bestE1rm > 0 && prevBest > 0 && cur.bestSet) {
@@ -238,7 +239,7 @@ export function insights(
         out.push({
           id: `stall-${id}`,
           tone: 'info',
-          title: `${getExercise(id)?.name ?? id} has stalled`,
+          title: `${exerciseName(id)} has stalled`,
           body: 'No progress in three sessions. Try one lighter week (about 10% less) and build back up, and check your sleep and recovery.',
         });
       }

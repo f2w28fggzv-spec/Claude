@@ -1,6 +1,5 @@
-import { useState } from 'preact/hooks';
-import { getExercise } from '../data/exercises';
-import { isBodyweight } from '../data/filters';
+import { useRef, useState } from 'preact/hooks';
+import { exerciseInfo } from '../log/exercises';
 import { MUSCLE_LABELS, type MuscleGroup } from '../data/types';
 import { startRoutine } from '../log/session';
 import { deleteRoutine, loadActiveWorkout, loadRoutines, loadWorkouts, saveActiveWorkout, saveMode, saveRoutine } from '../log/store';
@@ -16,7 +15,7 @@ const newId = () => `r${Date.now().toString(36)}${Math.random().toString(36).sli
 /** "Chest & Back" from the muscles with the most sets. */
 function suggestName(items: Routine['items']): string {
   const sets = new Map<MuscleGroup, number>();
-  for (const it of items) for (const g of getExercise(it.exerciseId)?.primary ?? []) sets.set(g, (sets.get(g) ?? 0) + it.sets);
+  for (const it of items) for (const g of exerciseInfo(it.exerciseId)?.primary ?? []) sets.set(g, (sets.get(g) ?? 0) + it.sets);
   const top = [...sets].sort((a, b) => b[1] - a[1]).slice(0, 2);
   return top.length ? top.map(([g]) => MUSCLE_LABELS[g]).join(' & ') : 'My routine';
 }
@@ -27,6 +26,7 @@ export function RoutineScreen({ id }: { id: string }) {
   const [name, setName] = useState(existing?.name ?? '');
   const [items, setItems] = useState<Routine['items']>(existing?.items ?? []);
   const [picker, setPicker] = useState(false);
+  const nameInput = useRef<HTMLInputElement>(null);
 
   if (id !== 'new' && !existing) {
     return (
@@ -72,8 +72,23 @@ export function RoutineScreen({ id }: { id: string }) {
 
   return (
     <Screen
-      title={existing ? 'Edit routine' : 'New routine'}
-      subtitle="My workouts"
+      title={existing ? name.trim() || existing.name : 'New routine'}
+      subtitle={existing ? 'Routine · My workouts' : 'My workouts'}
+      titleAction={
+        existing && (
+          <button
+            type="button"
+            class="icon-btn small title-edit"
+            aria-label="Rename routine"
+            onClick={() => {
+              nameInput.current?.focus();
+              nameInput.current?.select();
+            }}
+          >
+            <Icon name="edit" size={16} />
+          </button>
+        )
+      }
       back=""
       action={
         <button type="button" disabled={items.length === 0} onClick={save}>
@@ -82,21 +97,23 @@ export function RoutineScreen({ id }: { id: string }) {
       }
     >
       <label class="text-field">
-        <span>Name</span>
-        <input type="text" value={name} placeholder={items.length ? suggestName(items) : 'e.g. Push day'} maxLength={40} onInput={(e) => setName(e.currentTarget.value)} />
+        <span>Routine name</span>
+        <input ref={nameInput} type="text" value={name} placeholder={items.length ? suggestName(items) : 'e.g. Push day'} maxLength={40} onInput={(e) => setName(e.currentTarget.value)} />
       </label>
 
       {items.length > 0 && (
         <ul class="card routine-items">
           {items.map((it, i) => {
-            const ex = getExercise(it.exerciseId);
+            const ex = exerciseInfo(it.exerciseId);
             return (
               <li style={{ '--i': String(i) }}>
                 <span class="row-main">
-                  <strong>{ex?.name ?? it.exerciseId}</strong>
+                  <strong>{ex?.name ?? 'Removed exercise'}</strong>
                   <small>
-                    {ex?.primary.map((g) => MUSCLE_LABELS[g]).join(', ')}
-                    {ex && isBodyweight(ex) ? ' · Bodyweight' : ''}
+                    {[ex?.primary.map((g) => MUSCLE_LABELS[g]).join(', '), ex?.bodyweight ? 'Bodyweight' : ex?.custom ? 'Added weight' : '']
+                      .filter(Boolean)
+                      .join(' · ')}
+                    {ex?.custom && <span class="own-tag">Yours</span>}
                   </small>
                 </span>
                 <span class="routine-controls">
@@ -143,7 +160,7 @@ export function RoutineScreen({ id }: { id: string }) {
       {picker && (
         <ExercisePicker
           onPick={(exerciseId) => {
-            const hold = getExercise(exerciseId)?.tracking.kind === 'hold';
+            const hold = !!exerciseInfo(exerciseId)?.hold;
             setItems([...items, { exerciseId, sets: hold ? 2 : 3 }]);
             setPicker(false);
           }}

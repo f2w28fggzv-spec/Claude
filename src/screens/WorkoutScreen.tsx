@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { getExercise } from '../data/exercises';
-import { isBodyweight } from '../data/filters';
+import { exerciseInfo } from '../log/exercises';
 import { addExercise, completeSet, finishWorkout } from '../log/session';
 import { exerciseHistory, formatSetShort, formatWeight, fromUnit, toUnit } from '../log/stats';
 import { loadActiveWorkout, loadBodyweight, loadUnit, loadWorkouts, saveActiveWorkout, saveWorkout } from '../log/store';
@@ -8,6 +7,7 @@ import type { SetEntry, Unit, Workout } from '../log/types';
 import { navigate } from '../router';
 import { showToast } from '../ui/toast';
 import { ExercisePicker } from './ExercisePicker';
+import { RenameSheet } from './RenameSheet';
 import { Icon } from './icons';
 import { Screen } from './Layout';
 
@@ -31,6 +31,7 @@ export function WorkoutScreen() {
   const [now, setNow] = useState(Date.now());
   const [rest, setRest] = useState<{ until: number; total: number } | null>(null);
   const [picker, setPicker] = useState(false);
+  const [renaming, setRenaming] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -126,6 +127,11 @@ export function WorkoutScreen() {
       title={w.dayName ?? 'New workout'}
       subtitle={`${clock(now - new Date(w.startedAt).getTime())} · ${done} set${done === 1 ? '' : 's'} done`}
       back=""
+      titleAction={
+        <button type="button" class="icon-btn small title-edit" aria-label="Rename workout" onClick={() => setRenaming(true)}>
+          <Icon name="edit" size={16} />
+        </button>
+      }
       action={
         <button type="button" onClick={finish}>
           <Icon name="check" size={20} /> Finish workout
@@ -143,16 +149,22 @@ export function WorkoutScreen() {
         </section>
       )}
       {w.entries.map((e, ei) => {
-        const ex = getExercise(e.exerciseId);
-        const hold = ex?.tracking.kind === 'hold';
-        const bw = !!ex && isBodyweight(ex);
+        const ex = exerciseInfo(e.exerciseId);
+        const hold = !!ex?.hold;
+        const bw = !!ex?.bodyweight;
         const prev = exerciseHistory(history, e.exerciseId).at(-1);
         return (
           <section class="card log-ex" style={{ '--i': String(ei) }}>
             <header class="log-ex-head">
-              <a href={`#/exercise/${e.exerciseId}`}>
-                <strong>{ex?.name ?? e.exerciseId}</strong>
-              </a>
+              {ex?.library ? (
+                <a href={`#/exercise/${e.exerciseId}`}>
+                  <strong>{ex.name}</strong>
+                </a>
+              ) : (
+                <span>
+                  <strong>{ex?.name ?? 'Removed exercise'}</strong> <span class="own-tag">Yours</span>
+                </span>
+              )}
               <button type="button" class="icon-btn" aria-label={`Remove ${ex?.name}`} onClick={() => removeExercise(ei)}>
                 <Icon name="close" size={18} />
               </button>
@@ -222,9 +234,11 @@ export function WorkoutScreen() {
               <button type="button" class="link" onClick={() => addSet(ei)}>
                 <Icon name="plus" size={16} /> Add set
               </button>
-              <a class="link" href={`#/analyze/${e.exerciseId}`}>
-                <Icon name="camera" size={16} /> Check technique
-              </a>
+              {ex?.library && (
+                <a class="link" href={`#/analyze/${e.exerciseId}`}>
+                  <Icon name="camera" size={16} /> Check technique
+                </a>
+              )}
             </div>
           </section>
         );
@@ -247,6 +261,18 @@ export function WorkoutScreen() {
             Skip
           </button>
         </div>
+      )}
+
+      {renaming && (
+        <RenameSheet
+          title="Rename workout"
+          value={w.dayName ?? ''}
+          onSave={(name) => {
+            update({ ...w, dayName: name });
+            setRenaming(false);
+          }}
+          onClose={() => setRenaming(false)}
+        />
       )}
 
       {picker && (

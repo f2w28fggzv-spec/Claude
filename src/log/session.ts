@@ -1,9 +1,9 @@
 // Creating and finishing workouts.
 import { getExercise } from '../data/exercises';
-import { isBodyweight } from '../data/filters';
 import { MUSCLE_LABELS, type MuscleGroup } from '../data/types';
 import type { Program } from '../program/builder';
 import { suggest } from './coach';
+import { exerciseInfo } from './exercises';
 import { doneSets, exerciseHistory } from './stats';
 import type { ExerciseEntry, Routine, SetEntry, TechniqueSummary, Unit, Workout } from './types';
 
@@ -64,7 +64,7 @@ function plannedFromLast(exerciseId: string, workouts: Workout[], i: number): Se
   const last = exerciseHistory(workouts, exerciseId).at(-1);
   const prev = last?.sets[i] ?? last?.sets[last.sets.length - 1];
   if (prev) return { weight: prev.weight, reps: prev.reps, seconds: prev.seconds };
-  return getExercise(exerciseId)?.tracking.kind === 'hold' ? { seconds: 30 } : {};
+  return exerciseInfo(exerciseId)?.hold ? { seconds: 30 } : {};
 }
 
 /** Adds an exercise with 3 sets, pre-filled with what you did last time. */
@@ -83,7 +83,7 @@ export function startRoutine(routine: Routine, workouts: Workout[], now = new Da
     dayName: routine.name,
     routineId: routine.id,
     entries: routine.items
-      .filter((it) => getExercise(it.exerciseId))
+      .filter((it) => exerciseInfo(it.exerciseId))
       .map((it) => ({
         exerciseId: it.exerciseId,
         sets: Array.from({ length: Math.max(1, it.sets) }, (_, i) => ({ done: false, planned: plannedFromLast(it.exerciseId, workouts, i) })),
@@ -119,7 +119,7 @@ export function routineFromWorkout(w: Workout, now = new Date()): Routine {
 export function nameFromMuscles(entries: ExerciseEntry[]): string | undefined {
   const sets = new Map<MuscleGroup, number>();
   for (const e of entries) {
-    const ex = getExercise(e.exerciseId);
+    const ex = exerciseInfo(e.exerciseId);
     const n = e.sets.filter((x) => x.done).length;
     for (const g of ex?.primary ?? []) sets.set(g, (sets.get(g) ?? 0) + n);
   }
@@ -147,8 +147,7 @@ export function completeSet(set: SetEntry): SetEntry {
 export function finishWorkout(w: Workout, now = new Date(), bodyweight?: number): Workout {
   const entries = w.entries
     .map((e) => {
-      const ex = getExercise(e.exerciseId);
-      const bw = ex ? isBodyweight(ex) : false;
+      const bw = !!exerciseInfo(e.exerciseId)?.bodyweight;
       return {
         ...e,
         sets: e.sets

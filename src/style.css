@@ -707,3 +707,35 @@ button.link.version { color: var(--muted); font-weight: 500; font-size: 0.8rem; 
 .day-head a.link { color: var(--accent); }
 .rows .small-btn svg.icon { color: inherit; }
 .toast { width: max-content; text-align: center; }
+
+/* ── Your own exercises and renaming ───────────────────────────────────── */
+.title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.title-row h1 { min-width: 0; overflow-wrap: anywhere; }
+.title-edit { color: var(--muted); background: var(--raised); }
+.own-tag {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; vertical-align: 1px;
+  background: #1c2a3d; color: #8fc1ff; font-size: 0.72rem; font-weight: 700;
+}
+.create-own {
+  justify-content: flex-start; gap: 12px; text-align: left; margin: 12px 0 4px; padding: 12px 14px; min-height: 60px;
+  background: transparent; color: var(--text); border: 1.5px dashed #3a4452; font-weight: 500;
+}
+.create-own > svg.icon { color: var(--accent); }
+.create-own > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.create-own small { color: var(--muted); font-size: 0.8rem; }
+.create-own:hover { border-color: var(--accent); }
+.custom-form { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; animation: rise-in 260ms var(--ease) both; }
+.custom-form .back-link { align-self: flex-start; min-height: 36px; padding: 4px 0; font-size: 0.9rem; }
+.custom-form h3 { margin: 14px 0 8px; }
+.custom-form .text-field { margin: 4px 0 0; }
+.custom-form button.big { margin-top: 18px; }
+.custom-form .note.clash { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 10px 0 0; }
+.custom-form .note.clash .link { min-height: 32px; padding: 0; color: var(--warn); text-decoration: underline; }
+.kind-choice { margin: 0; }
+.kind-choice button { min-height: 86px; justify-content: flex-start; }
+.kind-choice button strong { font-size: 1rem; }
+.rename-sheet form { display: flex; flex-direction: column; gap: 6px; }
+.rename-sheet .text-field { margin: 14px 0 8px; }
+.sheet.picker .rows li.with-action .icon-btn.small { flex: none; }
+.sheet .kind-choice button { background: var(--raised); }
+.sheet .kind-choice button.on { background: var(--accent-soft); }

@@ -1,5 +1,5 @@
 // Training statistics from the log. Pure functions.
-import { getExercise } from '../data/exercises';
+import { exerciseInfo } from './exercises';
 import { MUSCLE_GROUPS, type MuscleGroup } from '../data/types';
 import type { SetEntry, Unit, Workout } from './types';
 
@@ -160,7 +160,7 @@ export function muscleSets(workouts: Workout[], from: Date, to: Date): Record<Mu
     const t = new Date(w.startedAt);
     if (t < from || t >= to) continue;
     for (const e of w.entries) {
-      const ex = getExercise(e.exerciseId);
+      const ex = exerciseInfo(e.exerciseId);
       if (!ex) continue;
       const n = doneSets(e.sets).length;
       for (const g of ex.primary) out[g] += n;

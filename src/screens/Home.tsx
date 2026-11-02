@@ -5,8 +5,9 @@ import { MUSCLE_GROUPS, MUSCLE_LABELS } from '../data/types';
 import { addCorrective, insights, nextDayIndex, suggest, type Insight } from '../log/coach';
 import { emptyWorkout, repeatWorkout, startFromPlan, startRoutine } from '../log/session';
 import { dayKey, exerciseHistory, finished, formatWeight, weekStart, workoutsByDay } from '../log/stats';
-import { loadActiveWorkout, loadMode, loadRoutines, loadTechnique, loadUnit, loadWorkouts, saveActiveWorkout, saveMode } from '../log/store';
-import type { TechniqueSummary, TrainMode, Unit, Workout } from '../log/types';
+import { exerciseName } from '../log/exercises';
+import { loadActiveWorkout, loadMode, loadRoutines, loadTechnique, loadUnit, loadWorkouts, saveActiveWorkout, saveMode, saveRoutine } from '../log/store';
+import type { Routine, TechniqueSummary, TrainMode, Unit, Workout } from '../log/types';
 import type { Program } from '../program/builder';
 import { navigate } from '../router';
 import { deleteProgram, loadPrograms, saveProgram } from '../storage';
@@ -14,6 +15,7 @@ import { showToast } from '../ui/toast';
 import { Icon, MuscleIcon, type IconName } from './icons';
 import { PRIVACY, Screen } from './Layout';
 import { PlanDays, planSubtitle } from './ProgramView';
+import { RenameSheet } from './RenameSheet';
 
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const elapsed = (iso: string) => Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -222,6 +224,8 @@ function CoachToday({ workouts, technique, unit, begin, refresh, useOwn }: PaneP
 
 /** My workouts: start an empty workout, one of your routines, or repeat a recent one. */
 function SelfToday({ workouts, technique, unit, begin }: PaneProps) {
+  const [renaming, setRenaming] = useState<Routine | null>(null);
+  const [, bump] = useState(0);
   const routines = loadRoutines();
   const done = finished(workouts);
   const recent = done.slice(0, 3);
@@ -230,7 +234,7 @@ function SelfToday({ workouts, technique, unit, begin }: PaneProps) {
   const names = (w: Workout) =>
     w.entries
       .slice(0, 3)
-      .map((e) => getExercise(e.exerciseId)?.name ?? e.exerciseId)
+      .map((e) => exerciseName(e.exerciseId))
       .join(', ') + (w.entries.length > 3 ? ` +${w.entries.length - 3}` : '');
 
   return (
@@ -267,6 +271,9 @@ function SelfToday({ workouts, technique, unit, begin }: PaneProps) {
                       </small>
                     </span>
                   </a>
+                  <button type="button" class="icon-btn small" aria-label={`Rename ${r.name}`} onClick={() => setRenaming(r)}>
+                    <Icon name="edit" size={16} />
+                  </button>
                   <button type="button" class="small-btn" onClick={() => begin(startRoutine(r, workouts))} aria-label={`Start ${r.name}`}>
                     <Icon name="play" size={16} /> Start
                   </button>
@@ -298,6 +305,20 @@ function SelfToday({ workouts, technique, unit, begin }: PaneProps) {
             ))}
           </ul>
         </section>
+      )}
+
+      {renaming && (
+        <RenameSheet
+          title="Rename routine"
+          value={renaming.name}
+          onSave={(name) => {
+            saveRoutine({ ...renaming, name });
+            showToast('Routine renamed');
+            setRenaming(null);
+            bump((n) => n + 1);
+          }}
+          onClose={() => setRenaming(null)}
+        />
       )}
 
       <WeekStrip workouts={workouts} />

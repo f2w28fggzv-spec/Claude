@@ -1,5 +1,6 @@
 // Training log data. Weights are always stored in kilograms and converted for
 // display, so switching units never changes the history. Numbers only.
+import type { MuscleGroup } from '../data/types';
 
 export type Unit = 'kg' | 'lb';
 
@@ -61,6 +62,19 @@ export interface Routine {
   name: string;
   createdAt: string;
   items: { exerciseId: string; sets: number }[];
+}
+
+/** An exercise you added yourself (names and numbers only; no technique check). */
+export interface CustomExercise {
+  id: string;
+  name: string;
+  /** Bodyweight: log body weight plus any added weight. Weighted: log weight × reps. */
+  kind: 'bodyweight' | 'weighted';
+  /** Main muscles, for weekly volume and workout names. May be empty. */
+  muscles: MuscleGroup[];
+  createdAt: string;
+  /** Removed from the picker; kept so earlier workouts still show its name. */
+  archived?: boolean;
 }
 
 /** Personal trainer (the app builds the plan) or My workouts (you do). */

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'preact/hooks';
-import { getExercise } from '../data/exercises';
+import { exerciseName } from '../log/exercises';
 import { dayKey, exerciseHistory, finished, formatWeight, toUnit, weekStreak, workoutMinutes, workoutSets, workoutVolume, workoutsByDay } from '../log/stats';
 import { loadUnit, loadWorkouts } from '../log/store';
 import type { Workout } from '../log/types';
@@ -125,7 +125,7 @@ export function LogScreen() {
                 <li style={{ '--i': String(i) }}>
                   <a href={`#/progress/${id}`}>
                     <span class="row-main">
-                      <strong>{getExercise(id)?.name ?? id}</strong>
+                      <strong>{exerciseName(id)}</strong>
                       <small>
                         {h.length} session{h.length === 1 ? '' : 's'}
                         {best > 0 ? ` · best est. max ${formatWeight(best, unit, 1)}` : ''}
