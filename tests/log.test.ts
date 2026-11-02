@@ -3,17 +3,22 @@ import { addCorrective, insights, loadStep, nextDayIndex, repeatedFaults, sugges
 import {
   e1rm,
   exerciseHistory,
+  formatSet,
+  formatSetShort,
   formatWeight,
   fromUnit,
   muscleSets,
   personalRecords,
+  setLoad,
   toUnit,
   weekStart,
   weekStreak,
   workoutVolume,
   workoutsByDay,
 } from '../src/log/stats';
-import type { SetEntry, TechniqueSummary, Workout } from '../src/log/types';
+import type { Routine, SetEntry, TechniqueSummary, Workout } from '../src/log/types';
+import { addExercise, completeSet, emptyWorkout, finishWorkout, repeatWorkout, routineFromWorkout, startRoutine } from '../src/log/session';
+import { isBodyweight } from '../src/data/filters';
 import { getExercise } from '../src/data/exercises';
 import { buildProgram, type ProgramItem } from '../src/program/builder';
 
@@ -67,7 +72,7 @@ describe('stats', () => {
     expect(h.map((x) => x.date)).toEqual([day('2026-10-01'), day('2026-10-04')]);
     expect(h[1].sets).toHaveLength(2); // the unfinished set doesn't count
     expect(h[1].bestSet).toMatchObject({ weight: 105, reps: 5 });
-    expect(personalRecords(h)).toEqual({ bestE1rm: e1rm(105, 5), heaviest: 105, mostReps: 5 });
+    expect(personalRecords(h)).toEqual({ bestE1rm: e1rm(105, 5), heaviest: 105, mostReps: 5, mostAdded: 0, longestHold: 0 });
     expect(workoutVolume(log[0])).toBe(1500);
   });
 
@@ -228,5 +233,117 @@ describe('coach: plan and insights', () => {
     const missed = ins.find((i) => i.id === 'missed-groups');
     expect(missed?.body).toMatch(/back/);
     expect(missed?.body).toMatch(/quads/);
+  });
+});
+
+describe('bodyweight sets', () => {
+  const bwSets = (added: number | undefined, ...reps: number[]): SetEntry[] => reps.map((r) => ({ bw: true, weight: added, reps: r, done: true }));
+
+  it('knows which exercises are bodyweight', () => {
+    expect(isBodyweight(getExercise('pull-up')!)).toBe(true);
+    expect(isBodyweight(getExercise('dip')!)).toBe(true);
+    expect(isBodyweight(getExercise('bench-dip')!)).toBe(true);
+    expect(isBodyweight(getExercise('bench-press')!)).toBe(false);
+  });
+
+  it('counts body weight plus added weight as the load, only when body weight is known', () => {
+    expect(setLoad({ bw: true, weight: 10, reps: 5, done: true }, 80)).toBe(90);
+    expect(setLoad({ bw: true, reps: 5, done: true }, 80)).toBe(80);
+    expect(setLoad({ bw: true, weight: 10, reps: 5, done: true })).toBe(0);
+    expect(setLoad({ weight: 60, reps: 5, done: true }, 80)).toBe(60);
+  });
+
+  it('formats bodyweight sets', () => {
+    expect(formatSet({ bw: true, reps: 12, done: true }, 'kg')).toBe('BW × 12');
+    expect(formatSet({ bw: true, weight: 10, reps: 6, done: true }, 'kg')).toBe('BW + 10 kg × 6');
+    expect(formatSet({ weight: 60, reps: 8, done: true }, 'kg')).toBe('60 kg × 8');
+    expect(formatSet({ bw: true, seconds: 45, done: true }, 'kg')).toBe('45 s');
+    expect(formatSet({ reps: 10, done: true }, 'kg')).toBe('10 reps');
+    expect(formatSetShort({ bw: true, weight: 10, reps: 6, done: true }, 'kg')).toBe('BW+10×6');
+    expect(formatSetShort({ bw: true, reps: 12, done: true }, 'kg')).toBe('BW×12');
+  });
+
+  it('uses the logged body weight for volume, estimated max and records', () => {
+    const w = workout('2026-10-01', [{ id: 'pull-up', sets: bwSets(10, 6, 5) }], { bodyweight: 80 });
+    expect(workoutVolume(w)).toBe(90 * 11);
+    const [h] = exerciseHistory([w], 'pull-up');
+    expect(h.bestE1rm).toBeCloseTo(e1rm(90, 6));
+    const rec = personalRecords([h]);
+    expect(rec.mostAdded).toBe(10);
+    expect(rec.heaviest).toBe(90);
+    // Without a body weight the sets still count for reps, not for load.
+    const noBw = workout('2026-10-02', [{ id: 'pull-up', sets: bwSets(undefined, 12) }]);
+    expect(workoutVolume(noBw)).toBe(0);
+    expect(exerciseHistory([noBw], 'pull-up')[0]).toMatchObject({ bestE1rm: 0, maxReps: 12 });
+  });
+
+  it('progresses bodyweight sets by added weight once reps are maxed', () => {
+    const pull = item('pull-up', [6, 10]);
+    const s = suggest(pull, exerciseHistory([workout('2026-10-01', [{ id: 'pull-up', sets: bwSets(10, 10, 10, 10) }])], 'pull-up'), []);
+    expect(s).toMatchObject({ kind: 'increase', weight: 12.5 });
+    expect(suggest(pull, [], []).note).toMatch(/body weight/);
+  });
+
+  it('celebrates rep records on bodyweight-only exercises', () => {
+    const program = buildProgram({ groups: ['chest'], daysPerWeek: 2, level: 'beginner', equipment: 'bodyweight' });
+    const log = [
+      workout('2026-10-01', [{ id: 'push-up', sets: bwSets(undefined, 15, 12) }]),
+      workout('2026-10-04', [{ id: 'push-up', sets: bwSets(undefined, 18, 14) }]),
+    ];
+    const pr = insights(program, log, [], 'kg', new Date('2026-10-05T12:00:00')).find((i) => i.id.startsWith('pr-'));
+    expect(pr?.body).toBe('18 reps in a set, up from 15.');
+  });
+});
+
+describe('logging your own workouts', () => {
+  const history = [
+    workout('2026-10-01', [{ id: 'bench-press', sets: sets(60, 8, 8, 7) }]),
+    workout('2026-10-04', [{ id: 'bench-press', sets: sets(62.5, 8, 7) }]),
+  ];
+
+  it('pre-fills an added exercise with last time’s sets', () => {
+    const w = addExercise(emptyWorkout(), 'bench-press', history);
+    expect(w.entries[0].sets.map((s) => s.planned)).toEqual([
+      { weight: 62.5, reps: 8, seconds: undefined },
+      { weight: 62.5, reps: 7, seconds: undefined },
+      { weight: 62.5, reps: 7, seconds: undefined },
+    ]);
+    expect(addExercise(emptyWorkout(), 'plank').entries[0].sets[0].planned).toEqual({ seconds: 30 });
+  });
+
+  it('starts routines and repeats workouts with your last numbers', () => {
+    const routine: Routine = { id: 'r1', name: 'Push day', createdAt: day('2026-09-01'), items: [{ exerciseId: 'bench-press', sets: 4 }, { exerciseId: 'push-up', sets: 2 }] };
+    const w = startRoutine(routine, history);
+    expect(w).toMatchObject({ dayName: 'Push day', routineId: 'r1' });
+    expect(w.entries.map((e) => e.sets.length)).toEqual([4, 2]);
+    expect(w.entries[0].sets[0].planned?.weight).toBe(62.5);
+    const again = repeatWorkout(history[0]);
+    expect(again.entries[0].sets.map((s) => s.planned?.reps)).toEqual([8, 8, 7]);
+    expect(again.finishedAt).toBeUndefined();
+  });
+
+  it('turns a workout into a routine', () => {
+    const r = routineFromWorkout({ ...history[1], dayName: 'Bench' });
+    expect(r).toMatchObject({ name: 'Bench', items: [{ exerciseId: 'bench-press', sets: 2 }] });
+  });
+
+  it('finishes a workout: marks bodyweight sets, keeps your body weight, names it after the muscles', () => {
+    let w = addExercise(addExercise(emptyWorkout(), 'pull-up'), 'bench-press');
+    w = {
+      ...w,
+      entries: w.entries.map((e) => ({ ...e, sets: e.sets.map((s, i) => (i < 2 ? { ...completeSet(s), reps: 8, weight: e.exerciseId === 'pull-up' ? 5 : 60 } : s)) })),
+    };
+    const done = finishWorkout(w, new Date('2026-10-05T19:00:00'), 82);
+    expect(done.bodyweight).toBe(82);
+    expect(done.entries[0].sets).toEqual([
+      { done: true, reps: 8, weight: 5, seconds: undefined, bw: true },
+      { done: true, reps: 8, weight: 5, seconds: undefined, bw: true },
+    ]);
+    expect(done.entries[1].sets.every((s) => !s.bw)).toBe(true);
+    expect(done.dayName).toBe('Back & Chest');
+    // Plan workouts keep their day name; no body weight is stored without bodyweight sets.
+    const plan = finishWorkout({ ...history[0], finishedAt: undefined, dayName: 'Day 1' }, new Date(), 82);
+    expect(plan.dayName).toBe('Day 1');
+    expect(plan.bodyweight).toBeUndefined();
   });
 });

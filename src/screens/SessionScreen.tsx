@@ -1,8 +1,8 @@
 import { useMemo } from 'preact/hooks';
 import { getExercise } from '../data/exercises';
-import { exerciseHistory, formatWeight, toUnit, workoutMinutes, workoutSets, workoutVolume } from '../log/stats';
-import { deleteWorkout, loadTechnique, loadUnit, loadWorkouts } from '../log/store';
-import { dayKey } from '../log/stats';
+import { repeatWorkout, routineFromWorkout } from '../log/session';
+import { dayKey, exerciseHistory, formatSet, toUnit, workoutMinutes, workoutSets, workoutVolume } from '../log/stats';
+import { deleteWorkout, loadActiveWorkout, loadRoutines, loadTechnique, loadUnit, loadWorkouts, saveActiveWorkout, saveMode, saveRoutine } from '../log/store';
 import { navigate } from '../router';
 import { showToast } from '../ui/toast';
 import { Icon } from './icons';
@@ -21,6 +21,19 @@ export function SessionScreen({ id }: { id: string }) {
     );
   }
   const technique = loadTechnique().filter((t) => dayKey(t.at) === dayKey(w.startedAt));
+  const routine = w.routineId ? loadRoutines().find((r) => r.id === w.routineId) : undefined;
+  const saveAsRoutine = () => {
+    const r = routineFromWorkout(w);
+    saveRoutine(r);
+    saveMode('self');
+    showToast('Saved to My workouts. Rename it if you like.');
+    navigate(`/routine/${r.id}`);
+  };
+  const repeat = () => {
+    if (loadActiveWorkout() && !confirm('Replace the workout in progress?')) return;
+    saveActiveWorkout(repeatWorkout(w));
+    navigate('/workout');
+  };
   const remove = () => {
     if (!confirm('Delete this workout from your log?')) return;
     deleteWorkout(w.id);
@@ -68,9 +81,7 @@ export function SessionScreen({ id }: { id: string }) {
             </header>
             <ol class="set-list">
               {e.sets.map((s) => (
-                <li>
-                  {s.seconds !== undefined ? `${s.seconds} s` : `${s.weight ? `${formatWeight(s.weight, unit)} × ` : ''}${s.reps ?? 0} reps`}
-                </li>
+                <li>{formatSet(s, unit)}</li>
               ))}
             </ol>
             {tech && (
@@ -81,6 +92,16 @@ export function SessionScreen({ id }: { id: string }) {
           </section>
         );
       })}
+      <div class="stack">
+        <button type="button" class="secondary" onClick={repeat}>
+          <Icon name="play" size={18} /> Repeat this workout
+        </button>
+        {!routine && (
+          <button type="button" class="secondary" onClick={saveAsRoutine}>
+            <Icon name="plus" size={18} /> Save as a routine
+          </button>
+        )}
+      </div>
       <button type="button" class="link danger center" onClick={remove}>
         Delete workout
       </button>

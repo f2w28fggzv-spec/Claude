@@ -1,10 +1,13 @@
 // On-device training log (localStorage, numbers only).
-import type { TechniqueSummary, Unit, Workout } from './types';
+import type { Routine, TechniqueSummary, TrainMode, Unit, Workout } from './types';
 
 const KEY_WORKOUTS = 'formcheck.v1.workouts';
 const KEY_ACTIVE = 'formcheck.v1.activeWorkout';
 const KEY_TECHNIQUE = 'formcheck.v1.technique';
 const KEY_UNIT = 'formcheck.v1.unit';
+const KEY_BODYWEIGHT = 'formcheck.v1.bodyweight';
+const KEY_ROUTINES = 'formcheck.v1.routines';
+const KEY_MODE = 'formcheck.v1.trainMode';
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -58,6 +61,37 @@ export function saveTechnique(t: TechniqueSummary): void {
 
 export const loadUnit = (): Unit => (read<string>(KEY_UNIT, 'kg') === 'lb' ? 'lb' : 'kg');
 export const saveUnit = (u: Unit) => write(KEY_UNIT, u);
+
+/** Your body weight in kg (optional, set in Settings). */
+export function loadBodyweight(): number | undefined {
+  const v = read<unknown>(KEY_BODYWEIGHT, null);
+  return typeof v === 'number' && v > 0 && v < 400 ? v : undefined;
+}
+export const saveBodyweight = (kg: number | null) => write(KEY_BODYWEIGHT, kg);
+
+/** Personal trainer or My workouts; null until you pick one. */
+export function loadMode(): TrainMode | null {
+  const m = read<unknown>(KEY_MODE, null);
+  return m === 'coach' || m === 'self' ? m : null;
+}
+export const saveMode = (m: TrainMode) => write(KEY_MODE, m);
+
+const isRoutine = (r: unknown): r is Routine =>
+  !!r && typeof (r as Routine).id === 'string' && typeof (r as Routine).name === 'string' && Array.isArray((r as Routine).items);
+
+/** Your saved routines, oldest first. */
+export function loadRoutines(): Routine[] {
+  const raw = read<unknown>(KEY_ROUTINES, []);
+  return Array.isArray(raw) ? raw.filter(isRoutine) : [];
+}
+export function saveRoutine(r: Routine): boolean {
+  const all = loadRoutines();
+  const i = all.findIndex((x) => x.id === r.id);
+  return write(KEY_ROUTINES, i < 0 ? [...all, r] : all.map((x) => (x.id === r.id ? r : x)));
+}
+export function deleteRoutine(id: string): void {
+  write(KEY_ROUTINES, loadRoutines().filter((r) => r.id !== id));
+}
 
 /** Every key this app stores, for backup / restore / delete-all. */
 export const ALL_KEYS_PREFIX = 'formcheck.v1.';

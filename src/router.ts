@@ -18,6 +18,7 @@ const DEPTH: Record<string, number> = {
   library: 0,
   log: 0,
   groups: 1,
+  routine: 1,
   exercise: 1,
   program: 1,
   session: 1,
@@ -51,7 +52,9 @@ export const prefersReducedMotion = () => {
   }
 };
 
-type ViewTransitionDoc = Document & { startViewTransition?: (update: () => Promise<void> | void) => unknown };
+type ViewTransitionDoc = Document & {
+  startViewTransition?: (update: () => Promise<void> | void) => { ready: Promise<void>; finished: Promise<void> };
+};
 
 export function useRoute(): Route {
   const [route, setRoute] = useState(parse);
@@ -70,10 +73,13 @@ export function useRoute(): Route {
       if (doc.startViewTransition && !prefersReducedMotion()) {
         // The browser snapshots the old page, we render the new one (Preact
         // renders on the next microtask), then it animates between them.
-        doc.startViewTransition(() => {
+        const t = doc.startViewTransition(() => {
           apply();
           return new Promise<void>((resolve) => setTimeout(resolve, 0));
         });
+        // A quick second navigation skips this transition; that's fine.
+        t.ready.catch(() => {});
+        t.finished.catch(() => {});
       } else {
         apply();
       }

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'preact/hooks';
 import { deleteAllRecordings } from '../calibration/store';
-import { deleteAll, exportAll, importAll, loadUnit, saveUnit } from '../log/store';
+import { fromUnit, toUnit } from '../log/stats';
+import { deleteAll, exportAll, importAll, loadBodyweight, loadUnit, saveBodyweight, saveUnit } from '../log/store';
 import type { Unit } from '../log/types';
 import { navigate } from '../router';
 import { downloadJson } from '../ui/download';
@@ -12,12 +13,24 @@ export const APP_VERSION = '0.5';
 /** Units, data backup and the hidden developer tools. */
 export function SettingsScreen() {
   const [unit, setUnit] = useState<Unit>(loadUnit);
+  const [bodyText, setBodyText] = useState(() => {
+    const kg = loadBodyweight();
+    return kg === undefined ? '' : String(Number(toUnit(kg, loadUnit()).toFixed(1)));
+  });
   const file = useRef<HTMLInputElement>(null);
   const taps = useRef<number[]>([]);
 
   const pickUnit = (u: Unit) => {
+    const kg = loadBodyweight();
+    if (kg !== undefined) setBodyText(String(Number(toUnit(kg, u).toFixed(1))));
     setUnit(u);
     saveUnit(u);
+  };
+  const saveBody = (text: string) => {
+    setBodyText(text);
+    const n = Number(text.replace(',', '.'));
+    if (text.trim() === '') saveBodyweight(null);
+    else if (Number.isFinite(n) && n > 0) saveBodyweight(fromUnit(n, unit));
   };
   const restore = async (f: File | undefined) => {
     if (!f) return;
@@ -50,6 +63,17 @@ export function SettingsScreen() {
           </button>
         ))}
       </div>
+
+      <h2 class="field">Body weight</h2>
+      <label class="text-field inline-unit">
+        <span class="sr-only">Body weight in {unit}</span>
+        <input type="text" inputMode="decimal" placeholder="Optional" value={bodyText} onInput={(e) => saveBody(e.currentTarget.value)} />
+        <span class="unit">{unit}</span>
+      </label>
+      <p class="muted small">
+        Counts push-ups, pull-ups, dips and other bodyweight sets in your volume and estimated max (body weight plus any added weight). Saved with
+        each workout you log from now on, only on this phone.
+      </p>
 
       <h2 class="field">Your data</h2>
       <p class="muted small">

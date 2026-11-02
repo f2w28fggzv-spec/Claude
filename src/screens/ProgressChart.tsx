@@ -1,10 +1,8 @@
 import { useState } from 'preact/hooks';
-import type { Unit } from '../log/types';
-import { formatWeight, toUnit } from '../log/stats';
 
 export interface ChartPoint {
   date: string;
-  /** Kilograms. */
+  /** In display units (kg or lb, reps, seconds). */
   value: number;
   detail: string;
 }
@@ -27,13 +25,14 @@ function niceTicks(min: number, max: number, count = 4): number[] {
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
 /**
- * Single-series line chart of estimated one-rep max over time, with a
+ * Single-series line chart of one measure over time (estimated one-rep max,
+ * most reps or longest hold), with a
  * crosshair that snaps to the nearest session (pointer and arrow keys).
  * The history list under it is the table view.
  */
-export function ProgressChart({ points, unit, title }: { points: ChartPoint[]; unit: Unit; title: string }) {
+export function ProgressChart({ points, format, title }: { points: ChartPoint[]; format: (v: number) => string; title: string }) {
   const [active, setActive] = useState<number | null>(null);
-  const vals = points.map((p) => toUnit(p.value, unit));
+  const vals = points.map((p) => p.value);
   const lo = Math.min(...vals);
   const hi = Math.max(...vals);
   const ticks = niceTicks(lo - (hi - lo || hi * 0.1) * 0.15, hi + (hi - lo || hi * 0.1) * 0.15);
@@ -61,7 +60,7 @@ export function ProgressChart({ points, unit, title }: { points: ChartPoint[]; u
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
-          aria-label={`${title}: ${points.length} sessions, from ${formatWeight(points[0].value, unit, 1)} to ${formatWeight(points[points.length - 1].value, unit, 1)}`}
+          aria-label={`${title}: ${points.length} sessions, from ${format(points[0].value)} to ${format(points[points.length - 1].value)}`}
           tabIndex={0}
           onPointerMove={(e) => setActive(nearest(e.clientX, (e.currentTarget as SVGSVGElement).getBoundingClientRect()))}
           onPointerLeave={() => setActive(null)}
@@ -100,7 +99,7 @@ export function ProgressChart({ points, unit, title }: { points: ChartPoint[]; u
             class={`chart-tip ${y(vals[a]) < H / 2 ? 'below' : ''}`}
             style={{ left: `${Math.min(80, Math.max(20, (x(a) / W) * 100))}%` }}
           >
-            <strong>{formatWeight(points[a].value, unit, 1)}</strong>
+            <strong>{format(points[a].value)}</strong>
             <span>{new Date(points[a].date).toLocaleDateString()}</span>
             <span>{points[a].detail}</span>
           </div>

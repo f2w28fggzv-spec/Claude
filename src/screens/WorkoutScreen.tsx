@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { EXERCISES, getExercise } from '../data/exercises';
+import { getExercise } from '../data/exercises';
+import { isBodyweight } from '../data/filters';
 import { addExercise, completeSet, finishWorkout } from '../log/session';
-import { exerciseHistory, formatWeight, fromUnit, toUnit } from '../log/stats';
-import { loadActiveWorkout, loadUnit, loadWorkouts, saveActiveWorkout, saveWorkout } from '../log/store';
+import { exerciseHistory, formatSetShort, formatWeight, fromUnit, toUnit } from '../log/stats';
+import { loadActiveWorkout, loadBodyweight, loadUnit, loadWorkouts, saveActiveWorkout, saveWorkout } from '../log/store';
 import type { SetEntry, Unit, Workout } from '../log/types';
 import { navigate } from '../router';
 import { showToast } from '../ui/toast';
+import { ExercisePicker } from './ExercisePicker';
 import { Icon } from './icons';
 import { Screen } from './Layout';
 
@@ -107,7 +109,7 @@ export function WorkoutScreen() {
   const done = w.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0);
   const finish = () => {
     if (done === 0 && !confirm('No sets are ticked yet. Finish anyway?')) return;
-    const final = finishWorkout(w);
+    const final = finishWorkout(w, new Date(), loadBodyweight());
     if (final.entries.length) saveWorkout(final);
     saveActiveWorkout(null);
     showToast(final.entries.length ? 'Workout saved' : 'Workout discarded');
@@ -121,7 +123,7 @@ export function WorkoutScreen() {
 
   return (
     <Screen
-      title={w.dayName ?? 'Workout'}
+      title={w.dayName ?? 'New workout'}
       subtitle={`${clock(now - new Date(w.startedAt).getTime())} · ${done} set${done === 1 ? '' : 's'} done`}
       back=""
       action={
@@ -130,9 +132,20 @@ export function WorkoutScreen() {
         </button>
       }
     >
+      {w.entries.length === 0 && (
+        <section class="card empty-workout">
+          <Icon name="plus" size={28} />
+          <h2>Add your first exercise</h2>
+          <p class="muted small">Log sets as you go: weight, reps, or body weight plus any added weight.</p>
+          <button type="button" class="big" onClick={() => setPicker(true)}>
+            <Icon name="plus" size={20} /> Add exercise
+          </button>
+        </section>
+      )}
       {w.entries.map((e, ei) => {
         const ex = getExercise(e.exerciseId);
         const hold = ex?.tracking.kind === 'hold';
+        const bw = !!ex && isBodyweight(ex);
         const prev = exerciseHistory(history, e.exerciseId).at(-1);
         return (
           <section class="card log-ex" style={{ '--i': String(ei) }}>
@@ -144,12 +157,22 @@ export function WorkoutScreen() {
                 <Icon name="close" size={18} />
               </button>
             </header>
-            {e.target && (
+            {(e.target || prev) && (
               <p class="muted small target">
-                Target {e.target.sets} × {e.target.reps[0]}–{e.target.reps[1]}
-                {e.target.unit === 'seconds' ? ' s' : ''}
-                {e.target.weight !== undefined && ` · ${formatWeight(e.target.weight, unit)}`}
-                {prev && ` · last: ${prev.sets.map((s) => (s.weight ? `${toUnit(s.weight, unit).toFixed(0)}×${s.reps}` : `${s.reps ?? s.seconds}`)).join(', ')}`}
+                {e.target && (
+                  <>
+                    Target {e.target.sets} × {e.target.reps[0]}–{e.target.reps[1]}
+                    {e.target.unit === 'seconds' ? ' s' : ''}
+                    {e.target.weight !== undefined && ` · ${bw ? 'BW + ' : ''}${formatWeight(e.target.weight, unit)}`}
+                    {prev && ' · '}
+                  </>
+                )}
+                {prev && `Last time: ${prev.sets.map((s) => formatSetShort(s, unit)).join(', ')}`}
+              </p>
+            )}
+            {bw && !hold && (
+              <p class="bw-hint">
+                <span class="bw-chip">BW</span> Body weight. Add weight under +{unit} for a vest, belt or dumbbell.
               </p>
             )}
             {e.coachNote && (
@@ -160,7 +183,7 @@ export function WorkoutScreen() {
             <div class="set-table" role="table" aria-label={`${ex?.name} sets`}>
               <div class="set-row head" role="row">
                 <span>Set</span>
-                {!hold && <span>{unit}</span>}
+                {!hold && <span>{bw ? `+${unit}` : unit}</span>}
                 <span>{hold ? 'Seconds' : 'Reps'}</span>
                 <span />
               </div>
@@ -170,8 +193,8 @@ export function WorkoutScreen() {
                   {!hold && (
                     <NumInput
                       decimal
-                      label={`Set ${si + 1} weight in ${unit}`}
-                      placeholder={s.planned?.weight !== undefined ? String(Number(toUnit(s.planned.weight, unit).toFixed(1))) : '–'}
+                      label={bw ? `Set ${si + 1} added weight in ${unit} (empty for body weight only)` : `Set ${si + 1} weight in ${unit}`}
+                      placeholder={s.planned?.weight !== undefined ? String(Number(toUnit(s.planned.weight, unit).toFixed(1))) : bw ? 'BW' : '–'}
                       value={s.weight !== undefined ? toUnit(s.weight, unit) : undefined}
                       onValue={(v) => updateSet(ei, si, { weight: v === undefined ? undefined : fromUnit(v, unit) })}
                     />
@@ -207,9 +230,11 @@ export function WorkoutScreen() {
         );
       })}
 
-      <button type="button" class="secondary" onClick={() => setPicker(true)}>
-        <Icon name="plus" size={18} /> Add exercise
-      </button>
+      {w.entries.length > 0 && (
+        <button type="button" class="secondary" onClick={() => setPicker(true)}>
+          <Icon name="plus" size={18} /> Add exercise
+        </button>
+      )}
       <button type="button" class="link danger center" onClick={discard}>
         Discard workout
       </button>
@@ -227,7 +252,7 @@ export function WorkoutScreen() {
       {picker && (
         <ExercisePicker
           onPick={(id) => {
-            update(addExercise(w, id));
+            update(addExercise(w, id, history));
             setPicker(false);
           }}
           onClose={() => setPicker(false)}
@@ -262,42 +287,5 @@ function NumInput(props: { value?: number; onValue: (v: number | undefined) => v
         props.onValue(num(e.currentTarget.value));
       }}
     />
-  );
-}
-
-function ExercisePicker({ onPick, onClose }: { onPick: (id: string) => void; onClose: () => void }) {
-  const [q, setQ] = useState('');
-  const list = EXERCISES.filter((e) => e.name.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 40);
-  return (
-    <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div class="sheet" role="dialog" aria-modal="true" aria-label="Add exercise">
-        <header class="sheet-head">
-          <h2>Add exercise</h2>
-          <button type="button" class="link" onClick={onClose}>
-            Close
-          </button>
-        </header>
-        <input class="search" type="search" placeholder="Search exercises" value={q} onInput={(e) => setQ(e.currentTarget.value)} autoFocus />
-        <ul class="rows">
-          {list.map((e, i) => (
-            <li style={{ '--i': String(i) }}>
-              <a
-                href="#"
-                onClick={(ev) => {
-                  ev.preventDefault();
-                  onPick(e.id);
-                }}
-              >
-                <span class="row-main">
-                  <strong>{e.name}</strong>
-                  <small>{e.primary.join(', ')}</small>
-                </span>
-                <Icon name="plus" size={18} />
-              </a>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
   );
 }

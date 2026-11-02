@@ -41,7 +41,7 @@ export function Screen(props: ScreenProps) {
 }
 
 const TABS: { id: Tab; href: string; icon: IconName; label: string }[] = [
-  { id: 'plan', href: '#/', icon: 'plan', label: 'Plan' },
+  { id: 'plan', href: '#/', icon: 'plan', label: 'Train' },
   { id: 'log', href: '#/log', icon: 'calendar', label: 'Log' },
   { id: 'exercises', href: '#/library', icon: 'exercises', label: 'Exercises' },
 ];
