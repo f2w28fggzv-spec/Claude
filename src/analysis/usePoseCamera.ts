@@ -33,14 +33,17 @@ export function cameraErrorMessage(err: unknown): string {
   return (err as Error)?.message ?? String(err);
 }
 
-export function usePoseCamera(onFrame?: (f: LiveFrame) => void) {
+export function usePoseCamera(
+  onFrame?: (f: LiveFrame) => void,
+  opts: { initialFacing?: Facing; onFacingChange?: (f: Facing) => void } = {},
+) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [variant, setVariant] = useState<ModelVariant>(currentModel()?.variant ?? 'full');
   const [ready, setReady] = useState(false);
   const [running, setRunning] = useState(false);
-  const [facing, setFacing] = useState<Facing>('environment');
+  const [facing, setFacing] = useState<Facing>(opts.initialFacing ?? 'environment');
   const [error, setError] = useState('');
   const [stats, setStats] = useState<CameraStats | null>(null);
   const cb = useRef(onFrame);
@@ -154,9 +157,16 @@ export function usePoseCamera(onFrame?: (f: LiveFrame) => void) {
   const flip = async () => {
     const next: Facing = facing === 'environment' ? 'user' : 'environment';
     setFacing(next);
+    opts.onFacingChange?.(next);
     stop();
     await start(next);
   };
 
-  return { videoRef, canvasRef, stageRef, ready, running, facing, error, stats, variant, setVariant, start, stop, flip };
+  /** Chooses the camera before starting. */
+  const choose = (next: Facing) => {
+    setFacing(next);
+    opts.onFacingChange?.(next);
+  };
+
+  return { videoRef, canvasRef, stageRef, ready, running, facing, error, stats, variant, setVariant, start, stop, flip, choose };
 }

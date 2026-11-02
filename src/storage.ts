@@ -86,3 +86,8 @@ const KEY_LIBRARY_FILTERS = 'formcheck.v1.libraryFilters';
 /** Exercises-tab filters (a per-device convenience). */
 export const loadLibraryFilters = (): unknown => read<unknown>(KEY_LIBRARY_FILTERS, null);
 export const saveLibraryFilters = (f: unknown) => write(KEY_LIBRARY_FILTERS, f);
+
+const KEY_FACING = 'formcheck.v1.facing';
+/** Camera for technique checks; front by default so lifters can see themselves. */
+export const loadFacing = (): 'user' | 'environment' => (read<string>(KEY_FACING, 'user') === 'environment' ? 'environment' : 'user');
+export const saveFacing = (f: 'user' | 'environment') => write(KEY_FACING, f);

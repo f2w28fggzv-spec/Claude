@@ -1,7 +1,7 @@
 import type { ComponentChildren } from 'preact';
-import { Icon } from './icons';
+import { Icon, type IconName } from './icons';
 
-export type Tab = 'plan' | 'exercises';
+export type Tab = 'plan' | 'log' | 'exercises';
 
 interface ScreenProps {
   title: string;
@@ -40,17 +40,23 @@ export function Screen(props: ScreenProps) {
   );
 }
 
+const TABS: { id: Tab; href: string; icon: IconName; label: string }[] = [
+  { id: 'plan', href: '#/', icon: 'plan', label: 'Plan' },
+  { id: 'log', href: '#/log', icon: 'calendar', label: 'Log' },
+  { id: 'exercises', href: '#/library', icon: 'exercises', label: 'Exercises' },
+];
+
 function TabBar({ active }: { active: Tab }) {
+  const index = TABS.findIndex((t) => t.id === active);
   return (
-    <nav class="tabs" aria-label="Main">
-      <a href="#/" class={active === 'plan' ? 'on' : ''} aria-current={active === 'plan' ? 'page' : undefined}>
-        <Icon name="plan" />
-        <span>Plan</span>
-      </a>
-      <a href="#/library" class={active === 'exercises' ? 'on' : ''} aria-current={active === 'exercises' ? 'page' : undefined}>
-        <Icon name="exercises" />
-        <span>Exercises</span>
-      </a>
+    <nav class="tabs" aria-label="Main" style={{ '--tab-count': String(TABS.length) }}>
+      <span class="tab-pill" aria-hidden="true" style={{ transform: `translateX(${index * 100}%)` }} />
+      {TABS.map((t) => (
+        <a href={t.href} class={active === t.id ? 'on' : ''} aria-current={active === t.id ? 'page' : undefined}>
+          <Icon name={t.icon} />
+          <span>{t.label}</span>
+        </a>
+      ))}
     </nav>
   );
 }

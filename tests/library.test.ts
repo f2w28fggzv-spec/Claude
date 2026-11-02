@@ -60,7 +60,8 @@ describe('exercise library', () => {
         expect(faults.size).toBe(e.faults.length);
         for (const c of e.checks) {
           expect(faults, c.id).toContain(c.fault);
-          expect(c.status).toBe('unvalidated');
+          expect(['unvalidated', 'calibrated']).toContain(c.status);
+          if (c.status === 'calibrated') expect(c.source).toMatch(/Calibrated on \d+ labelled reps/);
         }
       });
 
