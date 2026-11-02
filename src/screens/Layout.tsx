@@ -13,6 +13,8 @@ interface ScreenProps {
   action?: ComponentChildren;
   /** Small line under the title. */
   subtitle?: string;
+  /** Small button next to the title (e.g. rename). */
+  titleAction?: ComponentChildren;
   children: ComponentChildren;
 }
 
@@ -28,7 +30,14 @@ export function Screen(props: ScreenProps) {
             </a>
           )}
           <div>
-            <h1>{props.title}</h1>
+            {props.titleAction ? (
+              <div class="title-row">
+                <h1>{props.title}</h1>
+                {props.titleAction}
+              </div>
+            ) : (
+              <h1>{props.title}</h1>
+            )}
             {props.subtitle && <p class="subtitle">{props.subtitle}</p>}
           </div>
         </header>

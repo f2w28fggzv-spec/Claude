@@ -1,6 +1,5 @@
 import { useMemo } from 'preact/hooks';
-import { getExercise } from '../data/exercises';
-import { isBodyweight } from '../data/filters';
+import { exerciseInfo } from '../log/exercises';
 import { exerciseHistory, formatSet, formatSetShort, formatWeight, personalRecords, toUnit } from '../log/stats';
 import { loadBodyweight, loadTechnique, loadUnit, loadWorkouts } from '../log/store';
 import { ProgressChart, type ChartPoint } from './ProgressChart';
@@ -8,13 +7,14 @@ import { Screen } from './Layout';
 
 /** Progress for one exercise: estimated max over time, records and history. */
 export function ProgressScreen({ id }: { id: string }) {
-  const ex = getExercise(id);
+  const info = exerciseInfo(id);
+  const ex = info?.library;
   const unit = useMemo(loadUnit, []);
   const history = useMemo(() => exerciseHistory(loadWorkouts(), id), [id]);
   const technique = useMemo(() => loadTechnique().filter((t) => t.exerciseId === id), [id]);
   const rec = personalRecords(history);
-  const bw = !!ex && isBodyweight(ex);
-  const hold = ex?.tracking.kind === 'hold';
+  const bw = !!info?.bodyweight;
+  const hold = !!info?.hold;
   const loaded = history.filter((h) => h.bestE1rm > 0);
   const hasBodyweight = loadBodyweight() !== undefined;
   const kg = (v: number) => formatWeight(v, unit, 1);
@@ -63,7 +63,7 @@ export function ProgressScreen({ id }: { id: string }) {
         ];
 
   return (
-    <Screen title={ex?.name ?? 'Exercise'} subtitle="Progress" back="log" tab="log">
+    <Screen title={info?.name ?? 'Exercise'} subtitle={info?.custom ? 'Progress · your exercise' : 'Progress'} back="log" tab="log">
       {chart ? (
         <ProgressChart title={chart.title} format={chart.format} points={chart.points} />
       ) : (

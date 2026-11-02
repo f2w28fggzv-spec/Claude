@@ -1,5 +1,5 @@
 // On-device training log (localStorage, numbers only).
-import type { Routine, TechniqueSummary, TrainMode, Unit, Workout } from './types';
+import type { CustomExercise, Routine, TechniqueSummary, TrainMode, Unit, Workout } from './types';
 
 const KEY_WORKOUTS = 'formcheck.v1.workouts';
 const KEY_ACTIVE = 'formcheck.v1.activeWorkout';
@@ -8,6 +8,7 @@ const KEY_UNIT = 'formcheck.v1.unit';
 const KEY_BODYWEIGHT = 'formcheck.v1.bodyweight';
 const KEY_ROUTINES = 'formcheck.v1.routines';
 const KEY_MODE = 'formcheck.v1.trainMode';
+const KEY_CUSTOM = 'formcheck.v1.customExercises';
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -93,6 +94,29 @@ export function deleteRoutine(id: string): void {
   write(KEY_ROUTINES, loadRoutines().filter((r) => r.id !== id));
 }
 
+const isCustom = (c: unknown): c is CustomExercise =>
+  !!c &&
+  typeof (c as CustomExercise).id === 'string' &&
+  typeof (c as CustomExercise).name === 'string' &&
+  ((c as CustomExercise).kind === 'bodyweight' || (c as CustomExercise).kind === 'weighted');
+
+// Read on almost every render (exercise names), so kept in memory.
+let customCache: CustomExercise[] | null = null;
+
+/** Exercises you added yourself, including removed ones (for old workouts). */
+export function loadCustomExercises(): CustomExercise[] {
+  if (!customCache) {
+    const raw = read<unknown>(KEY_CUSTOM, []);
+    customCache = Array.isArray(raw) ? raw.filter(isCustom).map((c) => ({ ...c, muscles: Array.isArray(c.muscles) ? c.muscles : [] })) : [];
+  }
+  return customCache;
+}
+export function saveCustomExercise(c: CustomExercise): boolean {
+  const all = loadCustomExercises();
+  customCache = all.some((x) => x.id === c.id) ? all.map((x) => (x.id === c.id ? c : x)) : [...all, c];
+  return write(KEY_CUSTOM, customCache);
+}
+
 /** Every key this app stores, for backup / restore / delete-all. */
 export const ALL_KEYS_PREFIX = 'formcheck.v1.';
 
@@ -114,6 +138,7 @@ export function importAll(backup: unknown): number {
   const b = backup as { app?: string; data?: Record<string, unknown> };
   if (b?.app !== 'form-check' || !b.data || typeof b.data !== 'object') throw new Error('This isn’t a Form Check backup file.');
   let n = 0;
+  customCache = null;
   for (const [k, v] of Object.entries(b.data)) {
     if (k.startsWith(ALL_KEYS_PREFIX) && write(k, v)) n++;
   }
@@ -121,6 +146,7 @@ export function importAll(backup: unknown): number {
 }
 
 export function deleteAll(): void {
+  customCache = null;
   try {
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
