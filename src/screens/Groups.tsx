@@ -28,10 +28,16 @@ export function Groups() {
       }
     >
       <div class="muscle-grid">
-        {MUSCLE_GROUPS.map((g) => {
+        {MUSCLE_GROUPS.map((g, i) => {
           const on = selected.includes(g);
           return (
-            <button type="button" class={`muscle-tile ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => toggle(g)}>
+            <button
+              type="button"
+              class={`muscle-tile ${on ? 'on' : ''}`}
+              style={{ '--i': String(i) }}
+              aria-pressed={on}
+              onClick={() => toggle(g)}
+            >
               {on && (
                 <span class="tick">
                   <Icon name="check" size={16} />

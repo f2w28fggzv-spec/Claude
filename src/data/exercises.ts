@@ -9,6 +9,8 @@
 import { C, F, PLACEMENTS as P, ex } from './helpers';
 import * as D from '../demo/patterns';
 import { LOCKOUT_DEG, MIN_ECCENTRIC_SEC, SRC, cite } from './sources';
+import { applyCalibration, type CalibratedThresholds } from '../calibration/calibrate';
+import calibrated from './calibrated.json';
 import type { Exercise, Joint, RepTracking } from './types';
 
 type Phase = 'eccentric' | 'concentric';
@@ -34,7 +36,7 @@ const up = (joint: Joint, o: TrackOpts = {}): RepTracking => ({
 });
 const hold: RepTracking = { kind: 'hold' };
 
-export const EXERCISES: Exercise[] = [
+const DRAFT_EXERCISES: Exercise[] = [
   // ───────────────────────────── Quads ─────────────────────────────
   ex({
     id: 'back-squat',
@@ -1540,6 +1542,12 @@ export const EXERCISES: Exercise[] = [
     faults: [F.partialRange('crunch', 'Curl your ribs toward your hips; do not just hinge.')],
   }),
 ];
+
+/**
+ * The library with any calibrated thresholds from Phase 4 applied
+ * (src/data/calibrated.json, exported from the calibration screen).
+ */
+export const EXERCISES: Exercise[] = applyCalibration(DRAFT_EXERCISES, calibrated as unknown as Partial<CalibratedThresholds>);
 
 export const EXERCISES_BY_ID: ReadonlyMap<string, Exercise> = new Map(EXERCISES.map((e) => [e.id, e]));
 

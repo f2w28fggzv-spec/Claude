@@ -8,6 +8,7 @@ import type { AnalysisResult, CheckResult, PoseSequence } from '../engine/types'
 import { drawSkeleton } from '../draw';
 import { nearestShot } from '../analysis/snapshots';
 import { loadOverrides, loadProportions, saveOverride } from '../storage';
+import { saveTechnique } from '../log/store';
 import { Icon } from './icons';
 
 interface Props {
@@ -28,6 +29,24 @@ export function Results({ exercise, seq, shots, onAgain }: Props) {
 
   // Pictures are only ever in memory; release them when leaving results.
   useEffect(() => () => shots.clear(), [shots]);
+
+  // Save the outcome to the training log (numbers only) so the coach can use it.
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    if (result.reps.length === 0) return;
+    const faults: Record<string, number> = {};
+    for (const rep of result.reps) for (const c of rep.checks) if (c.status === 'fail' && c.fault) faults[c.fault] = (faults[c.fault] ?? 0) + 1;
+    saveTechnique({
+      exerciseId: exercise.id,
+      at: new Date().toISOString(),
+      reps: result.reps.length,
+      faults,
+      cleanReps: result.reps.filter((r) => r.checks.every((c) => c.status !== 'fail')).length,
+    });
+    setSaved(true);
+    // Saved once per recording, with the thresholds as they were when it finished.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seq]);
 
   const faultsSeen = new Map<string, number>();
   const checks = result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks);
@@ -138,6 +157,11 @@ export function Results({ exercise, seq, shots, onAgain }: Props) {
         </details>
       )}
 
+      {saved && (
+        <p class="saved-note">
+          <Icon name="check" size={16} /> Saved to your log. The coach uses it to adjust your weights.
+        </p>
+      )}
       <p class="muted small center">Feedback is still being tuned, so treat it as a guide. Pictures are deleted when you leave.</p>
       <div class="stack">
         <button type="button" onClick={onAgain}>

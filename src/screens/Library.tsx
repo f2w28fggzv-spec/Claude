@@ -86,12 +86,12 @@ export function Library() {
         </div>
       )}
 
-      {sections.map(({ g, list }) => (
-        <section class="lib-section">
+      {sections.map(({ g, list }, si) => (
+        <section class="lib-section" style={{ '--i': String(si) }}>
           <h2>{MUSCLE_LABELS[g]}</h2>
           <ul class="rows card">
-            {list.map((e) => (
-              <li>
+            {list.map((e, i) => (
+              <li style={{ '--i': String(i) }}>
                 <a href={`#/exercise/${e.id}`}>
                   <span class="row-main">
                     <strong>{e.name}</strong>

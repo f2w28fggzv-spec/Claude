@@ -12,9 +12,12 @@ import { beep, keepAwake, unlockAudio } from '../analysis/feedback';
 import { grabFrames, landmarksFromVideo, withVideoFile, type FileProgress } from '../analysis/fileSource';
 import { SnapshotKeeper } from '../analysis/snapshots';
 import { usePoseCamera, type LiveFrame } from '../analysis/usePoseCamera';
-import { loadHandsFree, loadProportions, saveHandsFree, saveProportions } from '../storage';
+import { loadFacing, loadHandsFree, loadProportions, saveFacing, saveHandsFree, saveProportions } from '../storage';
 import { CameraStage } from './CameraStage';
 import { Results } from './Results';
+import { saveRecording } from '../calibration/store';
+import { showToast } from '../ui/toast';
+import { navigate } from '../router';
 import { PRIVACY, Screen } from './Layout';
 import { Icon, type IconName } from './icons';
 import { ExerciseDemo } from './ExerciseDemo';
@@ -35,7 +38,7 @@ const ABSENT_STOP_MS = 2000;
 const STILL_STOP_MS = 3000;
 const HOLD_STOP_GRACE_MS = 2000;
 
-export function Analyze({ id }: { id: string }) {
+export function Analyze({ id, calibrate = false }: { id: string; calibrate?: boolean }) {
   const exercise = getExercise(id);
   if (!exercise) {
     return (
@@ -44,10 +47,14 @@ export function Analyze({ id }: { id: string }) {
       </Screen>
     );
   }
-  return <AnalyzeExercise exercise={exercise} />;
+  return <AnalyzeExercise exercise={exercise} calibrate={calibrate} />;
 }
 
-function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
+/**
+ * Technique check. With `calibrate`, a finished recording (landmarks only) is
+ * saved for the calibration screen instead of showing results.
+ */
+function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrate: boolean }) {
   const [stage, setStage] = useState<Stage>({ kind: 'intro' });
   const [error, setError] = useState('');
   const [handsFree, setHandsFree] = useState(loadHandsFree);
@@ -89,7 +96,7 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
     setPhase(p);
   };
 
-  const cam = usePoseCamera((f) => onFrame(f));
+  const cam = usePoseCamera((f) => onFrame(f), { initialFacing: loadFacing(), onFacingChange: saveFacing });
 
   useEffect(() => () => void keepAwake(false), []);
 
@@ -118,6 +125,15 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
     await cam.start();
   };
 
+  // Switch between front (see yourself) and back camera during setup.
+  const flipCamera = async () => {
+    const l = live.current;
+    if (l.phase !== 'setup' && l.phase !== 'countdown') return;
+    l.stabilizer.reset();
+    setLivePhase('setup');
+    await cam.flip();
+  };
+
   const cancelLive = () => {
     cam.stop();
     void keepAwake(false);
@@ -142,6 +158,19 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
     beep(1320, 250);
   };
 
+  const saveForCalibration = async (seq: PoseSequence, source: 'camera' | 'file') => {
+    await saveRecording({
+      id: `r${Date.now().toString(36)}`,
+      exerciseId: exercise.id,
+      createdAt: new Date().toISOString(),
+      source,
+      seq,
+      labels: {},
+    });
+    showToast('Saved for calibration');
+    navigate(`/dev/calibrate?exercise=${exercise.id}`);
+  };
+
   const finishRecording = async () => {
     const l = live.current;
     if (l.phase !== 'recording') return;
@@ -153,6 +182,11 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
     const seq: PoseSequence = { version: 1, width: l.width, height: l.height, source: 'camera', frames: l.frames };
     l.frames = [];
     l.keeper = null;
+    if (calibrate) {
+      shots.clear();
+      await saveForCalibration(seq, 'camera');
+      return;
+    }
     setStage({ kind: 'results', seq, shots });
   };
 
@@ -252,6 +286,7 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
           signal: controller.signal,
           onProgress: (progress) => setStage({ kind: 'processing', progress }),
         });
+        if (calibrate) return { seq, shots: new Map<number, Blob>() };
         const result = analyze(exercise, seq, { proportions: loadProportions() ?? undefined });
         const wanted = result.hold
           ? [Math.round((result.hold.startFrame + result.hold.endFrame) / 2)]
@@ -259,6 +294,10 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
         const shots = await grabFrames(video, seq, wanted);
         return { seq, shots };
       });
+      if (calibrate) {
+        await saveForCalibration(out.seq, 'file');
+        return;
+      }
       setStage({ kind: 'results', ...out });
     } catch (err) {
       if ((err as DOMException).name !== 'AbortError') setError((err as Error).message ?? String(err));
@@ -272,7 +311,7 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
 
   if (stage.kind === 'results') {
     return (
-      <Screen title={title} subtitle="Technique check" back={`exercise/${exercise.id}`}>
+      <Screen title={title} subtitle={calibrate ? 'Calibration recording' : 'Technique check'} back={calibrate ? 'dev/calibrate' : `exercise/${exercise.id}`}>
         <Results exercise={exercise} seq={stage.seq} shots={stage.shots} onAgain={() => setStage({ kind: 'intro' })} />
       </Screen>
     );
@@ -282,7 +321,7 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
     const p = stage.progress;
     const pct = p ? Math.round((p.done / p.total) * 100) : 0;
     return (
-      <Screen title={title} subtitle="Technique check" back={`exercise/${exercise.id}`}>
+      <Screen title={title} subtitle={calibrate ? 'Calibration recording' : 'Technique check'} back={calibrate ? 'dev/calibrate' : `exercise/${exercise.id}`}>
         <section class="card">
           <h2>Analyzing your video…</h2>
           <progress max={100} value={pct} />
@@ -297,7 +336,7 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
 
   const inLive = stage.kind === 'live';
   return (
-    <Screen title={title} subtitle="Technique check" back={`exercise/${exercise.id}`}>
+    <Screen title={title} subtitle={calibrate ? 'Calibration recording' : 'Technique check'} back={calibrate ? 'dev/calibrate' : `exercise/${exercise.id}`}>
       {!inLive && (
         <>
           <ExerciseDemo exercise={exercise} compact />
@@ -319,6 +358,21 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
               }}
             />
           </label>
+          <div class="segmented-2" role="group" aria-label="Camera">
+            <button type="button" class={cam.facing === 'user' ? 'on' : ''} aria-pressed={cam.facing === 'user'} onClick={() => cam.choose('user')}>
+              <strong>Front camera</strong>
+              <small>See yourself while you set up</small>
+            </button>
+            <button
+              type="button"
+              class={cam.facing === 'environment' ? 'on' : ''}
+              aria-pressed={cam.facing === 'environment'}
+              onClick={() => cam.choose('environment')}
+            >
+              <strong>Back camera</strong>
+              <small>Sharper, if someone films you</small>
+            </button>
+          </div>
           <button type="button" class="big" disabled={!cam.ready} onClick={startCamera}>
             <Icon name="camera" size={22} /> {cam.ready ? 'Start camera' : 'Loading…'}
           </button>
@@ -331,6 +385,11 @@ function AnalyzeExercise({ exercise }: { exercise: Exercise }) {
       )}
 
       <CameraStage cam={cam}>
+        {inLive && (phase === 'setup' || phase === 'countdown') && (
+          <button type="button" class="stage-flip" onClick={() => void flipCamera()} aria-label={cam.facing === 'user' ? 'Switch to back camera' : 'Switch to front camera'}>
+            <Icon name="flip" size={22} />
+          </button>
+        )}
         {inLive && (
           <div class={`stage-badge ${phase}`}>
             {phase === 'setup' && (setup?.ready ? (stable ? 'In position' : 'Hold still…') : (setup?.nudge ?? 'Starting…'))}

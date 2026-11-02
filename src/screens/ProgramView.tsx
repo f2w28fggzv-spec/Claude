@@ -22,23 +22,24 @@ export const planSubtitle = (p: Program) =>
   `${p.days.length} day${p.days.length === 1 ? '' : 's'} a week · ${LEVEL[p.inputs.level]} · ${EQUIPMENT_SETTING_LABELS[p.inputs.equipment]}`;
 
 /** The days of a plan with their exercises. Shared by the Plan tab and saved plans. */
-export function PlanDays({ program }: { program: Program }) {
+export function PlanDays({ program, hideNotes = false }: { program: Program; hideNotes?: boolean }) {
   return (
     <>
-      {program.notes.map((n) => (
-        <p class="note">{n}</p>
-      ))}
-      {program.days.map((day) => (
-        <section class="card day">
+      {!hideNotes &&
+        program.notes.map((n) => (
+          <p class="note">{n}</p>
+        ))}
+      {program.days.map((day, di) => (
+        <section class="card day" style={{ '--i': String(di) }}>
           <header class="day-head">
             <h2>{day.name}</h2>
             <span class="muted small">{day.groups.map((g) => MUSCLE_LABELS[g]).join(' · ')}</span>
           </header>
           <ul class="rows">
-            {day.items.map((item) => {
+            {day.items.map((item, ii) => {
               const e = getExercise(item.exerciseId);
               return (
-                <li>
+                <li style={{ '--i': String(di * 3 + ii) }}>
                   <a href={`#/exercise/${item.exerciseId}`}>
                     <span class="row-main">
                       <strong>{e?.name ?? item.exerciseId}</strong>
