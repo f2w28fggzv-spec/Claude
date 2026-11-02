@@ -1,8 +1,11 @@
 import { useMemo } from 'preact/hooks';
+import { getExercise } from '../data/exercises';
+import { CLEAN_SHARE, FORM_WINDOW_DAYS, formState, techniqueTrend } from '../log/coach';
 import { exerciseInfo } from '../log/exercises';
 import { exerciseHistory, formatSet, formatSetShort, formatWeight, personalRecords, toUnit } from '../log/stats';
 import { loadBodyweight, loadTechnique, loadUnit, loadWorkouts } from '../log/store';
 import { ProgressChart, type ChartPoint } from './ProgressChart';
+import { Icon } from './icons';
 import { Screen } from './Layout';
 
 /** Progress for one exercise: estimated max over time, records and history. */
@@ -12,6 +15,9 @@ export function ProgressScreen({ id }: { id: string }) {
   const unit = useMemo(loadUnit, []);
   const history = useMemo(() => exerciseHistory(loadWorkouts(), id), [id]);
   const technique = useMemo(() => loadTechnique().filter((t) => t.exerciseId === id), [id]);
+  const trend = techniqueTrend(technique, id);
+  const gate = formState(technique, id);
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
   const rec = personalRecords(history);
   const bw = !!info?.bodyweight;
   const hold = !!info?.hold;
@@ -111,30 +117,80 @@ export function ProgressScreen({ id }: { id: string }) {
           ))}
         </tbody>
       </table>
-      {technique.length > 0 && (
+      {ex && (trend.points.length > 0 || ex.analysis === 'full') && (
         <>
-          <h2>Technique checks</h2>
-          <ul class="rows card">
-            {technique.slice(0, 10).map((t) => (
-              <li>
-                <a href={`#/analyze/${id}`}>
-                  <span class="row-main">
-                    <strong>
-                      {t.cleanReps}/{t.reps} reps with no faults
-                    </strong>
-                    <small>
-                      {new Date(t.at).toLocaleDateString()}
-                      {Object.keys(t.faults).length
-                        ? ` · ${Object.entries(t.faults)
-                            .map(([f, n]) => `${ex?.faults.find((x) => x.id === f)?.label.toLowerCase() ?? f} ×${n}`)
-                            .join(', ')}`
-                        : ''}
-                    </small>
+          <header class="day-head section-head">
+            <h2>Technique</h2>
+            <a class="link" href={`#/analyze/${id}`}>
+              <Icon name="camera" size={16} /> Check technique
+            </a>
+          </header>
+          {trend.points.length >= 2 && (
+            <ProgressChart
+              title="Reps with no faults, per check (%)"
+              format={(v) => `${Math.round(v)}%`}
+              domain={[0, 100]}
+              points={trend.points.map((p) => ({ date: p.at, value: p.share * 100, detail: `${p.clean} of ${p.reps} reps clean` }))}
+            />
+          )}
+          {ex.analysis === 'full' && (
+            <p class={`form-gate ${gate.state}`}>
+              <strong>{gate.state === 'clean' ? 'Form ✓' : gate.state === 'faults' ? 'Form: hold weight' : 'Form: check needed'}</strong>
+              <span>
+                {gate.state === 'clean'
+                  ? `Your last check (${new Date(gate.latest!.at).toLocaleDateString()}) was clean, so the coach adds weight once every set reaches the top of the range.`
+                  : gate.state === 'faults'
+                    ? `Your last check had faults on ${gate.latest!.reps - gate.latest!.cleanReps} of ${gate.latest!.reps} reps. The coach keeps the weight until a check is at least ${Math.round(CLEAN_SHARE * 100)}% clean.`
+                    : `No check in the last ${FORM_WINDOW_DAYS} days. Before adding weight, the coach asks for a clean technique check.`}
+              </span>
+            </p>
+          )}
+          {trend.top &&
+            (() => {
+              const fault = ex.faults.find((f) => f.id === trend.top!.fault);
+              const corrective = fault ? getExercise(fault.corrective) : undefined;
+              return fault ? (
+                <section class="card top-fault">
+                  <h3>Most common fault</h3>
+                  <strong>{fault.label}</strong>
+                  <span class="muted small">
+                    {trend.top!.reps} rep{trend.top!.reps === 1 ? '' : 's'} across {trend.top!.checks} check{trend.top!.checks === 1 ? '' : 's'}
                   </span>
-                </a>
-              </li>
-            ))}
-          </ul>
+                  <p>{fault.cue}</p>
+                  {corrective && (
+                    <a class="link" href={`#/exercise/${corrective.id}`}>
+                      Helps: {corrective.name}
+                    </a>
+                  )}
+                </section>
+              ) : null;
+            })()}
+          {technique.length > 0 && (
+            <ul class="rows card">
+              {[...technique]
+                .sort((a, b) => b.at.localeCompare(a.at))
+                .slice(0, 10)
+                .map((t) => (
+                  <li>
+                    <a href={`#/analyze/${id}`}>
+                      <span class="row-main">
+                        <strong>
+                          {t.cleanReps}/{t.reps} reps with no faults · {pct(t.cleanReps / t.reps)}
+                        </strong>
+                        <small>
+                          {new Date(t.at).toLocaleDateString()}
+                          {Object.keys(t.faults).length
+                            ? ` · ${Object.entries(t.faults)
+                                .map(([f, n]) => `${ex.faults.find((x) => x.id === f)?.label.toLowerCase() ?? f} ×${n}`)
+                                .join(', ')}`
+                            : ''}
+                        </small>
+                      </span>
+                    </a>
+                  </li>
+                ))}
+            </ul>
+          )}
         </>
       )}
     </Screen>

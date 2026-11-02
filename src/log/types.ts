@@ -38,6 +38,11 @@ export interface ExerciseEntry {
   target?: { sets: number; reps: [number, number]; unit: 'reps' | 'seconds'; restSec: number; weight?: number };
   /** The coach's note for this exercise in this workout. */
   coachNote?: string;
+  /**
+   * Ready for more weight but no recent technique check: the weight the coach
+   * moves to (kg) once a check during this workout comes back clean.
+   */
+  nextWeight?: number;
 }
 
 export interface Workout {
@@ -75,6 +80,12 @@ export interface CustomExercise {
   createdAt: string;
   /** Removed from the picker; kept so earlier workouts still show its name. */
   archived?: boolean;
+}
+
+/** An easier week the coach suggested and you turned on. */
+export interface EasyWeek {
+  startedAt: string;
+  until: string;
 }
 
 /** Personal trainer (the app builds the plan) or My workouts (you do). */

@@ -69,6 +69,12 @@ export function SessionScreen({ id }: { id: string }) {
           <span>{unit} lifted</span>
         </div>
       </div>
+      {w.notes && (
+        <section class="card notes-card">
+          <h2>Notes</h2>
+          <p>{w.notes}</p>
+        </section>
+      )}
       {w.entries.map((e, i) => {
         const name = exerciseName(e.exerciseId);
         const hist = exerciseHistory(workouts, e.exerciseId);
@@ -101,6 +107,9 @@ export function SessionScreen({ id }: { id: string }) {
         );
       })}
       <div class="stack">
+        <a class="button secondary" href={`#/edit/${w.id}`}>
+          <Icon name="edit" size={18} /> Edit workout
+        </a>
         <button type="button" class="secondary" onClick={repeat}>
           <Icon name="play" size={18} /> Repeat this workout
         </button>

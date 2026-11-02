@@ -30,12 +30,12 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, {
  * crosshair that snaps to the nearest session (pointer and arrow keys).
  * The history list under it is the table view.
  */
-export function ProgressChart({ points, format, title }: { points: ChartPoint[]; format: (v: number) => string; title: string }) {
+export function ProgressChart({ points, format, title, domain }: { points: ChartPoint[]; format: (v: number) => string; title: string; domain?: [number, number] }) {
   const [active, setActive] = useState<number | null>(null);
   const vals = points.map((p) => p.value);
   const lo = Math.min(...vals);
   const hi = Math.max(...vals);
-  const ticks = niceTicks(lo - (hi - lo || hi * 0.1) * 0.15, hi + (hi - lo || hi * 0.1) * 0.15);
+  const ticks = domain ? niceTicks(domain[0], domain[1]) : niceTicks(lo - (hi - lo || hi * 0.1) * 0.15, hi + (hi - lo || hi * 0.1) * 0.15);
   const y0 = ticks[0];
   const y1 = ticks[ticks.length - 1];
   const t0 = new Date(points[0].date).getTime();

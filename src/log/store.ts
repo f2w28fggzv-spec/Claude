@@ -1,5 +1,5 @@
 // On-device training log (localStorage, numbers only).
-import type { CustomExercise, Routine, TechniqueSummary, TrainMode, Unit, Workout } from './types';
+import type { CustomExercise, EasyWeek, Routine, TechniqueSummary, TrainMode, Unit, Workout } from './types';
 
 const KEY_WORKOUTS = 'formcheck.v1.workouts';
 const KEY_ACTIVE = 'formcheck.v1.activeWorkout';
@@ -9,6 +9,14 @@ const KEY_BODYWEIGHT = 'formcheck.v1.bodyweight';
 const KEY_ROUTINES = 'formcheck.v1.routines';
 const KEY_MODE = 'formcheck.v1.trainMode';
 const KEY_CUSTOM = 'formcheck.v1.customExercises';
+const KEY_EASY = 'formcheck.v1.easyWeek';
+
+/** The latest easier week you turned on (kept after it ends, so the coach doesn't suggest another straight away). */
+export function loadEasyWeek(): EasyWeek | null {
+  const e = read<unknown>(KEY_EASY, null) as EasyWeek | null;
+  return e && typeof e.startedAt === 'string' && typeof e.until === 'string' ? e : null;
+}
+export const saveEasyWeek = (e: EasyWeek | null) => write(KEY_EASY, e);
 
 function read<T>(key: string, fallback: T): T {
   try {

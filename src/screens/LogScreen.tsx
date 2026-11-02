@@ -27,6 +27,7 @@ export function LogScreen() {
     return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth();
   });
   const volume = inMonth.reduce((s, w) => s + workoutVolume(w), 0);
+  const selectedDate = selected ? new Date(Number(selected.slice(0, 4)), Number(selected.slice(5, 7)) - 1, Number(selected.slice(8, 10))) : null;
   const shown: Workout[] = selected ? (byDay.get(selected) ?? []) : finished(workouts).slice(0, 6);
 
   const exercises = [...new Set(finished(workouts).flatMap((w) => w.entries.map((e) => e.exerciseId)))];
@@ -92,9 +93,14 @@ export function LogScreen() {
         </div>
       </div>
 
-      <h2>{selected ? new Date(selected).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Recent workouts'}</h2>
+      <h2>{selectedDate ? selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Recent workouts'}</h2>
+      {(!selected || selected <= dayKey(today)) && (
+        <a class="button secondary log-past" href={`#/edit/new${selected ? `?date=${selected}` : ''}`}>
+          <Icon name="plus" size={18} /> {selected ? (selected === dayKey(today) ? 'Log a workout for today' : 'Log a workout for this day') : 'Log a past workout'}
+        </a>
+      )}
       {shown.length === 0 ? (
-        <p class="muted">{selected ? 'No workout logged this day.' : 'No workouts yet. Start one from the Plan tab.'}</p>
+        <p class="muted">{selected ? 'No workout logged this day.' : 'No workouts yet. Start one from the Train tab, or log one you’ve already done.'}</p>
       ) : (
         <ul class="rows card">
           {shown.map((w, i) => (

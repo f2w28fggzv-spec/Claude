@@ -2,6 +2,7 @@ import { useRoute } from './router';
 import { ToastHost } from './ui/toast';
 import { LogScreen } from './screens/LogScreen';
 import { WorkoutScreen } from './screens/WorkoutScreen';
+import { EditWorkoutScreen } from './screens/EditWorkoutScreen';
 import { RoutineScreen } from './screens/RoutineScreen';
 import { SessionScreen } from './screens/SessionScreen';
 import { ProgressScreen } from './screens/ProgressScreen';
@@ -44,6 +45,8 @@ function Routes({ path, query }: ReturnType<typeof useRoute>) {
       return <LogScreen />;
     case 'workout':
       return <WorkoutScreen />;
+    case 'edit':
+      return <EditWorkoutScreen id={id ?? 'new'} date={query.get('date') ?? undefined} />;
     case 'routine':
       return <RoutineScreen id={id ?? 'new'} />;
     case 'session':

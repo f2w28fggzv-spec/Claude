@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCorrective, insights, loadStep, nextDayIndex, repeatedFaults, suggest } from '../src/log/coach';
+import { addCorrective, easyWeekActive, formState, insights, loadStep, nextDayIndex, repeatedFaults, startEasyWeek, suggest, techniqueTrend } from '../src/log/coach';
 import {
   e1rm,
   exerciseHistory,
@@ -17,7 +17,7 @@ import {
   workoutsByDay,
 } from '../src/log/stats';
 import type { Routine, SetEntry, TechniqueSummary, Workout } from '../src/log/types';
-import { addExercise, completeSet, emptyWorkout, finishWorkout, repeatWorkout, routineFromWorkout, startRoutine } from '../src/log/session';
+import { addExercise, applyNextWeight, completeSet, emptyWorkout, finishWorkout, repeatWorkout, routineFromWorkout, startFromPlan, startRoutine } from '../src/log/session';
 import { isBodyweight } from '../src/data/filters';
 import { getExercise } from '../src/data/exercises';
 import { buildProgram, type ProgramItem } from '../src/program/builder';
@@ -109,9 +109,38 @@ describe('coach: next weights', () => {
     expect(suggest(squat, [], [])).toMatchObject({ kind: 'start' });
   });
 
-  it('adds weight once every set reaches the top of the range', () => {
-    const s = suggest(squat, hist([workout('2026-10-01', [{ id: 'back-squat', sets: sets(100, 10, 10, 10) }])]), []);
-    expect(s).toMatchObject({ kind: 'increase', weight: 105, delta: 5 });
+  it('adds weight once every set reaches the top of the range (after a clean check on full-analysis lifts)', () => {
+    const log = [workout('2026-10-01', [{ id: 'back-squat', sets: sets(100, 10, 10, 10) }])];
+    const s = suggest(squat, hist(log), [check('back-squat', '2026-10-01', {})], 'kg', new Date('2026-10-03T12:00:00'));
+    expect(s).toMatchObject({ kind: 'increase', weight: 105, delta: 5, form: 'clean' });
+    // Basic-analysis lifts aren't gated.
+    const curl = suggest(item('dumbbell-curl', [8, 12]), hist([workout('2026-10-01', [{ id: 'dumbbell-curl', sets: sets(12, 12, 12, 12) }])], 'dumbbell-curl'), []);
+    expect(curl).toMatchObject({ kind: 'increase', weight: 13 }); // 12 kg + 10% cap
+    expect(curl.form).toBeUndefined();
+  });
+
+  it('holds the weight until a technique check is clean on full-analysis lifts', () => {
+    const log = [workout('2026-10-01', [{ id: 'back-squat', sets: sets(100, 10, 10, 10) }])];
+    const at = new Date('2026-10-03T12:00:00');
+    // No recent check: keep the weight and ask for one.
+    const none = suggest(squat, hist(log), [], 'kg', at);
+    expect(none).toMatchObject({ kind: 'check', weight: 100, delta: 0, nextWeight: 105, form: 'unchecked' });
+    // A check older than the window doesn't count.
+    expect(suggest(squat, hist(log), [check('back-squat', '2026-09-01', {})], 'kg', at).kind).toBe('check');
+    // Faults in the latest check (but not repeated): hold and name the fault.
+    const faulty = suggest(squat, hist(log), [check('back-squat', '2026-10-02', { shallowDepth: 2 })], 'kg', at);
+    expect(faulty).toMatchObject({ kind: 'repeat', weight: 100, form: 'faults' });
+    expect(faulty.note).toMatch(/depth/i);
+    // 4 of 5 clean reps is clean enough (80%).
+    expect(suggest(squat, hist(log), [check('back-squat', '2026-10-02', { shallowDepth: 1 })], 'kg', at).kind).toBe('increase');
+  });
+
+  it('reads the form gate from the latest recent check', () => {
+    const at = new Date('2026-10-10T12:00:00');
+    expect(formState([], 'back-squat', at).state).toBe('unchecked');
+    const tech = [check('back-squat', '2026-10-01', { shallowDepth: 3 }), check('back-squat', '2026-10-08', {})];
+    expect(formState(tech, 'back-squat', at)).toMatchObject({ state: 'clean', latest: { at: day('2026-10-08') } });
+    expect(formState(tech, 'back-squat', new Date('2026-10-05T12:00:00')).state).toBe('faults');
   });
 
   it('keeps the weight while reps are still climbing', () => {
@@ -149,9 +178,11 @@ describe('coach: next weights', () => {
 
   it('suggests plate-friendly pounds for lifters who log in pounds', () => {
     const lb = (n: number) => fromUnit(n, 'lb');
-    const up = suggest(squat, hist([workout('2026-10-01', [{ id: 'back-squat', sets: sets(lb(225), 10, 10, 10) }])]), [], 'lb');
+    const at = new Date('2026-10-02T12:00:00');
+    const clean = [check('back-squat', '2026-10-01', {}), check('bench-press', '2026-10-01', {})];
+    const up = suggest(squat, hist([workout('2026-10-01', [{ id: 'back-squat', sets: sets(lb(225), 10, 10, 10) }])]), clean, 'lb', at);
     expect(toUnit(up.weight!, 'lb')).toBeCloseTo(235, 6);
-    const bench = suggest(item('bench-press', [6, 10]), hist([workout('2026-10-01', [{ id: 'bench-press', sets: sets(lb(135), 10, 10, 10) }])], 'bench-press'), [], 'lb');
+    const bench = suggest(item('bench-press', [6, 10]), hist([workout('2026-10-01', [{ id: 'bench-press', sets: sets(lb(135), 10, 10, 10) }])], 'bench-press'), clean, 'lb', at);
     expect(toUnit(bench.weight!, 'lb')).toBeCloseTo(140, 6);
     const back = suggest(squat, hist([workout('2026-10-01', [{ id: 'back-squat', sets: sets(lb(225), 10, 10, 10) }])]), [check('back-squat', '2026-10-01', { shallowDepth: 3 }), check('back-squat', '2026-09-28', { shallowDepth: 2 })], 'lb');
     expect(toUnit(back.weight!, 'lb')).toBeCloseTo(202.5, 6);
@@ -222,17 +253,53 @@ describe('coach: plan and insights', () => {
     expect(insights(updated, [], tech).find((i) => i.id === 'fault-back-squat-shallowDepth')!.action).toBeUndefined();
   });
 
-  it('notices a completed week and missed muscles', () => {
+  it('notices a completed week and muscles behind plan', () => {
     const now = new Date('2026-10-23T12:00:00'); // Friday
+    const chest = program.days.flatMap((d) => d.items).filter((i) => getExercise(i.exerciseId)!.primary.includes('chest'));
     const week = ['2026-10-19', '2026-10-20', '2026-10-21'].map((d, i) =>
-      workout(d, [{ id: 'bench-press', sets: sets(60, 8, 8) }], { planId: program.id, dayIndex: i }),
+      workout(d, chest.map((c) => ({ id: c.exerciseId, sets: sets(60, 8, 8, 8, 8, 8) })), { planId: program.id, dayIndex: i }),
     );
     const older = workout('2026-10-01', [{ id: 'bench-press', sets: sets(60, 8) }]);
     const ins = insights(program, [...week, older], [], 'kg', now);
     expect(ins.some((i) => i.id === 'week-done')).toBe(true);
-    const missed = ins.find((i) => i.id === 'missed-groups');
-    expect(missed?.body).toMatch(/back/);
-    expect(missed?.body).toMatch(/quads/);
+    const behind = ins.find((i) => i.id === 'behind-plan');
+    expect(behind?.title).toMatch(/^Behind plan: /);
+    expect(behind?.title).toMatch(/back/);
+    expect(behind?.title).toMatch(/quads/);
+    expect(behind?.title).not.toMatch(/chest/);
+    expect(behind?.body).toMatch(/back 0 of \d+ planned sets/);
+  });
+
+  it('says how much of the plan was done when every muscle is behind', () => {
+    const now = new Date('2026-10-23T12:00:00');
+    const log = [workout('2026-10-01', [{ id: 'bench-press', sets: sets(60, 8) }]), workout('2026-10-20', [{ id: 'bench-press', sets: sets(60, 8) }])];
+    const behind = insights(program, log, [], 'kg', now).find((i) => i.id === 'behind-plan');
+    expect(behind?.title).toMatch(/^About \d+% of your planned sets$/);
+  });
+
+  it('suggests an easier week when two plan lifts stall, and applies it to plan days', () => {
+    const now = new Date('2026-10-12T12:00:00');
+    const [a, b] = program.days[0].items.filter((i) => i.unit === 'reps');
+    const log = ['2026-10-01', '2026-10-04', '2026-10-07', '2026-10-10'].map((d, i) =>
+      workout(d, [{ id: a.exerciseId, sets: sets(50, 8, 8, 8) }, { id: b.exerciseId, sets: sets(40, 8, 8, 8) }], { planId: program.id, dayIndex: i % program.days.length }),
+    );
+    const ins = insights(program, log, [], 'kg', now);
+    const easier = ins.find((i) => i.id === 'easier-week');
+    expect(easier?.action).toMatchObject({ kind: 'easyWeek' });
+    expect(ins.some((i) => i.id.startsWith('stall-'))).toBe(false);
+    // Turned on: plan days get about half the sets and 10% less weight.
+    const easy = startEasyWeek(now);
+    expect(easyWeekActive(easy, new Date('2026-10-15T12:00:00'))).toBe(true);
+    expect(easyWeekActive(easy, new Date('2026-10-20T12:00:00'))).toBe(false);
+    const w = startFromPlan(program, 0, log, [], 'kg', now, true);
+    const entry = w.entries.find((e) => e.exerciseId === a.exerciseId)!;
+    expect(entry.sets.length).toBe(Math.max(1, Math.round(a.sets / 2)));
+    expect(entry.sets[0].planned?.weight).toBe(45);
+    expect(entry.coachNote).toMatch(/Easier week/);
+    // While it's on, the coach says so and doesn't suggest another.
+    const during = insights(program, log, [], 'kg', new Date('2026-10-14T12:00:00'), easy);
+    expect(during.some((i) => i.id === 'easy-week-on')).toBe(true);
+    expect(during.some((i) => i.id === 'easier-week')).toBe(false);
   });
 });
 
@@ -345,5 +412,51 @@ describe('logging your own workouts', () => {
     const plan = finishWorkout({ ...history[0], finishedAt: undefined, dayName: 'Day 1' }, new Date(), 82);
     expect(plan.dayName).toBe('Day 1');
     expect(plan.bodyweight).toBeUndefined();
+  });
+});
+
+describe('technique over time', () => {
+  it('charts clean reps per check and finds the most common fault', () => {
+    const tech = [
+      check('back-squat', '2026-10-08', { forwardLean: 1 }),
+      check('back-squat', '2026-10-01', { shallowDepth: 3 }),
+      check('back-squat', '2026-10-04', { shallowDepth: 1, forwardLean: 1 }),
+      check('bench-press', '2026-10-04', { flare: 4 }),
+    ];
+    const t = techniqueTrend(tech, 'back-squat');
+    expect(t.points.map((p) => p.at)).toEqual([day('2026-10-01'), day('2026-10-04'), day('2026-10-08')]);
+    expect(t.points.map((p) => p.share)).toEqual([0.4, 0.8, 0.8]);
+    expect(t.top).toEqual({ fault: 'shallowDepth', reps: 4, checks: 2 });
+    expect(techniqueTrend([], 'back-squat')).toEqual({ points: [], top: undefined });
+  });
+
+  it('moves the rest of the sets up after a clean check during the workout', () => {
+    const program = buildProgram({ groups: ['quads'], daysPerWeek: 2, level: 'intermediate', equipment: 'fullGym' });
+    const squatDay = program.days.findIndex((d) => d.items.some((i) => i.exerciseId === 'back-squat'));
+    expect(squatDay).toBeGreaterThanOrEqual(0);
+    const it = program.days[squatDay].items.find((i) => i.exerciseId === 'back-squat')!;
+    const log = [workout('2026-10-01', [{ id: 'back-squat', sets: sets(100, ...Array(it.sets).fill(it.reps[1])) }], { planId: program.id, dayIndex: squatDay })];
+    const w = startFromPlan(program, squatDay, log, [], 'kg', new Date('2026-10-03T12:00:00'));
+    const ei = w.entries.findIndex((e) => e.exerciseId === 'back-squat');
+    expect(w.entries[ei].nextWeight).toBe(105);
+    expect(w.entries[ei].sets[0].planned?.weight).toBe(100);
+    const done = { ...w, entries: w.entries.map((e, i) => (i === ei ? { ...e, sets: e.sets.map((s, j) => (j === 0 ? completeSet(s) : s)) } : e)) };
+    const up = applyNextWeight(done, ei);
+    expect(up.entries[ei].sets[0]).toMatchObject({ done: true, weight: 100 });
+    expect(up.entries[ei].sets.slice(1).every((s) => s.planned?.weight === 105)).toBe(true);
+    expect(up.entries[ei].nextWeight).toBeUndefined();
+  });
+});
+
+describe('logging a workout afterwards', () => {
+  it('keeps the date you give it and drops sets you left out', () => {
+    let w = addExercise({ ...emptyWorkout(), startedAt: new Date('2026-10-20T18:00:00').toISOString() }, 'bench-press');
+    w = { ...w, notes: 'Felt strong', entries: w.entries.map((e) => ({ ...e, sets: e.sets.map((s, i) => (i < 2 ? { ...s, weight: 60, reps: 8, done: true } : s)) })) };
+    const done = finishWorkout(w, new Date('2026-10-20T19:05:00'));
+    expect(done.startedAt).toBe(new Date('2026-10-20T18:00:00').toISOString());
+    expect(done.finishedAt).toBe(new Date('2026-10-20T19:05:00').toISOString());
+    expect(done.entries[0].sets).toHaveLength(2);
+    expect(done.notes).toBe('Felt strong');
+    expect(done.dayName).toBe('Chest');
   });
 });

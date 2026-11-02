@@ -7,15 +7,26 @@
 // recommends a 2–10% load increase when the current load can be done for one
 // to two reps over the target. Repeated technique faults lower the load and
 // add the fault's corrective exercise (the Phase 5 rule in CLAUDE.md).
+//
+// Form gate (Phase 5): on full-analysis lifts, weight only goes up when the
+// latest technique check (within FORM_WINDOW_DAYS) was clean on at least
+// CLEAN_SHARE of its reps. No recent check: keep the weight and ask for one.
+// Faults: keep the weight until a check comes back clean.
+//
+// Easier week: Bell et al. (2023, Delphi consensus, Sports Med Open 9:87)
+// define a deload as a period of reduced training stress to manage fatigue,
+// help recovery and improve readiness. The app offers one when two or more
+// plan lifts stall; the amounts (one week, about half the sets, about 10%
+// lighter) are this app's choice, not numbers from that paper.
 import { getExercise } from '../data/exercises';
 import { isBodyweight } from '../data/filters';
 import { exerciseName } from './exercises';
 import { MUSCLE_LABELS, type Exercise, type MuscleGroup } from '../data/types';
 import type { Program, ProgramItem } from '../program/builder';
 import { exerciseHistory, finished, formatSet, fromUnit, muscleSets, toUnit, weekStart, type SessionSummary } from './stats';
-import type { TechniqueSummary, Unit, Workout } from './types';
+import type { EasyWeek, TechniqueSummary, Unit, Workout } from './types';
 
-export type SuggestionKind = 'start' | 'increase' | 'repeat' | 'reduce' | 'technique';
+export type SuggestionKind = 'start' | 'increase' | 'repeat' | 'reduce' | 'technique' | 'check';
 
 export interface Suggestion {
   kind: SuggestionKind;
@@ -26,6 +37,27 @@ export interface Suggestion {
   note: string;
   /** Corrective exercise to add, for technique suggestions. */
   corrective?: string;
+  /** Form gate result on full-analysis lifts that are ready for more weight. */
+  form?: FormState;
+  /** The weight the coach will move to once the form gate passes (kg). */
+  nextWeight?: number;
+}
+
+/** How long a technique check counts as recent, in days. */
+export const FORM_WINDOW_DAYS = 21;
+/** Share of a check's reps that must be clean for the form gate. */
+export const CLEAN_SHARE = 0.8;
+
+export type FormState = 'clean' | 'faults' | 'unchecked';
+
+/** The latest recent technique check of an exercise, and whether it was clean enough. */
+export function formState(technique: TechniqueSummary[], exerciseId: string, now = new Date()): { state: FormState; latest?: TechniqueSummary } {
+  const since = now.getTime() - FORM_WINDOW_DAYS * 86400000;
+  const latest = technique
+    .filter((t) => t.exerciseId === exerciseId && t.reps > 0 && new Date(t.at).getTime() >= since && new Date(t.at).getTime() <= now.getTime())
+    .sort((a, b) => b.at.localeCompare(a.at))[0];
+  if (!latest) return { state: 'unchecked' };
+  return { state: latest.cleanReps / latest.reps >= CLEAN_SHARE ? 'clean' : 'faults', latest };
 }
 
 const LOWER = new Set<MuscleGroup>(['quads', 'hamstrings', 'glutes']);
@@ -65,7 +97,7 @@ export function repeatedFaults(technique: TechniqueSummary[], exerciseId: string
 }
 
 /** The next weight / reps to aim for on one planned exercise. */
-export function suggest(item: ProgramItem, history: SessionSummary[], technique: TechniqueSummary[], weightUnit: Unit = 'kg'): Suggestion {
+export function suggest(item: ProgramItem, history: SessionSummary[], technique: TechniqueSummary[], weightUnit: Unit = 'kg', now = new Date()): Suggestion {
   const ex = getExercise(item.exerciseId);
   const [lo, hi] = item.reps;
   const last = history[history.length - 1];
@@ -116,6 +148,39 @@ export function suggest(item: ProgramItem, history: SessionSummary[], technique:
       return { kind: 'increase', note: item.unit === 'seconds' ? 'Every set hit the target: add 5–10 s.' : `Every set hit ${hi} reps: add reps or move to a harder variation.` };
     }
     const weight = roundLoad(top + loadStep(ex, top, weightUnit), weightUnit);
+    if (ex.analysis === 'full') {
+      // Consistent form progresses load; otherwise hold until a clean check.
+      const { state, latest } = formState(technique, item.exerciseId, now);
+      if (state === 'clean') {
+        return {
+          kind: 'increase',
+          weight,
+          delta: weight - top,
+          form: state,
+          note: `Every set hit ${hi} ${unit} and your last technique check was clean (${latest!.cleanReps}/${latest!.reps} reps): add weight.`,
+        };
+      }
+      if (state === 'faults') {
+        const worst = Object.entries(latest!.faults).sort((a, b) => b[1] - a[1])[0]?.[0];
+        const label = ex.faults.find((f) => f.id === worst)?.label.toLowerCase();
+        return {
+          kind: 'repeat',
+          weight: top,
+          delta: 0,
+          form: state,
+          nextWeight: weight,
+          note: `Every set hit ${hi} ${unit}, but your last technique check had faults${label ? ` (${label})` : ''}. Keep this weight until a check comes back clean.`,
+        };
+      }
+      return {
+        kind: 'check',
+        weight: top,
+        delta: 0,
+        form: state,
+        nextWeight: weight,
+        note: `Every set hit ${hi} ${unit}: you're ready for more weight. Check your technique on one set first; once it's clean, the coach adds weight.`,
+      };
+    }
     return { kind: 'increase', weight, delta: weight - top, note: `Every set hit ${hi} ${unit} last time: add weight.` };
   }
   return {
@@ -123,6 +188,69 @@ export function suggest(item: ProgramItem, history: SessionSummary[], technique:
     weight: weighted ? top : undefined,
     delta: 0,
     note: `Same ${weighted ? 'weight' : 'variation'}; aim for one more ${item.unit === 'seconds' ? 'few seconds' : 'rep'} per set, up to ${hi}.`,
+  };
+}
+
+export interface TechniqueTrend {
+  /** One point per check, oldest first: share of reps with no fault (0–1). */
+  points: { at: string; share: number; clean: number; reps: number }[];
+  /** The fault seen on the most reps, with how many checks it showed up in. */
+  top?: { fault: string; reps: number; checks: number };
+}
+
+/** Technique checks of one exercise over time, and its most common fault. */
+export function techniqueTrend(technique: TechniqueSummary[], exerciseId: string): TechniqueTrend {
+  const checks = technique.filter((t) => t.exerciseId === exerciseId && t.reps > 0).sort((a, b) => a.at.localeCompare(b.at));
+  const reps = new Map<string, number>();
+  const seen = new Map<string, number>();
+  for (const t of checks) {
+    for (const [f, n] of Object.entries(t.faults)) {
+      if (n <= 0) continue;
+      reps.set(f, (reps.get(f) ?? 0) + n);
+      seen.set(f, (seen.get(f) ?? 0) + 1);
+    }
+  }
+  const worst = [...reps].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return {
+    points: checks.map((t) => ({ at: t.at, share: t.cleanReps / t.reps, clean: t.cleanReps, reps: t.reps })),
+    top: worst ? { fault: worst[0], reps: worst[1], checks: seen.get(worst[0]) ?? 0 } : undefined,
+  };
+}
+
+/** Easier week: about half the sets and about 10% lighter, for 7 days. */
+export const EASY_WEEK = { setShare: 0.5, load: 0.9, days: 7 } as const;
+
+export const easyWeekActive = (easy: EasyWeek | null | undefined, now = new Date()) =>
+  !!easy && new Date(easy.startedAt).getTime() <= now.getTime() && now.getTime() < new Date(easy.until).getTime();
+
+export function startEasyWeek(now = new Date()): EasyWeek {
+  return { startedAt: now.toISOString(), until: new Date(now.getTime() + EASY_WEEK.days * 86400000).toISOString() };
+}
+
+/** The suggestion for a plan item plus its set count, adjusted during an easier week. */
+export function planSuggestion(
+  item: ProgramItem,
+  history: SessionSummary[],
+  technique: TechniqueSummary[],
+  unit: Unit = 'kg',
+  now = new Date(),
+  easy = false,
+): Suggestion & { sets: number } {
+  const s = suggest(item, history, technique, unit, now);
+  if (!easy) return { ...s, sets: item.sets };
+  const sets = Math.max(1, Math.round(item.sets * EASY_WEEK.setShare));
+  const last = history[history.length - 1];
+  const lastTop = last ? Math.max(0, ...last.sets.map((x) => x.weight ?? 0)) : 0;
+  const base = s.weight ?? (lastTop > 0 ? lastTop : undefined);
+  const weight = base !== undefined && base > 0 ? roundLoad(base * EASY_WEEK.load, unit) : undefined;
+  return {
+    ...s,
+    kind: weight !== undefined ? 'reduce' : s.kind,
+    weight,
+    delta: weight !== undefined && lastTop > 0 ? weight - lastTop : s.delta,
+    nextWeight: undefined,
+    sets,
+    note: `Easier week: ${sets} set${sets === 1 ? '' : 's'}${weight !== undefined ? ', about 10% lighter' : ''}. Keep every rep smooth; normal training resumes next week.`,
   };
 }
 
@@ -139,7 +267,10 @@ export interface Insight {
   tone: 'good' | 'warn' | 'info';
   title: string;
   body: string;
-  action?: { label: string; kind: 'addCorrective'; exerciseId: string; correctiveId: string };
+  action?:
+    | { label: string; kind: 'addCorrective'; exerciseId: string; correctiveId: string }
+    | { label: string; kind: 'easyWeek' }
+    | { label: string; kind: 'endEasyWeek' };
 }
 
 /** Coaching notes for the Plan tab, most important first. */
@@ -149,8 +280,18 @@ export function insights(
   technique: TechniqueSummary[],
   unit: Unit = 'kg',
   now = new Date(),
+  easy: EasyWeek | null = null,
 ): Insight[] {
   const out: Insight[] = [];
+  if (program && easyWeekActive(easy, now)) {
+    out.push({
+      id: 'easy-week-on',
+      tone: 'good',
+      title: `Easier week until ${new Date(easy!.until).toLocaleDateString(undefined, { weekday: 'long' })}`,
+      body: 'About half the sets and 10% lighter on every plan day. Normal weights come back after.',
+      action: { label: 'End it now', kind: 'endEasyWeek' },
+    });
+  }
   const done = finished(workouts).sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   if (done.length === 0) {
     out.push({
@@ -227,20 +368,42 @@ export function insights(
     }
   }
 
-  // Stalls: no e1RM improvement over the last three sessions.
+  // Stalls: no e1RM improvement over the last three sessions. Two or more
+  // stalled lifts suggest an easier week rather than one note per lift.
   if (program) {
     const ids = [...new Set(program.days.flatMap((d) => d.items.map((i) => i.exerciseId)))];
-    for (const id of ids) {
-      const h = exerciseHistory(done, id).filter((s) => s.bestE1rm > 0);
-      if (h.length < 4) continue;
-      const recent = Math.max(...h.slice(-3).map((s) => s.bestE1rm));
-      const earlier = Math.max(...h.slice(0, -3).map((s) => s.bestE1rm));
-      if (recent <= earlier) {
+    const stalled = ids.filter((id) => {
+      const h = exerciseHistory(done, id).filter((x) => x.bestE1rm > 0);
+      if (h.length < 4) return false;
+      return Math.max(...h.slice(-3).map((x) => x.bestE1rm)) <= Math.max(...h.slice(0, -3).map((x) => x.bestE1rm));
+    });
+    const recentEasy = !!easy && now.getTime() - new Date(easy.startedAt).getTime() < 28 * 86400000;
+    const names = stalled.map((id) => exerciseName(id).toLowerCase());
+    const list = names.length > 1 ? `${capitalize(names.slice(0, -1).join(', '))} and ${names[names.length - 1]}` : '';
+    if (stalled.length >= 2 && recentEasy) {
+      if (!easyWeekActive(easy, now)) {
+        out.push({
+          id: 'stalls',
+          tone: 'info',
+          title: `${stalled.length} lifts have stalled`,
+          body: `${list} haven't improved in three sessions, and you had an easier week recently. Try swapping one of them for a variation for a few weeks, and look at your sleep and recovery.`,
+        });
+      }
+    } else if (stalled.length >= 2) {
+      out.push({
+        id: 'easier-week',
+        tone: 'info',
+        title: 'Time for an easier week',
+        body: `${list} haven't improved in three sessions. Take an easier week: the same exercises with about half the sets and 10% less weight, then build back up.`,
+        action: { label: 'Make this week easier', kind: 'easyWeek' },
+      });
+    } else {
+      for (const id of stalled) {
         out.push({
           id: `stall-${id}`,
           tone: 'info',
           title: `${exerciseName(id)} has stalled`,
-          body: 'No progress in three sessions. Try one lighter week (about 10% less) and build back up, and check your sleep and recovery.',
+          body: 'No progress in three sessions. Try one lighter session (about 10% less) and build back up, and look at your sleep and recovery.',
         });
       }
     }
@@ -263,17 +426,32 @@ export function insights(
         body: 'You won’t fit every planned day this week. Do the next day in your plan; the coach keeps the order.',
       });
     }
-    // Muscles not trained in the last 10 days, once you've been training that long.
-    const tenDaysAgo = new Date(now.getTime() - 10 * 86400000);
-    const recentSets = muscleSets(done, tenDaysAgo, to);
-    const missed = program.inputs.groups.filter((g) => recentSets[g] === 0);
-    if (missed.length && new Date(done[0].startedAt) <= tenDaysAgo) {
-      out.push({
-        id: 'missed-groups',
-        tone: 'info',
-        title: 'Some muscles are missing out',
-        body: `No ${missed.map((g) => MUSCLE_LABELS[g].toLowerCase()).join(', ')} sets in the last 10 days.`,
-      });
+    // Muscles well behind the plan's weekly sets over the last two weeks,
+    // once you've been training that long.
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 86400000);
+    if (new Date(done[0].startedAt) <= twoWeeksAgo) {
+      const actual = muscleSets(done, twoWeeksAgo, to);
+      const rows = program.inputs.groups
+        .map((g) => ({ g, planned: 2 * (program.weeklySets[g] ?? 0), got: actual[g] }))
+        .filter((r) => r.planned > 0);
+      const behind = rows.filter((r) => r.got < r.planned * 0.5);
+      const fmt = (n: number) => String(Math.round(n * 10) / 10);
+      if (behind.length && behind.length === rows.length) {
+        const share = rows.reduce((n, r) => n + r.got, 0) / rows.reduce((n, r) => n + r.planned, 0);
+        out.push({
+          id: 'behind-plan',
+          tone: 'info',
+          title: `About ${Math.round(share * 100)}% of your planned sets`,
+          body: 'That’s over the last two weeks, for every muscle in your plan. Fit in the plan days you can; the coach keeps the order.',
+        });
+      } else if (behind.length) {
+        out.push({
+          id: 'behind-plan',
+          tone: 'info',
+          title: `Behind plan: ${behind.map((r) => MUSCLE_LABELS[r.g].toLowerCase()).join(', ')}`,
+          body: `Last two weeks: ${behind.map((r) => `${MUSCLE_LABELS[r.g].toLowerCase()} ${fmt(r.got)} of ${fmt(r.planned)} planned sets`).join(', ')}. Finishing every exercise on your plan days closes the gap.`,
+        });
+      }
     }
   }
   return out;
