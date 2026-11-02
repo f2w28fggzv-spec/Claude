@@ -4,8 +4,13 @@
 export type Unit = 'kg' | 'lb';
 
 export interface SetEntry {
-  /** Kilograms. Missing for bodyweight sets. */
+  /**
+   * Kilograms. For bodyweight sets (`bw`) this is the weight added on top of
+   * your body (vest, belt, dumbbell), and missing means body weight only.
+   */
   weight?: number;
+  /** Done with body weight (push-ups, pull-ups, dips…), plus `weight` if any. */
+  bw?: boolean;
   reps?: number;
   /** For timed holds. */
   seconds?: number;
@@ -42,6 +47,21 @@ export interface Workout {
   /** Index of the plan day this workout followed. */
   dayIndex?: number;
   dayName?: string;
+  /** The routine this workout was started from, if any. */
+  routineId?: string;
   entries: ExerciseEntry[];
   notes?: string;
+  /** Your body weight in kg when you logged it (from Settings, if set). */
+  bodyweight?: number;
 }
+
+/** A workout you put together yourself and repeat ("My workouts" mode). */
+export interface Routine {
+  id: string;
+  name: string;
+  createdAt: string;
+  items: { exerciseId: string; sets: number }[];
+}
+
+/** Personal trainer (the app builds the plan) or My workouts (you do). */
+export type TrainMode = 'coach' | 'self';

@@ -26,13 +26,40 @@ export function e1rm(weight: number, reps: number): number {
   return weight * (1 + reps / 30);
 }
 
+/**
+ * Load of one set in kg: the weight, or for bodyweight sets your body weight
+ * plus any added weight. 0 when the body weight isn't known (not counted).
+ */
+export function setLoad(s: SetEntry, bodyweight?: number): number {
+  if (s.bw) return bodyweight === undefined ? 0 : bodyweight + (s.weight ?? 0);
+  return s.weight ?? 0;
+}
+
+/** "60 kg × 8", "BW × 12", "BW + 10 kg × 6", "45 s". */
+export function formatSet(s: SetEntry, unit: Unit): string {
+  const load = s.bw ? (s.weight ? `BW + ${formatWeight(s.weight, unit)}` : 'BW') : s.weight ? formatWeight(s.weight, unit) : '';
+  if (s.seconds !== undefined) return load && load !== 'BW' ? `${load} · ${s.seconds} s` : `${s.seconds} s`;
+  return load ? `${load} × ${s.reps ?? 0}` : `${s.reps ?? 0} reps`;
+}
+
+/** Compact form for tables: "60×8", "BW×12", "BW+10×6", "45s". */
+export function formatSetShort(s: SetEntry, unit: Unit): string {
+  const n = (kg: number) => String(Number(toUnit(kg, unit).toFixed(1)));
+  if (s.seconds !== undefined) return s.bw && s.weight ? `BW+${n(s.weight)}·${s.seconds}s` : `${s.seconds}s`;
+  const load = s.bw ? (s.weight ? `BW+${n(s.weight)}` : 'BW') : s.weight ? n(s.weight) : '';
+  return load ? `${load}×${s.reps ?? 0}` : `${s.reps ?? 0}`;
+}
+
 export const doneSets = (sets: SetEntry[]) => sets.filter((s) => s.done && ((s.reps ?? 0) > 0 || (s.seconds ?? 0) > 0));
 
 export const finished = (workouts: Workout[]) => workouts.filter((w) => w.finishedAt);
 
-/** Total kilograms lifted (weight × reps over completed sets). */
+/**
+ * Total kilograms lifted (load × reps over completed sets). Bodyweight sets
+ * count only when the workout has your body weight.
+ */
 export function workoutVolume(w: Workout): number {
-  return w.entries.reduce((sum, e) => sum + doneSets(e.sets).reduce((s, set) => s + (set.weight ?? 0) * (set.reps ?? 0), 0), 0);
+  return w.entries.reduce((sum, e) => sum + doneSets(e.sets).reduce((s, set) => s + setLoad(set, w.bodyweight) * (set.reps ?? 0), 0), 0);
 }
 
 export function workoutSets(w: Workout): number {
@@ -43,10 +70,16 @@ export interface SessionSummary {
   workoutId: string;
   date: string;
   sets: SetEntry[];
+  /** Best estimated one-rep max (kg) of the session; 0 if no load is known. */
   bestE1rm: number;
   bestSet?: SetEntry;
+  /** Load (kg) of the best set, including body weight for bodyweight sets. */
+  bestLoad: number;
   volume: number;
   maxReps: number;
+  maxSeconds: number;
+  /** Body weight (kg) logged with the workout, if any. */
+  bodyweight?: number;
 }
 
 /** One summary per workout that included the exercise, oldest first. */
@@ -58,11 +91,14 @@ export function exerciseHistory(workouts: Workout[], exerciseId: string): Sessio
       const sets = w.entries.filter((e) => e.exerciseId === exerciseId).flatMap((e) => doneSets(e.sets));
       let bestE1rm = 0;
       let bestSet: SetEntry | undefined;
+      let bestLoad = 0;
       for (const s of sets) {
-        const v = e1rm(s.weight ?? 0, s.reps ?? 0);
+        const load = setLoad(s, w.bodyweight);
+        const v = e1rm(load, s.reps ?? 0);
         if (v > bestE1rm) {
           bestE1rm = v;
           bestSet = s;
+          bestLoad = load;
         }
       }
       return {
@@ -71,8 +107,11 @@ export function exerciseHistory(workouts: Workout[], exerciseId: string): Sessio
         sets,
         bestE1rm,
         bestSet,
-        volume: sets.reduce((s, x) => s + (x.weight ?? 0) * (x.reps ?? 0), 0),
+        bestLoad,
+        volume: sets.reduce((s, x) => s + setLoad(x, w.bodyweight) * (x.reps ?? 0), 0),
         maxReps: Math.max(0, ...sets.map((s) => s.reps ?? 0)),
+        maxSeconds: Math.max(0, ...sets.map((s) => s.seconds ?? 0)),
+        bodyweight: w.bodyweight,
       };
     })
     .filter((s) => s.sets.length > 0);
@@ -80,15 +119,21 @@ export function exerciseHistory(workouts: Workout[], exerciseId: string): Sessio
 
 export interface Records {
   bestE1rm: number;
+  /** Heaviest load (kg), body weight included for bodyweight sets when known. */
   heaviest: number;
   mostReps: number;
+  /** Most weight added to a bodyweight set (kg). */
+  mostAdded: number;
+  longestHold: number;
 }
 
 export function personalRecords(history: SessionSummary[]): Records {
   return {
     bestE1rm: Math.max(0, ...history.map((h) => h.bestE1rm)),
-    heaviest: Math.max(0, ...history.flatMap((h) => h.sets.map((s) => s.weight ?? 0))),
+    heaviest: Math.max(0, ...history.flatMap((h) => h.sets.map((s) => setLoad(s, h.bodyweight)))),
     mostReps: Math.max(0, ...history.map((h) => h.maxReps)),
+    mostAdded: Math.max(0, ...history.flatMap((h) => h.sets.filter((s) => s.bw).map((s) => s.weight ?? 0))),
+    longestHold: Math.max(0, ...history.map((h) => h.maxSeconds)),
   };
 }
 

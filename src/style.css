@@ -643,3 +643,67 @@ button.link.version { color: var(--muted); font-weight: 500; font-size: 0.8rem; 
 @media (prefers-reduced-motion: reduce) { .chart .series { stroke-dasharray: none; stroke-dashoffset: 0; } .pulse::after { display: none; } }
 .footer a { text-decoration: none; }
 .chart-tip.below { top: auto; bottom: 22px; }
+
+/* ── Train tab modes ───────────────────────────────────────────────────── */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mode-switch {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 4px; margin: 0 0 8px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+}
+.mode-switch button {
+  position: relative; z-index: 1; min-height: 48px; padding: 8px 6px; gap: 6px; border-radius: 12px;
+  background: transparent; color: var(--muted); font-size: 0.95rem;
+}
+.mode-switch button.on { color: var(--accent-ink); }
+.mode-switch button:active:not(:disabled) { transform: scale(0.98); }
+.mode-pill {
+  position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc(50% - 4px); border-radius: 12px;
+  background: var(--accent); box-shadow: 0 4px 14px rgba(61, 220, 132, 0.25);
+  transition: transform 340ms var(--ease-spring);
+}
+.mode-blurb { margin: 0 0 6px; padding: 0 4px; color: var(--muted); font-size: 0.88rem; line-height: 1.4; animation: vt-fade-in 260ms var(--ease) both; }
+.mode-pane { animation: mode-in 320ms var(--ease) both; }
+.mode-pane.self { --mode-from: 18px; }
+.mode-pane.coach { --mode-from: -18px; }
+@keyframes mode-in { from { opacity: 0; transform: translateX(var(--mode-from, 0)); } }
+.self-start { border: 1px solid #1d6b41; background: linear-gradient(140deg, var(--accent-soft), var(--card) 65%); }
+.self-start button.big { margin-bottom: 0; }
+.rows li.with-action { display: flex; align-items: center; gap: 10px; }
+.rows li.with-action > a { flex: 1; min-width: 0; }
+.rows li.with-action .row-main small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rows li.with-action .small-btn { gap: 4px; }
+.day-head .link { min-height: 36px; padding: 4px 0; font-size: 0.92rem; }
+
+/* Workouts you build yourself */
+.empty-workout { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 28px 18px 18px; }
+.empty-workout > svg.icon { color: var(--accent); }
+.empty-workout h2 { margin: 10px 0 4px; }
+.empty-workout button.big { margin-bottom: 0; }
+.bw-hint { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--muted); font-size: 0.82rem; line-height: 1.35; }
+.bw-chip {
+  flex: none; padding: 2px 7px; border-radius: 6px; background: var(--raised); color: var(--text);
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em;
+}
+.text-field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+.text-field input {
+  font: inherit; font-size: 1.05rem; font-weight: 600; color: var(--text); padding: 14px 16px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--card); transition: border-color 200ms;
+}
+.text-field input:focus { outline: none; border-color: var(--accent); }
+.text-field.inline-unit { flex-direction: row; align-items: center; gap: 10px; }
+.text-field.inline-unit input { width: 140px; text-align: center; font-variant-numeric: tabular-nums; }
+.text-field.inline-unit .unit { color: var(--text); font-size: 1rem; }
+.routine-items { list-style: none; padding: 4px 14px; }
+.routine-items li { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; animation: rise-in 320ms var(--ease) both; }
+.routine-items li + li { border-top: 1px solid var(--line); }
+.routine-controls { display: flex; align-items: center; gap: 6px; }
+.routine-controls .stepper { margin-right: auto; }
+.routine-controls .stepper output { min-width: 64px; font-size: 0.9rem; }
+.move-up svg { transform: rotate(-90deg); }
+.sheet.picker { min-height: 70vh; }
+.sheet.picker .filter-row { margin-top: 10px; }
+.sheet.picker h3 { margin-top: 12px; }
+.picker-top { position: sticky; top: -18px; z-index: 2; margin: -18px -16px 0; padding: 18px 16px 2px; background: var(--card); border-radius: 22px 22px 0 0; }
+.day-head a.link { color: var(--accent); }
+.rows .small-btn svg.icon { color: inherit; }
+.toast { width: max-content; text-align: center; }

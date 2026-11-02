@@ -8,9 +8,10 @@
 // to two reps over the target. Repeated technique faults lower the load and
 // add the fault's corrective exercise (the Phase 5 rule in CLAUDE.md).
 import { getExercise } from '../data/exercises';
+import { isBodyweight } from '../data/filters';
 import { MUSCLE_LABELS, type Exercise, type MuscleGroup } from '../data/types';
 import type { Program, ProgramItem } from '../program/builder';
-import { e1rm, exerciseHistory, finished, formatWeight, fromUnit, muscleSets, toUnit, weekStart, type SessionSummary } from './stats';
+import { exerciseHistory, finished, formatSet, fromUnit, muscleSets, toUnit, weekStart, type SessionSummary } from './stats';
 import type { TechniqueSummary, Unit, Workout } from './types';
 
 export type SuggestionKind = 'start' | 'increase' | 'repeat' | 'reduce' | 'technique';
@@ -28,6 +29,7 @@ export interface Suggestion {
 
 const LOWER = new Set<MuscleGroup>(['quads', 'hamstrings', 'glutes']);
 const roundTo = (v: number, step: number) => Math.round(v / step) * step;
+const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** Load jumps per unit: dumbbells, lower-body compounds, everything else, and the smallest step. */
 const STEPS: Record<Unit, { handheld: number; lower: number; other: number; min: number }> = {
@@ -40,6 +42,9 @@ export function loadStep(e: Exercise, current: number, unit: Unit = 'kg'): numbe
   const s = STEPS[unit];
   const handheld = e.equipment.includes('dumbbell') || e.equipment.includes('kettlebell');
   const base = handheld ? s.handheld : e.role === 'compound' && e.primary.some((g) => LOWER.has(g)) ? s.lower : s.other;
+  // Bodyweight moves: the added weight is a small part of the load (your body
+  // is most of it), so the 10% cap below doesn't apply to it.
+  if (isBodyweight(e)) return fromUnit(s.other, unit);
   // Never more than 10% of the current load (ACSM 2009: 2–10%), at least the smallest step.
   return fromUnit(Math.max(s.min, Math.min(base, roundTo(toUnit(current, unit) * 0.1, s.min))), unit);
 }
@@ -70,7 +75,9 @@ export function suggest(item: ProgramItem, history: SessionSummary[], technique:
       note:
         item.unit === 'seconds'
           ? `Hold for ${lo}–${hi} s with good form.`
-          : `Start light: a weight you could lift for ${hi + 2} reps with good form.`,
+          : ex && isBodyweight(ex)
+            ? `Start with your body weight: ${lo}–${hi} reps with good form. Add weight once every set reaches ${hi}.`
+            : `Start light: a weight you could lift for ${hi + 2} reps with good form.`,
     };
   }
 
@@ -185,13 +192,26 @@ export function insights(
       const hist = exerciseHistory(done, e.exerciseId);
       const cur = hist.find((h) => h.workoutId === latest.id);
       const before = hist.filter((h) => h.date < latest.startedAt);
-      if (!cur || before.length === 0 || !cur.bestSet) continue;
+      if (!cur || before.length === 0) continue;
+      const name = getExercise(e.exerciseId)?.name.toLowerCase() ?? e.exerciseId;
       const prevBest = Math.max(...before.map((h) => h.bestE1rm));
-      if (cur.bestE1rm > prevBest * 1.001) {
-        const name = getExercise(e.exerciseId)?.name.toLowerCase() ?? e.exerciseId;
-        const gain = Math.round(((cur.bestE1rm - prevBest) / prevBest) * 100);
+      let note = '';
+      if (cur.bestE1rm > 0 && prevBest > 0 && cur.bestSet) {
+        // Loaded sets: compare estimated one-rep max.
+        if (cur.bestE1rm > prevBest * 1.001) {
+          const gain = Math.round(((cur.bestE1rm - prevBest) / prevBest) * 100);
+          note = `${formatSet(cur.bestSet, unit)}: estimated one-rep max up ${gain || '<1'}%.`;
+        }
+      } else if (cur.bestE1rm === 0 && prevBest === 0) {
+        // Body weight only (or holds): compare the best set.
+        const prevReps = Math.max(...before.map((h) => h.maxReps));
+        const prevHold = Math.max(...before.map((h) => h.maxSeconds));
+        if (cur.maxSeconds > prevHold && cur.maxSeconds > 0) note = `${cur.maxSeconds} s hold, up from ${prevHold} s.`;
+        else if (cur.maxReps > prevReps && cur.maxReps > 0) note = `${cur.maxReps} reps in a set, up from ${prevReps}.`;
+      }
+      if (note) {
         records.push(name);
-        if (!first) first = `${formatWeight(cur.bestSet.weight, unit)} × ${cur.bestSet.reps}: estimated one-rep max up ${gain || '<1'}%.`;
+        if (!first) first = note;
       }
     }
     if (records.length === 1) {
@@ -201,7 +221,7 @@ export function insights(
         id: `pr-${latest.id}`,
         tone: 'good',
         title: `${records.length} new bests last workout`,
-        body: `${records.slice(0, -1).join(', ')} and ${records[records.length - 1]}. The coach raises those weights next time.`,
+        body: `${capitalize(records.slice(0, -1).join(', '))} and ${records[records.length - 1]}. The coach raises those weights next time.`,
       });
     }
   }
@@ -277,4 +297,3 @@ export function addCorrective(program: Program, exerciseId: string, correctiveId
   return { ...program, days };
 }
 
-export { e1rm };

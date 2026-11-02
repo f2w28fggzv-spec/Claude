@@ -39,6 +39,9 @@ export const NO_FILTERS: LibraryFilters = { muscle: 'all', equipment: [], levels
 /** No weights needed: bodyweight plus things to hang from or lean on. */
 const UNLOADED = new Set<Equipment>(['bodyweight', 'pullupBar', 'dipBars', 'bench']);
 
+/** Done with your own body as the load (weight can be added on top). */
+export const isBodyweight = (e: Exercise) => e.equipment.every((q) => UNLOADED.has(q));
+
 /** Which equipment chips an exercise matches. */
 export function equipmentCategories(e: Exercise): EquipmentFilter[] {
   const out = new Set<EquipmentFilter>();
@@ -50,7 +53,7 @@ export function equipmentCategories(e: Exercise): EquipmentFilter[] {
     if (q === 'machine') out.add('machine');
     if (q === 'band') out.add('band');
   }
-  if (e.equipment.every((q) => UNLOADED.has(q))) out.add('bodyweight');
+  if (isBodyweight(e)) out.add('bodyweight');
   return [...out];
 }
 
