@@ -2,11 +2,11 @@ import { useMemo, useState } from 'preact/hooks';
 import { getExercise } from '../data/exercises';
 import { isBodyweight } from '../data/filters';
 import { MUSCLE_GROUPS, MUSCLE_LABELS } from '../data/types';
-import { addCorrective, insights, nextDayIndex, suggest, type Insight } from '../log/coach';
+import { addCorrective, easyWeekActive, insights, nextDayIndex, planSuggestion, startEasyWeek, type Insight } from '../log/coach';
 import { emptyWorkout, repeatWorkout, startFromPlan, startRoutine } from '../log/session';
 import { dayKey, exerciseHistory, finished, formatWeight, weekStart, workoutsByDay } from '../log/stats';
 import { exerciseName } from '../log/exercises';
-import { loadActiveWorkout, loadMode, loadRoutines, loadTechnique, loadUnit, loadWorkouts, saveActiveWorkout, saveMode, saveRoutine } from '../log/store';
+import { loadActiveWorkout, loadEasyWeek, loadMode, loadRoutines, loadTechnique, loadUnit, loadWorkouts, saveActiveWorkout, saveEasyWeek, saveMode, saveRoutine } from '../log/store';
 import type { Routine, TechniqueSummary, TrainMode, Unit, Workout } from '../log/types';
 import type { Program } from '../program/builder';
 import { navigate } from '../router';
@@ -128,12 +128,21 @@ function CoachToday({ workouts, technique, unit, begin, refresh, useOwn }: PaneP
   const next = nextDayIndex(current, workouts);
   const dayIndex = picked ?? next;
   const day = current.days[dayIndex];
-  const tips = insights(current, workouts, technique, unit);
+  const easyWeek = loadEasyWeek();
+  const easy = easyWeekActive(easyWeek);
+  const tips = insights(current, workouts, technique, unit, new Date(), easyWeek);
 
   const act = (i: Insight) => {
-    if (i.action?.kind !== 'addCorrective') return;
-    saveProgram(addCorrective(current, i.action.exerciseId, i.action.correctiveId));
-    showToast(`${getExercise(i.action.correctiveId)?.name ?? 'Exercise'} added to your plan`);
+    if (i.action?.kind === 'easyWeek') {
+      saveEasyWeek(startEasyWeek());
+      showToast('Easier week on: lighter weights and fewer sets for 7 days');
+    } else if (i.action?.kind === 'endEasyWeek' && easyWeek) {
+      saveEasyWeek({ ...easyWeek, until: new Date().toISOString() });
+      showToast('Back to normal training');
+    } else if (i.action?.kind === 'addCorrective') {
+      saveProgram(addCorrective(current, i.action.exerciseId, i.action.correctiveId));
+      showToast(`${getExercise(i.action.correctiveId)?.name ?? 'Exercise'} added to your plan`);
+    } else return;
     refresh();
   };
 
@@ -156,7 +165,7 @@ function CoachToday({ workouts, technique, unit, begin, refresh, useOwn }: PaneP
           {day.items.map((item, i) => {
             const ex = getExercise(item.exerciseId);
             const bw = !!ex && isBodyweight(ex);
-            const s = suggest(item, exerciseHistory(workouts, item.exerciseId), technique, unit);
+            const s = planSuggestion(item, exerciseHistory(workouts, item.exerciseId), technique, unit, new Date(), easy);
             return (
               <li style={{ '--i': String(i) }}>
                 <a href={`#/exercise/${item.exerciseId}`}>
@@ -171,10 +180,13 @@ function CoachToday({ workouts, technique, unit, begin, refresh, useOwn }: PaneP
                             ? 'New: start light'
                             : 'No weight'}
                       {s.delta ? ` (${s.delta > 0 ? '+' : '−'}${formatWeight(Math.abs(s.delta), unit)})` : ''}
+                      {s.form === 'clean' && <span class="form-tag clean">form ✓</span>}
+                      {s.kind === 'check' && <span class="form-tag check">check form first</span>}
+                      {s.form === 'faults' && <span class="form-tag faults">form: hold weight</span>}
                     </small>
                   </span>
                   <span class="sets">
-                    {item.sets} × {item.reps[0]}–{item.reps[1]}
+                    {s.sets} × {item.reps[0]}–{item.reps[1]}
                     {item.unit === 'seconds' ? ' s' : ''}
                   </span>
                 </a>
@@ -182,7 +194,7 @@ function CoachToday({ workouts, technique, unit, begin, refresh, useOwn }: PaneP
             );
           })}
         </ul>
-        <button type="button" class="big" onClick={() => begin(startFromPlan(current, dayIndex, workouts, technique, unit))}>
+        <button type="button" class="big" onClick={() => begin(startFromPlan(current, dayIndex, workouts, technique, unit, new Date(), easy))}>
           <Icon name="play" size={20} /> Start workout
         </button>
       </section>

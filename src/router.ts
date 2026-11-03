@@ -19,6 +19,7 @@ const DEPTH: Record<string, number> = {
   log: 0,
   groups: 1,
   routine: 1,
+  edit: 2,
   exercise: 1,
   program: 1,
   session: 1,

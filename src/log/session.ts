@@ -2,7 +2,7 @@
 import { getExercise } from '../data/exercises';
 import { MUSCLE_LABELS, type MuscleGroup } from '../data/types';
 import type { Program } from '../program/builder';
-import { suggest } from './coach';
+import { planSuggestion } from './coach';
 import { exerciseInfo } from './exercises';
 import { doneSets, exerciseHistory } from './stats';
 import type { ExerciseEntry, Routine, SetEntry, TechniqueSummary, Unit, Workout } from './types';
@@ -17,12 +17,13 @@ export function startFromPlan(
   technique: TechniqueSummary[],
   unit: Unit = 'kg',
   now = new Date(),
+  easy = false,
 ): Workout {
   const day = program.days[dayIndex];
   const entries: ExerciseEntry[] = [];
   for (const item of day.items) {
     const history = exerciseHistory(workouts, item.exerciseId);
-    const s = suggest(item, history, technique, unit);
+    const s = planSuggestion(item, history, technique, unit, now, easy);
     const last = history[history.length - 1];
     const planned = (i: number): SetEntry['planned'] => {
       if (item.unit === 'seconds') return { seconds: item.reps[0] };
@@ -35,9 +36,10 @@ export function startFromPlan(
     };
     entries.push({
       exerciseId: item.exerciseId,
-      target: { sets: item.sets, reps: item.reps, unit: item.unit, restSec: item.restSec, weight: s.weight },
+      target: { sets: s.sets, reps: item.reps, unit: item.unit, restSec: item.restSec, weight: s.weight },
       coachNote: s.note,
-      sets: Array.from({ length: item.sets }, (_, i) => ({ done: false, planned: planned(i) })),
+      ...(s.kind === 'check' && s.nextWeight !== undefined ? { nextWeight: s.nextWeight } : {}),
+      sets: Array.from({ length: s.sets }, (_, i) => ({ done: false, planned: planned(i) })),
     });
     // Repeated technique fault: add its corrective right after (2 easy sets).
     if (s.corrective && !day.items.some((i) => i.exerciseId === s.corrective) && !entries.some((e) => e.exerciseId === s.corrective)) {
@@ -125,6 +127,24 @@ export function nameFromMuscles(entries: ExerciseEntry[]): string | undefined {
   }
   const top = [...sets].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 2);
   return top.length ? top.map(([g]) => MUSCLE_LABELS[g]).join(' & ') : undefined;
+}
+
+/** After a clean technique check: move the unfinished sets of an entry up to its next weight. */
+export function applyNextWeight(w: Workout, entryIndex: number): Workout {
+  return {
+    ...w,
+    entries: w.entries.map((e, i) => {
+      if (i !== entryIndex || e.nextWeight === undefined) return e;
+      const weight = e.nextWeight;
+      return {
+        ...e,
+        nextWeight: undefined,
+        target: e.target ? { ...e.target, weight } : e.target,
+        coachNote: 'Clean technique check: weight goes up.',
+        sets: e.sets.map((s) => (s.done || s.weight !== undefined ? s : { ...s, planned: { ...s.planned, weight } })),
+      };
+    }),
+  };
 }
 
 /** Marks a set done, filling in planned values for anything left blank. */
