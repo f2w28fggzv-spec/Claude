@@ -6,6 +6,7 @@ import { addCorrective, easyWeekActive, insights, nextDayIndex, planSuggestion, 
 import { emptyWorkout, repeatWorkout, startFromPlan, startRoutine } from '../log/session';
 import { dayKey, exerciseHistory, finished, formatWeight, weekStart, workoutsByDay } from '../log/stats';
 import { exerciseName } from '../log/exercises';
+import { weekMuscles } from '../log/muscles';
 import { loadActiveWorkout, loadEasyWeek, loadMode, loadRoutines, loadTechnique, loadUnit, loadWorkouts, saveActiveWorkout, saveEasyWeek, saveMode, saveRoutine } from '../log/store';
 import type { Routine, TechniqueSummary, TrainMode, Unit, Workout } from '../log/types';
 import type { Program } from '../program/builder';
@@ -14,6 +15,7 @@ import { deleteProgram, loadPrograms, saveProgram } from '../storage';
 import { showToast } from '../ui/toast';
 import { Icon, MuscleIcon, type IconName } from './icons';
 import { PRIVACY, Screen } from './Layout';
+import { BodyHeatmap } from './BodyHeatmap';
 import { PlanDays, planSubtitle } from './ProgramView';
 import { RenameSheet } from './RenameSheet';
 
@@ -199,7 +201,7 @@ function CoachToday({ workouts, technique, unit, begin, refresh, useOwn }: PaneP
         </button>
       </section>
 
-      <WeekStrip workouts={workouts} planned={current.days.length} />
+      <WeekStrip workouts={workouts} planned={current.days.length} program={current} />
       <CoachCard title="Coach" tips={tips} onAct={act} note="Adjusts your weights and plan from your log and technique checks, on this phone." />
 
       <details class="more">
@@ -333,7 +335,7 @@ function SelfToday({ workouts, technique, unit, begin }: PaneProps) {
         />
       )}
 
-      <WeekStrip workouts={workouts} />
+      <WeekStrip workouts={workouts} program={null} />
       <CoachCard title="Highlights" tips={tips} note="From your log and technique checks, on this phone." />
       <p class="footer small">
         <a href="#/settings">Settings</a>
@@ -342,7 +344,7 @@ function SelfToday({ workouts, technique, unit, begin }: PaneProps) {
   );
 }
 
-function WeekStrip({ workouts, planned }: { workouts: Workout[]; planned?: number }) {
+function WeekStrip({ workouts, planned, program }: { workouts: Workout[]; planned?: number; program: Program | null }) {
   const byDay = workoutsByDay(workouts);
   const monday = weekStart(new Date());
   const week = Array.from({ length: 7 }, (_, i) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i));
@@ -361,6 +363,7 @@ function WeekStrip({ workouts, planned }: { workouts: Workout[]; planned?: numbe
           </span>
         ))}
       </div>
+      <BodyHeatmap weeks={weekMuscles(workouts, program)} compact />
     </section>
   );
 }

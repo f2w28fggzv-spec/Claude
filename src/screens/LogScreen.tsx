@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'preact/hooks';
 import { exerciseName } from '../log/exercises';
-import { dayKey, exerciseHistory, finished, formatWeight, toUnit, weekStreak, workoutMinutes, workoutSets, workoutVolume, workoutsByDay } from '../log/stats';
-import { loadUnit, loadWorkouts } from '../log/store';
+import { dayKey, exerciseHistory, finished, formatWeight, toUnit, weekStart, weekStreak, workoutMinutes, workoutSets, workoutVolume, workoutsByDay } from '../log/stats';
+import { weekMuscles } from '../log/muscles';
+import { loadMode, loadUnit, loadWorkouts } from '../log/store';
+import { loadPrograms } from '../storage';
 import type { Workout } from '../log/types';
 import { CountUp } from '../ui/CountUp';
+import { BodyHeatmap } from './BodyHeatmap';
 import { Icon } from './icons';
 import { Screen } from './Layout';
 
@@ -16,6 +19,10 @@ export function LogScreen() {
   const today = new Date();
   const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState<string | null>(null);
+  const [weekOf, setWeekOf] = useState(() => new Date());
+  const plan = useMemo(() => (loadMode() === 'self' ? null : (loadPrograms()[0] ?? null)), []);
+  const thisWeek = dayKey(weekStart(weekOf)) === dayKey(weekStart(today));
+  const moveWeek = (days: number) => setWeekOf(new Date(weekOf.getFullYear(), weekOf.getMonth(), weekOf.getDate() + days));
   const byDay = useMemo(() => workoutsByDay(workouts), [workouts]);
 
   const first = month;
@@ -92,6 +99,19 @@ export function LogScreen() {
           <span>week streak</span>
         </div>
       </div>
+
+      <section class="card muscles-card">
+        <header class="cal-nav">
+          <button type="button" class="icon-btn" aria-label="Previous week" onClick={() => moveWeek(-7)}>
+            <Icon name="back" size={20} />
+          </button>
+          <h2 aria-live="polite">{thisWeek ? 'Muscles this week' : `Week of ${weekStart(weekOf).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}</h2>
+          <button type="button" class="icon-btn" aria-label="Next week" disabled={thisWeek} onClick={() => moveWeek(7)}>
+            <Icon name="chevron" size={20} />
+          </button>
+        </header>
+        <BodyHeatmap weeks={weekMuscles(workouts, plan, weekOf)} />
+      </section>
 
       <h2>{selectedDate ? selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Recent workouts'}</h2>
       {(!selected || selected <= dayKey(today)) && (

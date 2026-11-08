@@ -19,6 +19,7 @@ import {
 import type { Routine, SetEntry, TechniqueSummary, Workout } from '../src/log/types';
 import { addExercise, applyNextWeight, completeSet, emptyWorkout, finishWorkout, repeatWorkout, routineFromWorkout, startFromPlan, startRoutine } from '../src/log/session';
 import { isBodyweight } from '../src/data/filters';
+import { heatLevel, weekMuscles } from '../src/log/muscles';
 import { getExercise } from '../src/data/exercises';
 import { buildProgram, type ProgramItem } from '../src/program/builder';
 
@@ -458,5 +459,37 @@ describe('logging a workout afterwards', () => {
     expect(done.entries[0].sets).toHaveLength(2);
     expect(done.notes).toBe('Felt strong');
     expect(done.dayName).toBe('Chest');
+  });
+});
+
+describe('weekly body map', () => {
+  it('rates each muscle against its weekly target', () => {
+    expect(heatLevel(0, 10)).toBe(0);
+    expect(heatLevel(2, 10)).toBe(1);
+    expect(heatLevel(4, 10)).toBe(2);
+    expect(heatLevel(7, 10)).toBe(3);
+    expect(heatLevel(10, 10)).toBe(4);
+    expect(heatLevel(12, 10)).toBe(4);
+  });
+
+  it("counts this week's sets per muscle, secondary half, against the plan or 10 sets", () => {
+    const program = buildProgram({ groups: ['chest', 'back'], daysPerWeek: 2, level: 'intermediate', equipment: 'fullGym' });
+    const log = [
+      workout('2026-10-26', [{ id: 'bench-press', sets: sets(60, 8, 8, 8, 8) }]), // Monday
+      workout('2026-10-28', [{ id: 'push-up', sets: sets(undefined, 15, 15) }]),
+      workout('2026-10-20', [{ id: 'bench-press', sets: sets(60, 8, 8, 8, 8, 8, 8) }]), // last week
+    ];
+    const week = weekMuscles(log, program, new Date('2026-10-29T12:00:00'));
+    const chest = week.find((m) => m.group === 'chest')!;
+    expect(chest.sets).toBe(6);
+    expect(chest.target).toBe(program.targets.chest);
+    expect(chest.exercises).toEqual(['Barbell bench press', 'Push-up']);
+    // Bench press and push-ups work the triceps as a secondary muscle: half sets.
+    const triceps = week.find((m) => m.group === 'triceps')!;
+    expect(triceps.sets).toBe(3);
+    expect(triceps.target).toBe(14); // not in the plan: the plan level's target
+    expect(week.find((m) => m.group === 'quads')!.level).toBe(0);
+    // No plan: 10 sets a week.
+    expect(weekMuscles(log, null, new Date('2026-10-29T12:00:00')).find((m) => m.group === 'chest')).toMatchObject({ target: 10, level: 2 });
   });
 });
