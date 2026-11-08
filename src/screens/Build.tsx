@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { LEVELS, MUSCLE_LABELS, type Level } from '../data/types';
 import { EQUIPMENT_SETTING_LABELS, MAX_DAYS, MIN_DAYS, buildProgram, type EquipmentSetting } from '../program/builder';
+import { ageOf, loadProfile, trainingSex } from '../profile';
 import { navigate } from '../router';
 import { loadGroups, saveProgram } from '../storage';
 import { Icon, LevelIcon, type IconName } from './icons';
@@ -38,7 +39,8 @@ export function Build() {
   }
 
   const build = () => {
-    const program = buildProgram({ groups, daysPerWeek: days, level, equipment });
+    const profile = loadProfile();
+    const program = buildProgram({ groups, daysPerWeek: days, level, equipment, sex: trainingSex(profile), age: ageOf(profile) });
     // The Plan tab shows the newest saved plan; if saving failed, show it directly.
     if (saveProgram(program)) navigate('/');
     else {
@@ -92,6 +94,21 @@ export function Build() {
           </button>
         ))}
       </div>
+      <ProfileNote />
     </Screen>
+  );
+}
+
+/** Tells the lifter whether the plan uses their profile, with a link to it. */
+function ProfileNote() {
+  const p = loadProfile();
+  const sex = trainingSex(p);
+  const age = ageOf(p);
+  const parts = [sex === 'female' ? 'female' : sex === 'male' ? 'male' : '', age !== undefined ? `${age} years` : ''].filter(Boolean);
+  return (
+    <p class="muted small profile-note">
+      {parts.length ? `Adjusted for your profile (${parts.join(', ')}). ` : 'Add your age and sex to your profile to tailor the plan. '}
+      <a href="#/profile">Edit profile</a>
+    </p>
   );
 }

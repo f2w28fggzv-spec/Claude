@@ -36,17 +36,22 @@ function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<
   );
 }
 
+// The memory copy is only used when IndexedDB isn't available, so large
+// values (saved videos) aren't also kept in memory.
 export async function dbGet<T>(key: string): Promise<T | undefined> {
-  const v = await run<T>('readonly', (s) => s.get(key) as IDBRequest<T>);
-  return v ?? (memory.get(key) as T | undefined);
+  if (!(await open())) return memory.get(key) as T | undefined;
+  return run<T>('readonly', (s) => s.get(key) as IDBRequest<T>);
 }
 
 export async function dbSet(key: string, value: unknown): Promise<void> {
-  memory.set(key, value);
+  if (!(await open())) {
+    memory.set(key, value);
+    return;
+  }
   await run('readwrite', (s) => s.put(value, key));
 }
 
 export async function dbDelete(key: string): Promise<void> {
   memory.delete(key);
-  await run('readwrite', (s) => s.delete(key));
+  if (await open()) await run('readwrite', (s) => s.delete(key));
 }

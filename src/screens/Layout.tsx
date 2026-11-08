@@ -70,4 +70,4 @@ function TabBar({ active }: { active: Tab }) {
   );
 }
 
-export const PRIVACY = 'Everything runs on your phone. Video is never uploaded or saved.';
+export const PRIVACY = 'Everything runs on your phone. Video is never uploaded, and it’s only kept if you choose to save it.';

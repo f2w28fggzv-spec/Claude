@@ -4,7 +4,8 @@
 // app's muscle groups and renders them.
 import type { JSX } from 'preact';
 import type { MuscleGroup } from '../data/types';
-import { BACK_PATHS, FRONT_PATHS, type BodyPart, type BodySlug } from './bodyPaths';
+import { figureOf, loadProfile, type Figure } from '../profile';
+import { BACK_PATHS, FEMALE_BACK_PATHS, FEMALE_FRONT_PATHS, FRONT_PATHS, type BodyPart, type BodySlug } from './bodyPaths';
 
 export type View = 'front' | 'back';
 
@@ -65,9 +66,15 @@ const NAMES: Record<BodySlug, string> = {
   knees: 'Knees',
 };
 
-const PARTS: Record<View, BodyPart[]> = { front: FRONT_PATHS, back: BACK_PATHS };
-/** Tight boxes around each figure (the back view is drawn 724 units to the right). */
-const BOX: Record<View, [number, number, number, number]> = { front: [45, 88, 640, 1264], back: [765, 88, 640, 1264] };
+const PARTS: Record<Figure, Record<View, BodyPart[]>> = {
+  male: { front: FRONT_PATHS, back: BACK_PATHS },
+  female: { front: FEMALE_FRONT_PATHS, back: FEMALE_BACK_PATHS },
+};
+/** Tight boxes around each figure (each back view is drawn to the right of its front). */
+const BOX: Record<Figure, Record<View, [number, number, number, number]>> = {
+  male: { front: [45, 88, 640, 1264], back: [765, 88, 640, 1264] },
+  female: { front: [-4, -8, 648, 1444], back: [818, -8, 648, 1444] },
+};
 
 /** The view that shows a group best. */
 export const VIEW_OF: Record<MuscleGroup, View> = {
@@ -85,6 +92,8 @@ export const VIEW_OF: Record<MuscleGroup, View> = {
 
 interface FigureProps {
   view: View;
+  /** Male or female drawing; defaults to the profile's choice. */
+  figure?: Figure;
   /** Class for each muscle by its group (null = not a training group). */
   muscleClass?: (group: MuscleGroup | null) => string;
   /** Inline fill for each muscle by its group (for continuous shading). */
@@ -98,8 +107,8 @@ interface FigureProps {
 }
 
 /** One view of the figure with every muscle drawn and classed or shaded by its group. */
-export function BodyFigure({ view, muscleClass, muscleFill, onPick, class: cls = '', width, label, children }: FigureProps) {
-  const [x, y, w, h] = BOX[view];
+export function BodyFigure({ view, figure = figureOf(loadProfile()), muscleClass, muscleFill, onPick, class: cls = '', width, label, children }: FigureProps) {
+  const [x, y, w, h] = BOX[figure][view];
   return (
     <svg
       class={`anatomy ${cls}`}
@@ -110,7 +119,7 @@ export function BodyFigure({ view, muscleClass, muscleFill, onPick, class: cls =
       aria-label={label}
       aria-hidden={label ? undefined : 'true'}
     >
-      {PARTS[view].map((part) => {
+      {PARTS[figure][view].map((part) => {
         const group = GROUP[part.slug];
         if (group === 'body') {
           return (
@@ -129,7 +138,7 @@ export function BodyFigure({ view, muscleClass, muscleFill, onPick, class: cls =
             style={fill ? { fill } : undefined}
             onClick={group && onPick ? () => onPick(group) : undefined}
           >
-            <title>{NAMES[part.slug]}</title>
+            {onPick && <title>{NAMES[part.slug]}</title>}
             {part.d.map((d) => (
               <path d={d} />
             ))}

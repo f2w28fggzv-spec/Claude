@@ -21,7 +21,9 @@ import { addExercise, applyNextWeight, completeSet, emptyWorkout, finishWorkout,
 import { isBodyweight } from '../src/data/filters';
 import { heatLevel, weekMuscles } from '../src/log/muscles';
 import { getExercise } from '../src/data/exercises';
-import { buildProgram, type ProgramItem } from '../src/program/builder';
+import { buildProgram, lifterNotes, personalPrescription, type ProgramItem } from '../src/program/builder';
+import { ageOf, birthYearFromAge, figureOf, formatHeight, trainingSex } from '../src/profile';
+import type { MuscleGroup } from '../src/data/types';
 
 const day = (iso: string, h = 18) => new Date(`${iso}T${String(h).padStart(2, '0')}:00:00`).toISOString();
 const sets = (weight: number | undefined, ...reps: number[]): SetEntry[] => reps.map((r) => ({ weight, reps: r, done: true }));
@@ -491,5 +493,46 @@ describe('weekly body map', () => {
     expect(week.find((m) => m.group === 'quads')!.level).toBe(0);
     // No plan: 10 sets a week.
     expect(weekMuscles(log, null, new Date('2026-10-29T12:00:00')).find((m) => m.group === 'chest')).toMatchObject({ target: 10, level: 2 });
+  });
+});
+
+describe('profile and lifter adjustments', () => {
+  it('keeps only valid profile fields and works out age and figure', () => {
+    const now = new Date('2026-11-08T12:00:00');
+    expect(ageOf({ birthYear: 1990 }, now)).toBe(36);
+    expect(birthYearFromAge(36, now)).toBe(1990);
+    expect(figureOf({ sex: 'female' })).toBe('female');
+    expect(figureOf({ sex: 'female', figure: 'male' })).toBe('male');
+    expect(figureOf({})).toBe('male');
+    expect(trainingSex({ sex: 'unspecified' })).toBeUndefined();
+    expect(formatHeight(180, false)).toBe('180 cm');
+    expect(formatHeight(180, true)).toBe('5 ft 11 in');
+  });
+
+  it('shortens rest for women and keeps everything else the same', () => {
+    const base = { groups: ['chest', 'quads'] as MuscleGroup[], daysPerWeek: 3, level: 'intermediate' as const, equipment: 'fullGym' as const };
+    const men = buildProgram({ ...base, sex: 'male' }, new Date('2026-11-01'));
+    const women = buildProgram({ ...base, sex: 'female' }, new Date('2026-11-01'));
+    const items = (p: typeof men) => p.days.flatMap((d) => d.items);
+    expect(items(women).map((i) => [i.exerciseId, i.sets, i.reps])).toEqual(items(men).map((i) => [i.exerciseId, i.sets, i.reps]));
+    for (const [w, m] of items(women).map((i, k) => [i, items(men)[k]] as const)) {
+      expect(w.restSec).toBeLessThanOrEqual(m.restSec);
+      expect(w.restSec).toBeGreaterThanOrEqual(60);
+    }
+    expect(personalPrescription({ reps: [6, 10], restSec: 120 }, 'compound', { sex: 'female' }).restSec).toBe(90);
+    expect(women.notes.some((n) => /Grgic & Schoenfeld/.test(n))).toBe(true);
+    expect(men.notes.some((n) => /Grgic/.test(n))).toBe(false);
+  });
+
+  it('keeps youth and older lifters at 8 reps or more', () => {
+    expect(personalPrescription({ reps: [5, 8], restSec: 180 }, 'compound', { age: 15 }).reps).toEqual([8, 12]);
+    expect(personalPrescription({ reps: [6, 10], restSec: 120 }, 'compound', { age: 70 }).reps).toEqual([8, 12]);
+    expect(personalPrescription({ reps: [8, 12], restSec: 90 }, 'compound', { age: 70 }).reps).toEqual([8, 12]);
+    expect(personalPrescription({ reps: [6, 10], restSec: 120 }, 'compound', { age: 40 }).reps).toEqual([6, 10]);
+    expect(personalPrescription({ reps: [30, 45], restSec: 60 }, 'hold', { age: 70 }).reps).toEqual([30, 45]);
+    expect(lifterNotes({ age: 70 })[0]).toMatch(/Fragala/);
+    expect(lifterNotes({ age: 16 })[0]).toMatch(/Lloyd/);
+    const older = buildProgram({ groups: ['chest', 'back'], daysPerWeek: 3, level: 'advanced', equipment: 'fullGym', age: 70 });
+    expect(older.days.flatMap((d) => d.items).every((i) => i.unit === 'seconds' || i.reps[0] >= 8)).toBe(true);
   });
 });

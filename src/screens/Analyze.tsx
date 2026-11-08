@@ -22,11 +22,31 @@ import { PRIVACY, Screen } from './Layout';
 import { Icon, type IconName } from './icons';
 import { ExerciseDemo } from './ExerciseDemo';
 
+/** The set's video, held in memory until the lifter saves it or leaves the results. */
+export interface RecordedVideo {
+  blob: Blob;
+  /** Frame time (ms since recording start) at video time 0. */
+  offsetMs: number;
+  mirrored: boolean;
+}
+
 type Stage =
   | { kind: 'intro' }
   | { kind: 'live' }
   | { kind: 'processing'; progress: FileProgress | null }
-  | { kind: 'results'; seq: PoseSequence; shots: Map<number, Blob> };
+  | { kind: 'results'; seq: PoseSequence; shots: Map<number, Blob>; video?: RecordedVideo };
+
+/** A video format this browser can record (MP4 on iPhone, WebM elsewhere). */
+function recordableType(): string | undefined {
+  if (typeof MediaRecorder === 'undefined') return undefined;
+  return ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find((t) => {
+    try {
+      return MediaRecorder.isTypeSupported(t);
+    } catch {
+      return false;
+    }
+  });
+}
 
 type Phase = 'setup' | 'countdown' | 'recording' | 'finishing';
 
@@ -85,6 +105,9 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
     reader: null as Reader | null,
     counter: null as OnlineRepCounter | null,
     keeper: null as SnapshotKeeper | null,
+    recorder: null as MediaRecorder | null,
+    chunks: [] as Blob[],
+    videoOffset: 0,
     lastSeenAt: 0,
     stillSince: 0,
     handsFree,
@@ -108,6 +131,7 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
     l.frames = [];
     l.counter = null;
     l.keeper = null;
+    dropRecorder();
     setRepCount(0);
     setElapsed(0);
     setStable(false);
@@ -141,6 +165,56 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
     setStage({ kind: 'intro' });
   };
 
+  // The set is recorded to memory (never uploaded) so it can be saved after
+  // the analysis; it's dropped if the lifter doesn't save it.
+  const startRecorder = () => {
+    const l = live.current;
+    dropRecorder();
+    const stream = cam.getStream();
+    const type = recordableType();
+    if (calibrate || !stream || !type) return;
+    try {
+      const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 1_500_000 });
+      rec.ondataavailable = (e) => e.data.size && l.chunks.push(e.data);
+      rec.onstart = () => (l.videoOffset = Math.max(0, performance.now() - l.recStart));
+      rec.start(1000);
+      l.recorder = rec;
+    } catch {
+      l.recorder = null;
+    }
+  };
+  const stopRecorder = (): Promise<Blob | null> => {
+    const l = live.current;
+    const rec = l.recorder;
+    if (!rec) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const done = () => {
+        const blob = l.chunks.length ? new Blob(l.chunks, { type: rec.mimeType || 'video/mp4' }) : null;
+        l.chunks = [];
+        l.recorder = null;
+        resolve(blob);
+      };
+      if (rec.state === 'inactive') return done();
+      rec.onstop = done;
+      setTimeout(done, 2500);
+      try {
+        rec.stop();
+      } catch {
+        done();
+      }
+    });
+  };
+  function dropRecorder() {
+    const l = live.current;
+    try {
+      if (l.recorder && l.recorder.state !== 'inactive') l.recorder.stop();
+    } catch {
+      // Already stopped.
+    }
+    l.recorder = null;
+    l.chunks = [];
+  }
+
   const beginRecording = (t: number) => {
     const l = live.current;
     const proportions = l.meter.result();
@@ -155,6 +229,7 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
       exercise.tracking.kind === 'reps' && Number.isFinite(torso) ? new OnlineRepCounter(exercise.tracking, torso) : null;
     setRepCount(0);
     setLivePhase('recording');
+    startRecorder();
     beep(1320, 250);
   };
 
@@ -176,6 +251,8 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
     if (l.phase !== 'recording') return;
     setLivePhase('finishing');
     beep(660, 300);
+    const blob = await stopRecorder();
+    const facing = cam.facing;
     cam.stop();
     void keepAwake(false);
     const shots = (await l.keeper?.finish()) ?? new Map<number, Blob>();
@@ -187,7 +264,7 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
       await saveForCalibration(seq, 'camera');
       return;
     }
-    setStage({ kind: 'results', seq, shots });
+    setStage({ kind: 'results', seq, shots, video: blob ? { blob, offsetMs: l.videoOffset, mirrored: facing === 'user' } : undefined });
   };
 
   function onFrame({ frame, video, width, height }: LiveFrame) {
@@ -298,7 +375,7 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
         await saveForCalibration(out.seq, 'file');
         return;
       }
-      setStage({ kind: 'results', ...out });
+      setStage({ kind: 'results', ...out, video: { blob: file, offsetMs: 0, mirrored: false } });
     } catch (err) {
       if ((err as DOMException).name !== 'AbortError') setError((err as Error).message ?? String(err));
       setStage({ kind: 'intro' });
@@ -312,7 +389,7 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
   if (stage.kind === 'results') {
     return (
       <Screen title={title} subtitle={calibrate ? 'Calibration recording' : 'Technique check'} back={calibrate ? 'dev/calibrate' : `exercise/${exercise.id}`}>
-        <Results exercise={exercise} seq={stage.seq} shots={stage.shots} onAgain={() => setStage({ kind: 'intro' })} />
+        <Results exercise={exercise} seq={stage.seq} shots={stage.shots} video={stage.video} onAgain={() => setStage({ kind: 'intro' })} />
       </Screen>
     );
   }

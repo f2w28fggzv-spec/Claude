@@ -1,4 +1,5 @@
 // On-device training log (localStorage, numbers only).
+import { resetProfileCache } from '../profile';
 import type { CustomExercise, EasyWeek, Routine, TechniqueSummary, TrainMode, Unit, Workout } from './types';
 
 const KEY_WORKOUTS = 'formcheck.v1.workouts';
@@ -147,6 +148,7 @@ export function importAll(backup: unknown): number {
   if (b?.app !== 'form-check' || !b.data || typeof b.data !== 'object') throw new Error('This isn’t a Form Check backup file.');
   let n = 0;
   customCache = null;
+  resetProfileCache();
   for (const [k, v] of Object.entries(b.data)) {
     if (k.startsWith(ALL_KEYS_PREFIX) && write(k, v)) n++;
   }
@@ -155,6 +157,7 @@ export function importAll(backup: unknown): number {
 
 export function deleteAll(): void {
   customCache = null;
+  resetProfileCache();
   try {
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {

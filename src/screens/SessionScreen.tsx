@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'preact/hooks';
 import { exerciseName } from '../log/exercises';
+import { formText } from '../log/form';
 import { repeatWorkout, routineFromWorkout } from '../log/session';
 import { dayKey, exerciseHistory, formatSet, toUnit, workoutMinutes, workoutSets, workoutVolume } from '../log/stats';
 import { deleteWorkout, loadActiveWorkout, loadRoutines, loadTechnique, loadUnit, loadWorkouts, saveActiveWorkout, saveMode, saveRoutine, saveWorkout } from '../log/store';
@@ -99,8 +100,13 @@ export function SessionScreen({ id }: { id: string }) {
               ))}
             </ol>
             {tech && (
-              <p class="muted small">
-                Technique check: {tech.cleanReps}/{tech.reps} reps with no faults
+              <p class="muted small tech-line">
+                Technique check: {formText(tech.cleanReps, tech.reps)}
+                {tech.setId && (
+                  <a class="link small" href={`#/set/${tech.setId}`}>
+                    <Icon name="play" size={14} /> Watch
+                  </a>
+                )}
               </p>
             )}
           </section>

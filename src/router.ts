@@ -25,6 +25,10 @@ const DEPTH: Record<string, number> = {
   session: 1,
   progress: 1,
   settings: 1,
+  profile: 2,
+  set: 2,
+  terms: 2,
+  privacy: 2,
   camera: 1,
   dev: 1,
   build: 2,
@@ -60,8 +64,10 @@ type ViewTransitionDoc = Document & {
 export function useRoute(): Route {
   const [route, setRoute] = useState(parse);
   const current = useRef(route);
+  const shownHash = useRef(location.hash);
   useEffect(() => {
     const on = () => {
+      shownHash.current = location.hash;
       const next = parse();
       const dir = navDirection(current.current, next);
       current.current = next;
@@ -86,6 +92,8 @@ export function useRoute(): Route {
       }
     };
     window.addEventListener('hashchange', on);
+    // The hash may have changed between the first render and this listener.
+    if (location.hash !== shownHash.current) on();
     return () => window.removeEventListener('hashchange', on);
   }, []);
   return route;

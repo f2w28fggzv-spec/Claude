@@ -168,5 +168,8 @@ export function usePoseCamera(
     opts.onFacingChange?.(next);
   };
 
-  return { videoRef, canvasRef, stageRef, ready, running, facing, error, stats, variant, setVariant, start, stop, flip, choose };
+  /** The live camera stream (for recording a set to memory), while running. */
+  const getStream = () => s.current.stream;
+
+  return { videoRef, canvasRef, stageRef, ready, running, facing, error, stats, variant, setVariant, start, stop, flip, choose, getStream };
 }
