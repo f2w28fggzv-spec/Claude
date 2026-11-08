@@ -1,37 +1,43 @@
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { deleteAllRecordings } from '../calibration/store';
-import { fromUnit, toUnit } from '../log/stats';
-import { deleteAll, exportAll, importAll, loadBodyweight, loadUnit, saveBodyweight, saveUnit } from '../log/store';
+import { formatWeight } from '../log/stats';
+import { deleteAll, exportAll, importAll, loadBodyweight, loadUnit, saveUnit } from '../log/store';
+import { ageOf, formatHeight, loadProfile } from '../profile';
+import { deleteAllSets, deleteAllVideos, loadSets } from '../sets/sets';
 import type { Unit } from '../log/types';
 import { navigate } from '../router';
 import { downloadJson } from '../ui/download';
 import { showToast } from '../ui/toast';
+import { Icon } from './icons';
 import { PRIVACY, Screen } from './Layout';
 
-export const APP_VERSION = '0.5';
+export const APP_VERSION = '0.6';
 
 /** Units, data backup and the hidden developer tools. */
 export function SettingsScreen() {
   const [unit, setUnit] = useState<Unit>(loadUnit);
-  const [bodyText, setBodyText] = useState(() => {
-    const kg = loadBodyweight();
-    return kg === undefined ? '' : String(Number(toUnit(kg, loadUnit()).toFixed(1)));
-  });
   const file = useRef<HTMLInputElement>(null);
   const taps = useRef<number[]>([]);
 
   const pickUnit = (u: Unit) => {
-    const kg = loadBodyweight();
-    if (kg !== undefined) setBodyText(String(Number(toUnit(kg, u).toFixed(1))));
     setUnit(u);
     saveUnit(u);
   };
-  const saveBody = (text: string) => {
-    setBodyText(text);
-    const n = Number(text.replace(',', '.'));
-    if (text.trim() === '') saveBodyweight(null);
-    else if (Number.isFinite(n) && n > 0) saveBodyweight(fromUnit(n, unit));
-  };
+  const [stored, setStored] = useState<{ sets: number; videos: number; bytes: number } | null>(null);
+  const refreshStored = () =>
+    void loadSets().then((all) =>
+      setStored({ sets: all.length, videos: all.filter((m) => m.video).length, bytes: all.reduce((n, m) => n + (m.video?.bytes ?? 0), 0) }),
+    );
+  useEffect(refreshStored, []);
+  const profile = loadProfile();
+  const bw = loadBodyweight();
+  const age = ageOf(profile);
+  const summary = [
+    bw !== undefined ? formatWeight(bw, unit) : '',
+    profile.heightCm ? formatHeight(profile.heightCm, unit === 'lb') : '',
+    age !== undefined ? `${age} years` : '',
+    profile.sex === 'female' ? 'Female' : profile.sex === 'male' ? 'Male' : '',
+  ].filter(Boolean);
   const restore = async (f: File | undefined) => {
     if (!f) return;
     try {
@@ -64,20 +70,44 @@ export function SettingsScreen() {
         ))}
       </div>
 
-      <h2 class="field">Body weight</h2>
-      <label class="text-field inline-unit">
-        <span class="sr-only">Body weight in {unit}</span>
-        <input type="text" inputMode="decimal" placeholder="Optional" value={bodyText} onInput={(e) => saveBody(e.currentTarget.value)} />
-        <span class="unit">{unit}</span>
-      </label>
+      <h2 class="field">Profile</h2>
+      <ul class="rows card">
+        <li>
+          <a href="#/profile">
+            <span class="row-main">
+              <strong>{profile.name ?? 'Your profile'}</strong>
+              <small>{summary.length ? summary.join(' · ') : 'Body weight, height, age and sex: tailors your plan'}</small>
+            </span>
+            <Icon name="chevron" size={18} />
+          </a>
+        </li>
+      </ul>
+
+      <h2 class="field">Saved sets</h2>
       <p class="muted small">
-        Counts push-ups, pull-ups, dips and other bodyweight sets in your volume and estimated max (body weight plus any added weight). Saved with
-        each workout you log from now on, only on this phone.
+        {stored
+          ? `${stored.sets} saved set${stored.sets === 1 ? '' : 's'} on this phone, ${stored.videos} with video (${(stored.bytes / 1e6).toFixed(1)} MB). Replays are kept for your last 60 checks; videos until you delete them.`
+          : 'Loading…'}
       </p>
+      {stored && stored.videos > 0 && (
+        <button
+          type="button"
+          class="secondary"
+          onClick={() => {
+            if (!confirm('Delete every saved video? Replays and results stay.')) return;
+            void deleteAllVideos().then(() => {
+              showToast('Saved videos deleted');
+              refreshStored();
+            });
+          }}
+        >
+          Delete all saved videos
+        </button>
+      )}
 
       <h2 class="field">Your data</h2>
       <p class="muted small">
-        {PRIVACY} Your plan, log and settings live only in this browser. Back them up to a file to move them to another phone.
+        {PRIVACY} Your plan, log, profile and settings live only in this browser. Back them up to a file to move them to another phone (saved videos and replays aren’t included in backups).
       </p>
       <div class="stack">
         <button type="button" class="secondary" onClick={() => downloadJson(`form-check-backup-${new Date().toISOString().slice(0, 10)}.json`, exportAll())}>
@@ -91,9 +121,10 @@ export function SettingsScreen() {
           type="button"
           class="link danger center"
           onClick={() => {
-            if (confirm('Delete your plans, workout log and settings from this phone? This can’t be undone.')) {
+            if (confirm('Delete your plans, workout log, profile, saved sets and videos, and settings from this phone? This can’t be undone.')) {
               deleteAll();
               void deleteAllRecordings();
+              void deleteAllSets();
               showToast('All data deleted');
               setTimeout(() => (location.hash = '#/'), 400);
             }
@@ -111,6 +142,25 @@ export function SettingsScreen() {
               <strong>Camera test</strong>
               <small>Check that pose tracking works on this phone</small>
             </span>
+          </a>
+        </li>
+      </ul>
+      <h2 class="field">Legal</h2>
+      <ul class="rows card">
+        <li>
+          <a href="#/terms">
+            <span class="row-main">
+              <strong>Terms of service</strong>
+            </span>
+            <Icon name="chevron" size={18} />
+          </a>
+        </li>
+        <li>
+          <a href="#/privacy">
+            <span class="row-main">
+              <strong>Privacy policy</strong>
+            </span>
+            <Icon name="chevron" size={18} />
           </a>
         </li>
       </ul>

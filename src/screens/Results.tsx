@@ -9,6 +9,9 @@ import { drawSkeleton } from '../draw';
 import { nearestShot } from '../analysis/snapshots';
 import { loadOverrides, loadProportions, saveOverride } from '../storage';
 import { saveTechnique } from '../log/store';
+import { newSetId, saveSet, saveSetVideo } from '../sets/sets';
+import { showToast } from '../ui/toast';
+import type { RecordedVideo } from './Analyze';
 import { Icon } from './icons';
 
 interface Props {
@@ -16,13 +19,17 @@ interface Props {
   seq: PoseSequence;
   /** In-memory JPEGs by frame index. Dropped when this screen closes. */
   shots: Map<number, Blob>;
+  /** The set's video, in memory until saved or this screen closes. */
+  video?: RecordedVideo;
   onAgain: () => void;
 }
 
 const ICON = { pass: '✓', fail: '✗', unknown: '?' } as const;
 const STATUS_TEXT = { pass: 'Pass', fail: 'Fault', unknown: 'Couldn’t judge' } as const;
 
-export function Results({ exercise, seq, shots, onAgain }: Props) {
+const mb = (bytes: number) => `${Math.max(0.1, bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0)} MB`;
+
+export function Results({ exercise, seq, shots, video, onAgain }: Props) {
   const [overrides, setOverrides] = useState(loadOverrides);
   const proportions = useMemo(loadProportions, []);
   const result = useMemo(() => analyze(exercise, seq, { proportions: proportions ?? undefined, overrides }), [exercise, seq, overrides]);
@@ -30,23 +37,55 @@ export function Results({ exercise, seq, shots, onAgain }: Props) {
   // Pictures are only ever in memory; release them when leaving results.
   useEffect(() => () => shots.clear(), [shots]);
 
-  // Save the outcome to the training log (numbers only) so the coach can use it.
+  // Save the outcome to the training log (numbers only) so the coach can use
+  // it, and keep a skeleton replay of the set (landmarks + analysis).
   const [saved, setSaved] = useState(false);
+  const [setId, setSetId] = useState<string | null>(null);
+  const [videoState, setVideoState] = useState<'none' | 'saving' | 'saved'>('none');
   useEffect(() => {
-    if (result.reps.length === 0) return;
+    if (result.reps.length === 0 && !result.hold) return;
+    const id = newSetId();
+    const at = new Date().toISOString();
     const faults: Record<string, number> = {};
-    for (const rep of result.reps) for (const c of rep.checks) if (c.status === 'fail' && c.fault) faults[c.fault] = (faults[c.fault] ?? 0) + 1;
-    saveTechnique({
-      exerciseId: exercise.id,
-      at: new Date().toISOString(),
-      reps: result.reps.length,
-      faults,
-      cleanReps: result.reps.filter((r) => r.checks.every((c) => c.status !== 'fail')).length,
-    });
+    for (const list of result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks)) {
+      for (const c of list) if (c.status === 'fail' && c.fault) faults[c.fault] = (faults[c.fault] ?? 0) + 1;
+    }
+    const cleanReps = result.hold
+      ? Number(result.hold.checks.every((c) => c.status !== 'fail'))
+      : result.reps.filter((r) => r.checks.every((c) => c.status !== 'fail')).length;
+    if (result.reps.length > 0) saveTechnique({ exerciseId: exercise.id, at, reps: result.reps.length, faults, cleanReps, setId: id });
+    void saveSet(
+      {
+        id,
+        exerciseId: exercise.id,
+        at,
+        source: seq.source === 'file' ? 'file' : 'camera',
+        durationSec: Math.round((seq.frames.at(-1)?.t ?? 0) / 100) / 10,
+        reps: result.reps.length,
+        cleanReps,
+        holdSec: result.hold ? Math.round(result.hold.durationSec * 10) / 10 : undefined,
+        faults,
+        mirrored: video?.mirrored ?? false,
+      },
+      { seq, result },
+    ).then(() => setSetId(id));
     setSaved(true);
     // Saved once per recording, with the thresholds as they were when it finished.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seq]);
+
+  const keepVideo = async () => {
+    if (!video || !setId) return;
+    setVideoState('saving');
+    try {
+      await saveSetVideo(setId, video.blob, video.offsetMs);
+      setVideoState('saved');
+      showToast('Video saved on this phone');
+    } catch {
+      setVideoState('none');
+      showToast('Couldn’t save the video: the phone may be out of storage');
+    }
+  };
 
   const faultsSeen = new Map<string, number>();
   const checks = result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks);
@@ -158,11 +197,30 @@ export function Results({ exercise, seq, shots, onAgain }: Props) {
       )}
 
       {saved && (
-        <p class="saved-note">
-          <Icon name="check" size={16} /> Saved to your log. The coach uses it to adjust your weights.
-        </p>
+        <section class="card keep-set">
+          <p class="saved-note">
+            <Icon name="check" size={16} /> Saved to your log with a skeleton replay. The coach uses it to adjust your weights.
+          </p>
+          {video && videoState !== 'saved' && (
+            <button type="button" class={`secondary ${videoState === 'saving' ? 'loading' : ''}`} disabled={!setId || videoState === 'saving'} onClick={() => void keepVideo()}>
+              <Icon name="video" size={18} /> Save video on this phone ({mb(video.blob.size)})
+            </button>
+          )}
+          {videoState === 'saved' && (
+            <p class="saved-note">
+              <Icon name="check" size={16} /> Video saved on this phone. It’s never uploaded.
+            </p>
+          )}
+          {setId && (
+            <a class="link center" href={`#/set/${setId}`}>
+              <Icon name="play" size={16} /> Watch {videoState === 'saved' ? 'the video' : 'the replay'}
+            </a>
+          )}
+        </section>
       )}
-      <p class="muted small center">Feedback is still being tuned, so treat it as a guide. Pictures are deleted when you leave.</p>
+      <p class="muted small center">
+        Feedback is still being tuned, so treat it as a guide. {video && videoState !== 'saved' ? 'The video is deleted when you leave unless you save it.' : 'Pictures are deleted when you leave.'}
+      </p>
       <div class="stack">
         <button type="button" onClick={onAgain}>
           Record another set

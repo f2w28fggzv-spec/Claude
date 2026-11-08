@@ -23,6 +23,25 @@
 // - Secondary muscles count as half a set (fractional counting), as in
 //   Pelland et al. (2024), "The resistance training dose-response" (SportRxiv
 //   preprint).
+// - Sex: men and women gain muscle and lower-body strength at similar relative
+//   rates, and women gain relatively more upper-body strength; Roberts,
+//   Nuckols & Krieger (2020), "Sex differences in resistance training: a
+//   systematic review and meta-analysis", J Strength Cond Res 34(5):1448-1460.
+//   So plans are the same for everyone except rest: women tend to fatigue
+//   less and recover faster between sets; Grgic & Schoenfeld (2019), "A case
+//   for considering age and sex when prescribing rest intervals in resistance
+//   training", Kinesiology 51(1):78-82. Rest is about 20% shorter (HEURISTIC
+//   amount). No menstrual-cycle adjustments: Colenso-Semple et al. (2023),
+//   Front Sports Act Living 5:1054542, found no meaningful effect of cycle
+//   phase on strength or adaptations.
+// - Age under 18: technique first, moderate loads, sets of 6-12+ reps; Lloyd
+//   et al. (2014), "Position statement on youth resistance training: the 2014
+//   International Consensus", Br J Sports Med 48(7):498-505. Here: no sets
+//   below 8 reps.
+// - Age 65+: sets of about 8-15 reps, lifting with intent (power) and not to
+//   failure; Fragala et al. (2019), "Resistance training for older adults:
+//   position statement from the NSCA", J Strength Cond Res 33(8):2019-2052.
+//   Here: no sets below 8 reps.
 // Values marked HEURISTIC below are practical limits, not from a study.
 import { EXERCISES } from '../data/exercises';
 import {
@@ -68,6 +87,44 @@ export interface ProgramInputs {
   daysPerWeek: number;
   level: Level;
   equipment: EquipmentSetting;
+  /** From the profile, if given: adjusts rest between sets. */
+  sex?: 'female' | 'male';
+  /** From the profile, if given: under 18 and 65+ get no sets below 8 reps. */
+  age?: number;
+}
+
+/** The level's prescription adjusted for the lifter's sex and age (see the header for sources). */
+export function personalPrescription(
+  rx: { reps: [number, number]; restSec: number },
+  kind: PrescriptionKind,
+  lifter: Pick<ProgramInputs, 'sex' | 'age'>,
+): { reps: [number, number]; restSec: number } {
+  let [lo, hi] = rx.reps;
+  let restSec = rx.restSec;
+  const youthOrOlder = lifter.age !== undefined && (lifter.age < 18 || lifter.age >= 65);
+  if (youthOrOlder && kind !== 'hold' && lo < 8) {
+    hi = Math.max(hi, 12, 8 + (hi - lo));
+    lo = 8;
+  }
+  // HEURISTIC amount: about 20% shorter, rounded to 15 s, never under a minute.
+  if (lifter.sex === 'female') restSec = Math.max(60, Math.round((restSec * 0.8) / 15) * 15);
+  return { reps: [lo, hi], restSec };
+}
+
+/** Notes explaining how the plan was adjusted for the lifter. */
+export function lifterNotes(lifter: Pick<ProgramInputs, 'sex' | 'age'>): string[] {
+  const out: string[] = [];
+  if (lifter.sex === 'female') {
+    out.push(
+      'Rest between sets is about 20% shorter: women tend to recover faster between sets (Grgic & Schoenfeld 2019). Everything else is the same as for men, because both build muscle and strength at similar rates (Roberts et al. 2020).',
+    );
+  }
+  if (lifter.age !== undefined && lifter.age < 18) {
+    out.push('Under 18: no sets below 8 reps. Learn the technique with moderate weights first, ideally with a qualified coach (Lloyd et al. 2014).');
+  } else if (lifter.age !== undefined && lifter.age >= 65) {
+    out.push('65 and over: sets of 8 or more reps. Push each rep up with intent, lower it under control, and stop a rep or two before failure (NSCA position statement, Fragala et al. 2019).');
+  }
+  return out;
 }
 
 export interface ProgramItem {
@@ -292,7 +349,7 @@ export function buildProgram(inputs: ProgramInputs, now = new Date()): Program {
       const sets = Math.max(minSets, Math.min(maxSets, Math.round(need), sessionCap - dayTotal));
       dayTotal += sets;
       const kind = prescriptionKind(pick);
-      const rx = PRESCRIPTION[level][kind];
+      const rx = personalPrescription(PRESCRIPTION[level][kind], kind, inputs);
       items.push({
         exercise: pick,
         item: {
@@ -355,6 +412,8 @@ export function buildProgram(inputs: ProgramInputs, now = new Date()): Program {
   for (const g of missing) {
     notes.push(`No ${MUSCLE_LABELS[g].toLowerCase()} exercises match your equipment, so ${MUSCLE_LABELS[g].toLowerCase()} is not trained directly.`);
   }
+
+  notes.push(...lifterNotes(inputs));
 
   const label = groups.length === MUSCLE_GROUPS.length ? 'Full body' : groups.map((g) => MUSCLE_LABELS[g]).join(', ');
   return {

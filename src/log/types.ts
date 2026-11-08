@@ -29,6 +29,8 @@ export interface TechniqueSummary {
   faults: Record<string, number>;
   /** Reps where every check passed. */
   cleanReps: number;
+  /** The saved set (skeleton replay, maybe a video) for this check. */
+  setId?: string;
 }
 
 export interface ExerciseEntry {

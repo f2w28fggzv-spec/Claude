@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { exerciseName } from '../log/exercises';
-import { dayKey, exerciseHistory, finished, formatWeight, toUnit, weekStart, weekStreak, workoutMinutes, workoutSets, workoutVolume, workoutsByDay } from '../log/stats';
+import { formRating, formText } from '../log/form';
+import { dayKey, exerciseHistory, finished, formatSetShort, formatWeight, toUnit, weekStart, weekStreak, workoutMinutes, workoutSets, workoutVolume, workoutsByDay } from '../log/stats';
 import { weekMuscles } from '../log/muscles';
-import { loadMode, loadUnit, loadWorkouts } from '../log/store';
+import { loadMode, loadTechnique, loadUnit, loadWorkouts } from '../log/store';
+import { loadSets, type SavedSetMeta } from '../sets/sets';
 import { loadPrograms } from '../storage';
-import type { Workout } from '../log/types';
+import type { Unit, Workout } from '../log/types';
 import { CountUp } from '../ui/CountUp';
 import { BodyHeatmap } from './BodyHeatmap';
 import { Icon } from './icons';
@@ -24,6 +26,12 @@ export function LogScreen() {
   const thisWeek = dayKey(weekStart(weekOf)) === dayKey(weekStart(today));
   const moveWeek = (days: number) => setWeekOf(new Date(weekOf.getFullYear(), weekOf.getMonth(), weekOf.getDate() + days));
   const byDay = useMemo(() => workoutsByDay(workouts), [workouts]);
+  const [sets, setSets] = useState<SavedSetMeta[]>([]);
+  useEffect(() => {
+    void loadSets().then(setSets);
+  }, []);
+  // Days with a technique check (saved set or summary), for the calendar.
+  const checkedDays = useMemo(() => new Set([...sets.map((m) => dayKey(m.at)), ...loadTechnique().map((t) => dayKey(t.at))]), [sets]);
 
   const first = month;
   const offset = (first.getDay() + 6) % 7; // Monday first
@@ -67,7 +75,7 @@ export function LogScreen() {
                 style={{ '--i': String(i) }}
                 class={[
                   'cal-day',
-                  byDay.has(dayKey(c)) ? 'trained' : '',
+                  byDay.has(dayKey(c)) ? 'trained' : checkedDays.has(dayKey(c)) ? 'checked' : '',
                   dayKey(c) === dayKey(today) ? 'today' : '',
                   selected === dayKey(c) ? 'sel' : '',
                 ].join(' ')}
@@ -119,8 +127,10 @@ export function LogScreen() {
           <Icon name="plus" size={18} /> {selected ? (selected === dayKey(today) ? 'Log a workout for today' : 'Log a workout for this day') : 'Log a past workout'}
         </a>
       )}
-      {shown.length === 0 ? (
-        <p class="muted">{selected ? 'No workout logged this day.' : 'No workouts yet. Start one from the Train tab, or log one you’ve already done.'}</p>
+      {selected ? (
+        <DayDetail workouts={shown} sets={sets.filter((m) => dayKey(m.at) === selected)} unit={unit} />
+      ) : shown.length === 0 ? (
+        <p class="muted">No workouts yet. Start one from the Train tab, or log one you’ve already done.</p>
       ) : (
         <ul class="rows card">
           {shown.map((w, i) => (
@@ -171,5 +181,78 @@ export function LogScreen() {
         </a>
       </p>
     </Screen>
+  );
+}
+
+/** A saved technique check: form rating, linked to its video or replay. */
+function SetBadge({ meta }: { meta: SavedSetMeta }) {
+  const reps = meta.reps || (meta.holdSec !== undefined ? 1 : 0);
+  const tone = formRating(meta.cleanReps, reps)?.tone ?? 'ok';
+  return (
+    <a class={`set-badge ${tone}`} href={`#/set/${meta.id}`}>
+      <Icon name={meta.video ? 'video' : 'play'} size={14} />
+      {meta.reps > 0 ? formText(meta.cleanReps, meta.reps) : meta.holdSec !== undefined ? `Hold ${meta.holdSec} s` : 'Replay'}
+      <span class="set-badge-kind">{meta.video ? 'Video' : 'Replay'}</span>
+    </a>
+  );
+}
+
+/** Everything about one calendar day: each workout's exercises, sets, notes and technique checks. */
+function DayDetail({ workouts, sets, unit }: { workouts: Workout[]; sets: SavedSetMeta[]; unit: Unit }) {
+  const used = new Set<string>();
+  const cards = workouts.map((w, i) => (
+    <section class="card day-workout" style={{ '--i': String(i) }}>
+      <header class="day-head">
+        <a href={`#/session/${w.id}`}>
+          <h2>{w.dayName ?? 'Workout'}</h2>
+        </a>
+        <span class="muted small">
+          {new Date(w.startedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} · {workoutMinutes(w)} min
+        </span>
+      </header>
+      <ul class="day-ex">
+        {w.entries.map((e) => {
+          const check = sets.find((m) => m.exerciseId === e.exerciseId && !used.has(m.id));
+          if (check) used.add(check.id);
+          return (
+            <li>
+              <strong>{exerciseName(e.exerciseId)}</strong>
+              <small>{e.sets.map((x) => formatSetShort(x, unit)).join(', ')}</small>
+              {check && <SetBadge meta={check} />}
+            </li>
+          );
+        })}
+      </ul>
+      {w.notes && <p class="day-notes">“{w.notes}”</p>}
+      <div class="day-foot">
+        <span class="muted small">
+          {workoutSets(w)} sets · {formatWeight(workoutVolume(w), unit)}
+        </span>
+        <a class="link" href={`#/session/${w.id}`}>
+          Open workout <Icon name="chevron" size={14} />
+        </a>
+      </div>
+    </section>
+  ));
+  const others = sets.filter((m) => !used.has(m.id));
+  return (
+    <>
+      {workouts.length === 0 && others.length === 0 && <p class="muted">No workout logged this day.</p>}
+      {cards}
+      {others.length > 0 && (
+        <section class="card">
+          <h2>Technique checks</h2>
+          <ul class="day-ex">
+            {others.map((m) => (
+              <li>
+                <strong>{exerciseName(m.exerciseId)}</strong>
+                <small>{new Date(m.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</small>
+                <SetBadge meta={m} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </>
   );
 }

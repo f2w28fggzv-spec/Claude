@@ -1,4 +1,9 @@
+import { useState } from 'preact/hooks';
+import { loadProfile, termsAccepted } from './profile';
 import { useRoute } from './router';
+import { PrivacyScreen, TermsScreen, Welcome } from './screens/Legal';
+import { ProfileScreen } from './screens/ProfileScreen';
+import { SetScreen } from './screens/SetScreen';
 import { ToastHost } from './ui/toast';
 import { LogScreen } from './screens/LogScreen';
 import { WorkoutScreen } from './screens/WorkoutScreen';
@@ -19,14 +24,20 @@ import { Analyze } from './screens/Analyze';
 import { DevDemos } from './screens/DevDemos';
 import { DevCalibrate } from './screens/DevCalibrate';
 
+/** Pages readable before accepting the terms. */
+const OPEN = new Set(['terms', 'privacy']);
+
 export function App() {
   const route = useRoute();
+  const [, rerender] = useState(0);
+  // First launch (or new terms): the welcome screen until they're accepted.
+  const gate = !termsAccepted(loadProfile()) && !OPEN.has(route.path[0] ?? '');
   // Keyed wrapper so the CSS entrance animation replays on every navigation
   // (used where the View Transitions API isn't available).
   return (
     <>
-      <div class="page" key={`${route.path.join('/')}?${route.query}`}>
-        <Routes {...route} />
+      <div class="page" key={gate ? 'welcome' : `${route.path.join('/')}?${route.query}`}>
+        {gate ? <Welcome onDone={() => rerender((n) => n + 1)} /> : <Routes {...route} />}
       </div>
       <ToastHost />
     </>
@@ -56,6 +67,14 @@ function Routes({ path, query }: ReturnType<typeof useRoute>) {
       return <ProgressScreen id={id ?? ''} />;
     case 'settings':
       return <SettingsScreen />;
+    case 'set':
+      return <SetScreen id={id ?? ''} />;
+    case 'profile':
+      return <ProfileScreen setup={query.has('setup')} />;
+    case 'terms':
+      return <TermsScreen />;
+    case 'privacy':
+      return <PrivacyScreen />;
     case 'library':
       return <Library />;
     case 'exercise':

@@ -172,7 +172,7 @@ export function ProgressScreen({ id }: { id: string }) {
                 .slice(0, 10)
                 .map((t) => (
                   <li>
-                    <a href={`#/analyze/${id}`}>
+                    <a href={t.setId ? `#/set/${t.setId}` : `#/analyze/${id}`}>
                       <span class="row-main">
                         <strong>
                           {t.cleanReps}/{t.reps} reps with no faults · {pct(t.cleanReps / t.reps)}
