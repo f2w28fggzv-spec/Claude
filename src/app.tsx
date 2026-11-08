@@ -2,6 +2,7 @@ import { useRoute } from './router';
 import { ToastHost } from './ui/toast';
 import { LogScreen } from './screens/LogScreen';
 import { WorkoutScreen } from './screens/WorkoutScreen';
+import { DevAnatomy } from './screens/DevAnatomy';
 import { EditWorkoutScreen } from './screens/EditWorkoutScreen';
 import { RoutineScreen } from './screens/RoutineScreen';
 import { SessionScreen } from './screens/SessionScreen';
@@ -61,6 +62,7 @@ function Routes({ path, query }: ReturnType<typeof useRoute>) {
       return <ExerciseDetail id={id ?? ''} />;
     case 'dev':
       if (id === 'demos') return <DevDemos still={query.has('still')} />;
+      if (id === 'anatomy') return <DevAnatomy />;
       if (id === 'calibrate') return <DevCalibrate exerciseId={query.get('exercise') ?? undefined} />;
       return <Home />;
     case 'analyze':

@@ -53,9 +53,9 @@ svg.icon { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: 
 svg.level rect { stroke: none; }
 svg.level .on { fill: currentColor; }
 svg.level .off { fill: var(--line); }
-.muscle-icon .mi-body path, .muscle-icon .mi-body ellipse { fill: #2f3640; stroke: #444d59; stroke-width: 0.7; }
-.muscle-icon .mi-body .mi-hair { fill: #1f242b; stroke: none; }
-.muscle-icon .mi-body .mi-ear { stroke: none; }
+.muscle-icon .an-body path, .muscle-icon .an-body ellipse { fill: #2f3640; stroke: #444d59; stroke-width: 0.7; }
+.muscle-icon .an-body .an-hair { fill: #1f242b; stroke: none; }
+.muscle-icon .an-body .an-ear { stroke: none; }
 .muscle-icon .mi-off path { fill: #3f4855; stroke: #2a3039; stroke-width: 0.5; }
 .muscle-icon .mi-on path { fill: var(--accent); stroke: #1d6b41; stroke-width: 0.5; }
 
@@ -104,7 +104,7 @@ button.link.danger { color: var(--danger); margin-top: 20px; }
 .muscle-tile .muscle-icon .mi-on path { fill: #2fae69; }
 .muscle-tile.on { border-color: var(--accent); background: var(--accent-soft); }
 .muscle-tile.on .muscle-icon .mi-on path { fill: var(--accent); }
-.muscle-tile.on .muscle-icon .mi-body path, .muscle-tile.on .muscle-icon .mi-body ellipse { fill: #36404b; }
+.muscle-tile.on .muscle-icon .an-body path, .muscle-tile.on .muscle-icon .an-body ellipse { fill: #36404b; }
 .tick {
   position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; border-radius: 50%;
   display: grid; place-items: center; background: var(--accent); color: var(--accent-ink);
@@ -173,7 +173,7 @@ details.more.small summary { font-size: 0.85rem; padding: 6px 0; }
 }
 .filter.on { background: var(--accent); color: var(--accent-ink); }
 .filter.on .muscle-icon .mi-on path { fill: var(--accent-ink); stroke: none; }
-.filter.on .muscle-icon .mi-body path, .filter.on .muscle-icon .mi-body ellipse { fill: #1b7a46; stroke: none; }
+.filter.on .muscle-icon .an-body path, .filter.on .muscle-icon .an-body ellipse { fill: #1b7a46; stroke: none; }
 .filter.on .muscle-icon .mi-off path { fill: #27a35f; stroke: none; }
 .search-row { display: flex; gap: 8px; }
 .search-row .search { flex: 1; min-width: 0; }
@@ -783,3 +783,57 @@ button.link.version { color: var(--muted); font-weight: 500; font-size: 0.8rem; 
 .top-fault .link { align-self: flex-start; padding-left: 0; }
 .when-row { grid-template-columns: 1fr 1fr; }
 .when-row .text-field:first-child { grid-column: 1 / -1; }
+
+/* ── Anatomy ────────────────────────────────────────────────────────────── */
+svg.anatomy { display: block; }
+.anatomy .an-body path { fill: #2a313b; stroke: #3d4652; stroke-width: 0.5; stroke-linejoin: round; }
+.anatomy .an-body .an-hair { fill: #1b2026; stroke: none; }
+.anatomy .an-body .an-ear { fill: #262c35; stroke: #3a434f; stroke-width: 0.4; }
+.anatomy .an-muscle path { stroke: #14181d; stroke-width: 0.7; stroke-linejoin: round; transition: fill 260ms; }
+.anatomy .an-neutral path { fill: #343c47; }
+.dev-anatomy { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.dev-anatomy svg { width: 100%; height: auto; background: var(--card); border-radius: 12px; }
+.dev-icons { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px; }
+.dev-icons figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.dev-chest path { fill: #e8684a; } .dev-shoulders path { fill: #f2b84b; } .dev-biceps path { fill: #6aa7ff; }
+.dev-triceps path { fill: #a98bff; } .dev-back path { fill: #3ddc84; } .dev-core path { fill: #ff8cc6; }
+.dev-quads path { fill: #4dd2d6; } .dev-hamstrings path { fill: #c9e265; } .dev-glutes path { fill: #ff9a5c; }
+.dev-calves path { fill: #9aa4b2; }
+
+/* ── Weekly body map ───────────────────────────────────────────────────── */
+:root { --heat-n: #2d343e; --heat-0: #343c47; --heat-1: #1f6040; --heat-2: #26874f; --heat-3: #33b067; --heat-4: #5fe89c; }
+.heat-n path { fill: var(--heat-n); }
+.heat-0 path { fill: var(--heat-0); }
+.heat-1 path { fill: var(--heat-1); }
+.heat-2 path { fill: var(--heat-2); }
+.heat-3 path { fill: var(--heat-3); }
+.heat-4 path { fill: var(--heat-4); }
+.heat-body .an-muscle[data-group] { cursor: pointer; }
+.heat-body .heat-sel path { stroke: var(--text); stroke-width: 1.1; }
+.heat-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 300px; margin: 6px auto 0; }
+.heatmap.compact .heat-figures { max-width: 240px; }
+.heat-figures figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.heat-figures svg { width: 100%; height: auto; }
+.heat-figures figcaption { color: var(--muted); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.heat-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; margin: 10px 0 4px; font-size: 0.75rem; color: var(--muted); }
+.heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.heat-sw { display: inline-block; width: 12px; height: 12px; border-radius: 4px; }
+.heat-sw.heat-0, .heat-bar .heat-0 { background: var(--heat-0); }
+.heat-sw.heat-1, .heat-bar .heat-1 { background: var(--heat-1); }
+.heat-sw.heat-2, .heat-bar .heat-2 { background: var(--heat-2); }
+.heat-sw.heat-3, .heat-bar .heat-3 { background: var(--heat-3); }
+.heat-sw.heat-4, .heat-bar .heat-4 { background: var(--heat-4); }
+.heat-detail { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 4px; text-align: center; font-size: 0.92rem; min-height: 2.9em; }
+.heat-detail small { color: var(--muted); }
+.heat-list { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 2px; }
+.heat-list li { animation: rise-in 300ms var(--ease) both; animation-delay: calc(var(--i, 0) * 22ms); }
+.heat-list button {
+  display: grid; grid-template-columns: 6.5em 1fr 4em; align-items: center; gap: 10px; min-height: 36px; padding: 4px 6px;
+  background: transparent; color: var(--text); font-weight: 500; font-size: 0.88rem; border-radius: 10px; text-align: left;
+}
+.heat-list button.on { background: var(--raised); }
+.heat-bar { position: relative; height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
+.heat-list button.on .heat-bar { background: #2f3742; }
+.heat-bar i { position: absolute; inset: 0; transform-origin: left; border-radius: 4px; transition: transform 500ms var(--ease); }
+.heat-num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .heat-bar i { transition: none; } }
