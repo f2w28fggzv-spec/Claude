@@ -95,7 +95,7 @@ button.link.danger { color: var(--danger); margin-top: 20px; }
 
 /* Muscle picker */
 .muscle-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.muscle-tile .muscle-icon { width: 66px; height: auto; }
+.muscle-tile .muscle-icon { width: 78px; height: auto; }
 .muscle-tile {
   position: relative; flex-direction: column; gap: 8px; min-height: 0; padding: 16px 8px 14px;
   background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 20px;
@@ -786,43 +786,25 @@ button.link.version { color: var(--muted); font-weight: 500; font-size: 0.8rem; 
 
 /* ── Anatomy ────────────────────────────────────────────────────────────── */
 svg.anatomy { display: block; }
-.anatomy .an-body path { fill: #2a313b; stroke: #3d4652; stroke-width: 0.5; stroke-linejoin: round; }
-.anatomy .an-body .an-hair { fill: #1b2026; stroke: none; }
-.anatomy .an-body .an-ear { fill: #262c35; stroke: #3a434f; stroke-width: 0.4; }
-.anatomy .an-muscle path { stroke: #14181d; stroke-width: 0.7; stroke-linejoin: round; transition: fill 260ms; }
-.anatomy .an-neutral path { fill: #343c47; }
+.anatomy .an-body path { fill: #262d36; }
+.anatomy .an-hair path { fill: #1d2229; }
+.anatomy .an-muscle path { stroke: #14181d; stroke-width: 2.5; stroke-linejoin: round; transition: fill 400ms var(--ease); }
+.anatomy .an-muscle { fill: #3e4753; }
 .dev-anatomy { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.dev-anatomy svg { width: 100%; height: auto; background: var(--card); border-radius: 12px; }
+.dev-anatomy svg { width: 100%; height: auto; background: var(--card); border-radius: 12px; padding: 8px; }
 .dev-icons { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px; }
 .dev-icons figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.dev-chest path { fill: #e8684a; } .dev-shoulders path { fill: #f2b84b; } .dev-biceps path { fill: #6aa7ff; }
-.dev-triceps path { fill: #a98bff; } .dev-back path { fill: #3ddc84; } .dev-core path { fill: #ff8cc6; }
-.dev-quads path { fill: #4dd2d6; } .dev-hamstrings path { fill: #c9e265; } .dev-glutes path { fill: #ff9a5c; }
-.dev-calves path { fill: #9aa4b2; }
 
 /* ── Weekly body map ───────────────────────────────────────────────────── */
-:root { --heat-n: #2d343e; --heat-0: #343c47; --heat-1: #1f6040; --heat-2: #26874f; --heat-3: #33b067; --heat-4: #5fe89c; }
-.heat-n path { fill: var(--heat-n); }
-.heat-0 path { fill: var(--heat-0); }
-.heat-1 path { fill: var(--heat-1); }
-.heat-2 path { fill: var(--heat-2); }
-.heat-3 path { fill: var(--heat-3); }
-.heat-4 path { fill: var(--heat-4); }
+:root { --heat-n: #2f363f; }
+.anatomy .heat-n, .anatomy .heat-n path { fill: var(--heat-n); }
 .heat-body .an-muscle[data-group] { cursor: pointer; }
-.heat-body .heat-sel path { stroke: var(--text); stroke-width: 1.1; }
-.heat-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 300px; margin: 6px auto 0; }
-.heatmap.compact .heat-figures { max-width: 240px; }
+.heat-body .heat-sel path { stroke: var(--text); stroke-width: 6; }
+.heat-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 340px; margin: 6px auto 0; }
+.heatmap.compact .heat-figures { max-width: 300px; }
 .heat-figures figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .heat-figures svg { width: 100%; height: auto; }
 .heat-figures figcaption { color: var(--muted); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
-.heat-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; margin: 10px 0 4px; font-size: 0.75rem; color: var(--muted); }
-.heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.heat-sw { display: inline-block; width: 12px; height: 12px; border-radius: 4px; }
-.heat-sw.heat-0, .heat-bar .heat-0 { background: var(--heat-0); }
-.heat-sw.heat-1, .heat-bar .heat-1 { background: var(--heat-1); }
-.heat-sw.heat-2, .heat-bar .heat-2 { background: var(--heat-2); }
-.heat-sw.heat-3, .heat-bar .heat-3 { background: var(--heat-3); }
-.heat-sw.heat-4, .heat-bar .heat-4 { background: var(--heat-4); }
 .heat-detail { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 4px; text-align: center; font-size: 0.92rem; min-height: 2.9em; }
 .heat-detail small { color: var(--muted); }
 .heat-list { list-style: none; padding: 0; margin: 6px 0 0; display: flex; flex-direction: column; gap: 2px; }
@@ -837,3 +819,5 @@ svg.anatomy { display: block; }
 .heat-bar i { position: absolute; inset: 0; transform-origin: left; border-radius: 4px; transition: transform 500ms var(--ease); }
 .heat-num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .heat-bar i { transition: none; } }
+.heat-scale { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; max-width: 320px; margin: 12px auto 2px; font-size: 0.75rem; color: var(--muted); }
+.heat-scale i { display: block; height: 8px; border-radius: 4px; }

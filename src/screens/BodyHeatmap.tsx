@@ -1,26 +1,48 @@
 import { useState } from 'preact/hooks';
 import { MUSCLE_LABELS, type MuscleGroup } from '../data/types';
-import { HEAT_LABELS, type HeatLevel, type MuscleWeek } from '../log/muscles';
+import { HEAT_LABELS, type MuscleWeek } from '../log/muscles';
 import { BodyFigure } from './anatomy';
 
-const LEVELS: HeatLevel[] = [0, 1, 2, 3, 4];
 const fmt = (n: number) => String(Math.round(n * 2) / 2);
 
+// One colour, blended from the untrained muscle tone to the accent green by
+// how much of the weekly target a group got. Any training at all starts at
+// 30% so a single set is visible; the target (or more) is full brightness.
+const OFF: [number, number, number] = [0x3e, 0x47, 0x53];
+const ON: [number, number, number] = [0x3d, 0xdc, 0x84];
+const START = 0.3;
+const hex = (c: number[]) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+const mix = (t: number) => hex(OFF.map((o, i) => o + (ON[i] - o) * t));
+
+/** Shading strength 0–1 for a group's week. */
+export function heatStrength(w: Pick<MuscleWeek, 'sets' | 'share'> | undefined): number {
+  if (!w || w.sets <= 0) return 0;
+  return START + (1 - START) * Math.min(1, w.share);
+}
+export const heatColour = (w: Pick<MuscleWeek, 'sets' | 'share'> | undefined) => mix(heatStrength(w));
+
 /**
- * Front and back of the body with each muscle group shaded by how much of
- * its weekly set target it got (one green, dim to bright). Tap a muscle or a
- * row for its sets and the exercises that trained it; the list is the same
- * data as text.
+ * Front and back of the body, each muscle group shaded brighter the more of
+ * its weekly set target it got. Tap a muscle or a row for its sets and the
+ * exercises that trained it; the list is the same data as text.
  */
 export function BodyHeatmap({ weeks, compact = false }: { weeks: MuscleWeek[]; compact?: boolean }) {
   const [sel, setSel] = useState<MuscleGroup | null>(null);
   const by = new Map(weeks.map((w) => [w.group, w]));
-  const cls = (g: MuscleGroup | null) => (g ? `heat-${by.get(g)?.level ?? 0}${g === sel ? ' heat-sel' : ''}` : 'heat-n');
   const pick = (g: MuscleGroup) => setSel((cur) => (cur === g ? null : g));
   const trained = weeks.filter((w) => w.sets > 0).length;
   const met = weeks.filter((w) => w.level === 4).length;
   const cur = sel ? by.get(sel) : undefined;
   const summary = `${trained} of ${weeks.length} muscle groups trained, ${met} at target`;
+  const figure = (view: 'front' | 'back') => (
+    <BodyFigure
+      view={view}
+      class="heat-body"
+      muscleClass={(g) => (g ? (g === sel ? 'heat-sel' : '') : 'heat-n')}
+      muscleFill={(g) => (g ? heatColour(by.get(g)) : undefined)}
+      onPick={pick}
+    />
+  );
 
   const list = (
     <ul class="heat-list">
@@ -29,7 +51,7 @@ export function BodyHeatmap({ weeks, compact = false }: { weeks: MuscleWeek[]; c
           <button type="button" class={sel === w.group ? 'on' : ''} aria-pressed={sel === w.group} onClick={() => pick(w.group)}>
             <span class="heat-name">{MUSCLE_LABELS[w.group]}</span>
             <span class="heat-bar" aria-hidden="true">
-              <i class={`heat-${w.level}`} style={{ transform: `scaleX(${Math.min(1, w.share)})` }} />
+              <i style={{ transform: `scaleX(${Math.min(1, w.share)})`, background: heatColour(w) }} />
             </span>
             <span class="heat-num">
               {fmt(w.sets)}/{w.target}
@@ -44,21 +66,18 @@ export function BodyHeatmap({ weeks, compact = false }: { weeks: MuscleWeek[]; c
     <div class={`heatmap ${compact ? 'compact' : ''}`}>
       <div class="heat-figures" role="img" aria-label={`Body map: ${summary}.`}>
         <figure>
-          <BodyFigure view="front" class="heat-body" muscleClass={cls} onPick={pick} />
+          {figure('front')}
           <figcaption>Front</figcaption>
         </figure>
         <figure>
-          <BodyFigure view="back" class="heat-body" muscleClass={cls} onPick={pick} />
+          {figure('back')}
           <figcaption>Back</figcaption>
         </figure>
       </div>
-      <div class="heat-legend" aria-hidden="true">
-        {LEVELS.map((l) => (
-          <span>
-            <i class={`heat-sw heat-${l}`} />
-            {HEAT_LABELS[l]}
-          </span>
-        ))}
+      <div class="heat-scale" aria-hidden="true">
+        <span>Not trained</span>
+        <i style={{ background: `linear-gradient(90deg, ${mix(0)} 0%, ${mix(0)} 8%, ${mix(START)} 12%, ${mix(1)} 100%)` }} />
+        <span>Weekly target</span>
       </div>
       <p class="heat-detail" aria-live="polite">
         {cur ? (
@@ -71,7 +90,7 @@ export function BodyHeatmap({ weeks, compact = false }: { weeks: MuscleWeek[]; c
         ) : (
           <>
             <strong>{summary}</strong>
-            <small>Tap a muscle to see its sets. Secondary muscles count as half a set.</small>
+            <small>The more sets a muscle gets, the brighter it is. Tap one for details.</small>
           </>
         )}
       </p>
