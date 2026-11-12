@@ -5,11 +5,11 @@ import { BodyFigure } from './anatomy';
 
 const fmt = (n: number) => String(Math.round(n * 2) / 2);
 
-// One colour, blended from the untrained muscle tone to the accent green by
-// how much of the weekly target a group got. Any training at all starts at
-// 30% so a single set is visible; the target (or more) is full brightness.
-const OFF: [number, number, number] = [0x3e, 0x47, 0x53];
-const ON: [number, number, number] = [0x3d, 0xdc, 0x84];
+// One colour, blended from the untrained muscle grey to plate green by how
+// much of the weekly target a group got. Any training at all starts at 30% so
+// a single set is visible; the target (or more) is full strength.
+const OFF: [number, number, number] = [0xcd, 0xd1, 0xd7];
+const ON: [number, number, number] = [0x1e, 0x9a, 0x55];
 const START = 0.3;
 const hex = (c: number[]) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
 const mix = (t: number) => hex(OFF.map((o, i) => o + (ON[i] - o) * t));
@@ -22,7 +22,7 @@ export function heatStrength(w: Pick<MuscleWeek, 'sets' | 'share'> | undefined):
 export const heatColour = (w: Pick<MuscleWeek, 'sets' | 'share'> | undefined) => mix(heatStrength(w));
 
 /**
- * Front and back of the body, each muscle group shaded brighter the more of
+ * Front and back of the body, each muscle group shaded greener the more of
  * its weekly set target it got. Tap a muscle or a row for its sets and the
  * exercises that trained it; the list is the same data as text.
  */
@@ -90,7 +90,7 @@ export function BodyHeatmap({ weeks, compact = false }: { weeks: MuscleWeek[]; c
         ) : (
           <>
             <strong>{summary}</strong>
-            <small>The more sets a muscle gets, the brighter it is. Tap one for details.</small>
+            <small>The more sets a muscle gets, the greener it is. Tap one for details.</small>
           </>
         )}
       </p>

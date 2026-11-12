@@ -1,4 +1,4 @@
-# Form Check
+# fitee
 
 Mobile web app: pick muscle groups, get a workout program, and get technique
 feedback from your phone camera. All pose detection runs on the phone with

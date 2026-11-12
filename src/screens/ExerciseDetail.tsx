@@ -1,6 +1,7 @@
 import { getExercise } from '../data/exercises';
 import { EQUIPMENT_LABELS, MUSCLE_LABELS } from '../data/types';
 import { describeTarget } from '../data/describe';
+import { groupStyle } from '../ui/brand';
 import { Icon, MuscleIcon } from './icons';
 import { ExerciseDemo } from './ExerciseDemo';
 import { Screen } from './Layout';
@@ -19,7 +20,7 @@ export function ExerciseDetail({ id }: { id: string }) {
       <ExerciseDemo exercise={e} />
       <div class="tags">
         {e.primary.map((g) => (
-          <span class="tag strong">
+          <span class="tag strong" style={groupStyle(g)}>
             <MuscleIcon group={g} size={10} />
             {MUSCLE_LABELS[g]}
           </span>

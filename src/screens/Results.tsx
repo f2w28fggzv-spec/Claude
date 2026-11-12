@@ -13,6 +13,7 @@ import { newSetId, saveSet, saveSetVideo } from '../sets/sets';
 import { showToast } from '../ui/toast';
 import type { RecordedVideo } from './Analyze';
 import { Icon } from './icons';
+import { PLATE } from '../ui/brand';
 
 interface Props {
   exercise: Exercise;
@@ -406,7 +407,7 @@ function highlight(
     for (const j of joints)
       for (const s of sides) {
         const i = landmarkIndex(j, s);
-        if (result.status === 'fail' || !colour.has(i)) colour.set(i, result.status === 'fail' ? '#ff5c5c' : '#3ddc84');
+        if (result.status === 'fail' || !colour.has(i)) colour.set(i, result.status === 'fail' ? PLATE.red : PLATE.green);
       }
   }
   ctx.lineWidth = r / 3;

@@ -139,13 +139,14 @@ export function exportAll(): Record<string, unknown> {
   } catch {
     // Storage blocked: nothing to export.
   }
-  return { app: 'form-check', version: 1, exportedAt: new Date().toISOString(), data: out };
+  return { app: 'fitee', version: 1, exportedAt: new Date().toISOString(), data: out };
 }
 
 /** Restores a backup made by exportAll. Returns the number of keys restored. */
 export function importAll(backup: unknown): number {
   const b = backup as { app?: string; data?: Record<string, unknown> };
-  if (b?.app !== 'form-check' || !b.data || typeof b.data !== 'object') throw new Error('This isn’t a Form Check backup file.');
+  // Backups made before the rename to fitee say 'form-check'; both restore.
+  if ((b?.app !== 'fitee' && b?.app !== 'form-check') || !b.data || typeof b.data !== 'object') throw new Error('This isn’t a fitee backup file.');
   let n = 0;
   customCache = null;
   resetProfileCache();

@@ -150,7 +150,7 @@ export function ExerciseCards({ w, update, history, unit, technique = [], editin
             ) : (
               e.coachNote && (
                 <p class="coach-note">
-                  <Icon name="spark" size={16} /> {e.coachNote}
+                  <Icon name="spark" size={16} /> <span>{e.coachNote}</span>
                   {e.nextWeight !== undefined && ex?.library && (
                     <a class="link inline-check" href={`#/analyze/${e.exerciseId}`}>
                       <Icon name="camera" size={14} /> Check technique now

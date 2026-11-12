@@ -11,7 +11,7 @@ import { showToast } from '../ui/toast';
 import { Icon } from './icons';
 import { PRIVACY, Screen } from './Layout';
 
-export const APP_VERSION = '0.6';
+export const APP_VERSION = '0.7';
 
 /** Units, data backup and the hidden developer tools. */
 export function SettingsScreen() {
@@ -110,7 +110,7 @@ export function SettingsScreen() {
         {PRIVACY} Your plan, log, profile and settings live only in this browser. Back them up to a file to move them to another phone (saved videos and replays aren’t included in backups).
       </p>
       <div class="stack">
-        <button type="button" class="secondary" onClick={() => downloadJson(`form-check-backup-${new Date().toISOString().slice(0, 10)}.json`, exportAll())}>
+        <button type="button" class="secondary" onClick={() => downloadJson(`fitee-backup-${new Date().toISOString().slice(0, 10)}.json`, exportAll())}>
           Back up my data
         </button>
         <button type="button" class="secondary" onClick={() => file.current?.click()}>
@@ -166,7 +166,7 @@ export function SettingsScreen() {
       </ul>
       <p class="footer small">
         <button type="button" class="link version" onClick={tapVersion}>
-          Form Check {APP_VERSION}
+          fitee {APP_VERSION}
         </button>
       </p>
     </Screen>

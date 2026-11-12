@@ -1,13 +1,13 @@
 // Welcome (first launch: accept the terms), terms of service and privacy
 // policy. The texts describe what the app actually does: no account, no
 // server, everything stays on the device. Keep them in step with the code.
-import { MUSCLE_GROUPS } from '../data/types';
 import { loadProfile, saveProfile, TERMS_VERSION } from '../profile';
 import { navigate } from '../router';
-import { Icon, MuscleIcon } from './icons';
+import { Logo } from '../ui/Logo';
+import { Icon } from './icons';
 import { Screen } from './Layout';
 
-const UPDATED = '8 November 2026';
+const UPDATED = '12 November 2026';
 
 /** First-launch screen. Continuing accepts the terms and privacy policy. */
 export function Welcome({ onDone }: { onDone: () => void }) {
@@ -17,12 +17,11 @@ export function Welcome({ onDone }: { onDone: () => void }) {
     navigate(next);
   };
   return (
-    <Screen title="Welcome to Form Check">
+    <Screen title="Welcome to fitee">
       <section class="hero welcome">
-        <div class="hero-icons" aria-hidden="true">
-          {MUSCLE_GROUPS.slice(0, 5).map((g) => (
-            <MuscleIcon group={g} size={34} />
-          ))}
+        <div class="welcome-brand">
+          <Logo height={44} />
+          <p>Train with a plan, log every set, check your technique.</p>
         </div>
         <ul class="welcome-list">
           <li>
@@ -45,7 +44,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
           Skip for now
         </button>
         <p class="muted small">
-          By continuing you agree to the <a href="#/terms">Terms of service</a> and the <a href="#/privacy">Privacy policy</a>. Form Check gives technique feedback,
+          By continuing you agree to the <a href="#/terms">Terms of service</a> and the <a href="#/privacy">Privacy policy</a>. fitee gives technique feedback,
           not medical advice.
         </p>
       </section>
@@ -57,11 +56,11 @@ export function TermsScreen() {
   return (
     <Screen title="Terms of service" subtitle={`Last updated ${UPDATED}`} back="settings">
       <article class="legal">
-        <p>These terms apply when you use Form Check (“the app”). By using the app you agree to them. If you don’t agree, please don’t use the app.</p>
+        <p>These terms apply when you use fitee (“the app”, formerly called Form Check). By using the app you agree to them. If you don’t agree, please don’t use the app.</p>
 
         <h2>1. What the app does</h2>
         <p>
-          Form Check builds training plans, lets you log workouts, and gives automated technique feedback from your phone’s camera. It runs in your web browser.
+          fitee builds training plans, lets you log workouts, and gives automated technique feedback from your phone’s camera. It runs in your web browser.
           There is no account and no server: your data stays on your device (see the Privacy policy).
         </p>
 
@@ -126,7 +125,7 @@ export function PrivacyScreen() {
     <Screen title="Privacy policy" subtitle={`Last updated ${UPDATED}`} back="settings">
       <article class="legal">
         <p class="lead">
-          Short version: Form Check has no account and no server. Everything you enter, and any video you choose to save, stays in this browser on this device.
+          Short version: fitee has no account and no server. Everything you enter, and any video you choose to save, stays in this browser on this device.
           Nothing is sent to us or to anyone else.
         </p>
 
@@ -150,7 +149,7 @@ export function PrivacyScreen() {
 
         <h2>3. Network requests</h2>
         <p>
-          The app’s files (including the pose model) are downloaded from the website that hosts it, GitHub Pages. GitHub may log technical information, such
+          The app’s files (including the pose model and the font) are downloaded from the website that hosts it, GitHub Pages. GitHub may log technical information, such
           as your IP address, when your browser downloads them; see GitHub’s privacy statement. After that, the app blocks requests to any other server. There
           are no analytics, no advertising, no tracking cookies and no third-party scripts.
         </p>

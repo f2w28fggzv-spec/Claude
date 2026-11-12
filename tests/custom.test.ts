@@ -51,7 +51,8 @@ describe('your own exercises', () => {
   it('logs a bodyweight exercise of your own as BW + added weight', () => {
     const c = newCustomExercise('Ring dip', 'bodyweight', ['triceps', 'chest']);
     saveCustomExercise(c);
-    const w = tick(addExercise(emptyWorkout(), c.id), [{ reps: 10 }, { weight: 10, reps: 6 }]);
+    // Fixed start date: the week counted below must contain it, whatever today is.
+    const w = tick(addExercise(emptyWorkout(new Date('2026-11-02T18:00:00')), c.id), [{ reps: 10 }, { weight: 10, reps: 6 }]);
     const done = finishWorkout(w, new Date('2026-11-02T19:00:00'), 75);
     expect(done.entries[0].sets.every((s) => s.bw)).toBe(true);
     expect(done.bodyweight).toBe(75);

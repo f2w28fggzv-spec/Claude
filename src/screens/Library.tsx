@@ -14,6 +14,7 @@ import {
 } from '../data/filters';
 import { LEVELS, MUSCLE_GROUPS, MUSCLE_LABELS } from '../data/types';
 import { loadGroups, loadLibraryFilters, saveLibraryFilters } from '../storage';
+import { groupStyle } from '../ui/brand';
 import { Icon, MuscleIcon } from './icons';
 import { Screen } from './Layout';
 
@@ -67,7 +68,13 @@ export function Library() {
           All
         </button>
         {order.map((g) => (
-          <button type="button" class={`filter ${filters.muscle === g ? 'on' : ''}`} aria-pressed={filters.muscle === g} onClick={() => update({ muscle: g })}>
+          <button
+            type="button"
+            class={`filter group ${filters.muscle === g ? 'on' : ''}`}
+            style={groupStyle(g)}
+            aria-pressed={filters.muscle === g}
+            onClick={() => update({ muscle: g })}
+          >
             <MuscleIcon group={g} size={12} />
             {MUSCLE_LABELS[g]}
           </button>
