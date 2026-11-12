@@ -43,7 +43,7 @@ export function ProfileScreen({ setup = false }: { setup?: boolean }) {
         : undefined
       : num(cm);
     const a = num(age);
-    if (a !== undefined && (a < 13 || a > 110)) return showToast('Form Check is for people aged 13 and over');
+    if (a !== undefined && (a < 13 || a > 110)) return showToast('fitee is for people aged 13 and over');
     const w = num(weight);
     if (w !== undefined && (w <= 0 || fromUnit(w, unit) > 400)) return showToast('Check your body weight');
     const next: Profile = {
@@ -121,7 +121,7 @@ export function ProfileScreen({ setup = false }: { setup?: boolean }) {
       <div class="figure-choice" role="radiogroup" aria-label="Body drawing">
         {(['female', 'male'] as const).map((f) => (
           <button type="button" role="radio" aria-checked={shownFigure === f} class={shownFigure === f ? 'on' : ''} onClick={() => setFigure(f)}>
-            <BodyFigure view="front" figure={f} class="muscle-icon" muscleClass={(g) => (g === 'chest' || g === 'quads' ? 'mi-on' : 'mi-off')} />
+            <BodyFigure view="front" figure={f} class="muscle-icon" muscleClass={(g) => (g === 'chest' ? 'mi-on push' : g === 'quads' ? 'mi-on legs' : 'mi-off')} />
             <span>{f === 'female' ? 'Female body' : 'Male body'}</span>
           </button>
         ))}

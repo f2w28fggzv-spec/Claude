@@ -1,6 +1,7 @@
 // Inline SVG icons (no icon font or third-party assets, so nothing is fetched).
 import type { JSX } from 'preact';
 import type { MuscleGroup } from '../data/types';
+import { groupStyle } from '../ui/brand';
 import { BodyFigure, VIEW_OF } from './anatomy';
 
 type Shape = JSX.Element;
@@ -9,9 +10,17 @@ type Shape = JSX.Element;
 // The anatomical figure (see anatomy.tsx) with one group highlighted, shown
 // from the side that shows that group best.
 
-/** Human figure with one muscle group highlighted (front or back view). */
+/** Human figure with one muscle group highlighted in its plate colour (front or back view). */
 export function MuscleIcon({ group, size = 64 }: { group: MuscleGroup; size?: number }) {
-  return <BodyFigure view={VIEW_OF[group]} class="muscle-icon" width={size} muscleClass={(g) => (g === group ? 'mi-on' : 'mi-off')} />;
+  return (
+    <BodyFigure
+      view={VIEW_OF[group]}
+      class="muscle-icon"
+      width={size}
+      style={groupStyle(group)}
+      muscleClass={(g) => (g === group ? 'mi-on' : 'mi-off')}
+    />
+  );
 }
 
 // ── Line icons ────────────────────────────────────────────────────────────
@@ -111,8 +120,9 @@ const ICONS = {
   trash: <path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" />,
   settings: (
     <>
-      <circle cx={12} cy={12} r={3} />
-      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+      <path d="M4 7h8.5M17.5 7H20M4 17h2.5M11.5 17H20" />
+      <circle cx={15} cy={7} r={2.5} />
+      <circle cx={9} cy={17} r={2.5} />
     </>
   ),
   close: <path d="M6 6l12 12M18 6L6 18" />,

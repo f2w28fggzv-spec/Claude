@@ -101,17 +101,20 @@ interface FigureProps {
   /** Called with a muscle's group when it is tapped. */
   onPick?: (group: MuscleGroup) => void;
   class?: string;
+  /** Inline style on the svg (e.g. CSS variables). */
+  style?: Record<string, string>;
   width?: number;
   label?: string;
   children?: JSX.Element | JSX.Element[];
 }
 
 /** One view of the figure with every muscle drawn and classed or shaded by its group. */
-export function BodyFigure({ view, figure = figureOf(loadProfile()), muscleClass, muscleFill, onPick, class: cls = '', width, label, children }: FigureProps) {
+export function BodyFigure({ view, figure = figureOf(loadProfile()), muscleClass, muscleFill, onPick, class: cls = '', style, width, label, children }: FigureProps) {
   const [x, y, w, h] = BOX[figure][view];
   return (
     <svg
       class={`anatomy ${cls}`}
+      style={style}
       viewBox={`${x} ${y} ${w} ${h}`}
       width={width}
       height={width ? (width * h) / w : undefined}

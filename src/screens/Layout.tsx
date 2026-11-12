@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { Logo } from '../ui/Logo';
 import { Icon, type IconName } from './icons';
 
 export type Tab = 'plan' | 'log' | 'exercises';
@@ -23,6 +24,16 @@ export function Screen(props: ScreenProps) {
   return (
     <>
       <main class={pad}>
+        {props.tab && props.back === undefined && (
+          <div class="brandbar">
+            <a href="#/" aria-label="fitee, Train tab" class="brand-link">
+              <Logo height={20} />
+            </a>
+            <a class="icon-btn" href="#/settings" aria-label="Settings">
+              <Icon name="settings" size={20} />
+            </a>
+          </div>
+        )}
         <header class="top">
           {props.back !== undefined && (
             <a class="back" href={`#/${props.back}`} aria-label="Back">

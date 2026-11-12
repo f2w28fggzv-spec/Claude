@@ -7,6 +7,7 @@ import { finished } from '../log/stats';
 import { loadCustomExercises, loadWorkouts, saveCustomExercise } from '../log/store';
 import type { CustomExercise } from '../log/types';
 import { showToast } from '../ui/toast';
+import { groupStyle } from '../ui/brand';
 import { Icon, MuscleIcon } from './icons';
 
 type View = { kind: 'list' } | { kind: 'form'; editing?: CustomExercise; name: string };
@@ -105,7 +106,7 @@ export function ExercisePicker({ onPick, onClose, title = 'Add exercise' }: { on
               All
             </button>
             {MUSCLE_GROUPS.map((g) => (
-              <button type="button" class={`filter ${muscle === g ? 'on' : ''}`} aria-pressed={muscle === g} onClick={() => setMuscle(g)}>
+              <button type="button" class={`filter group ${muscle === g ? 'on' : ''}`} style={groupStyle(g)} aria-pressed={muscle === g} onClick={() => setMuscle(g)}>
                 <MuscleIcon group={g} size={12} />
                 {MUSCLE_LABELS[g]}
               </button>
@@ -245,7 +246,7 @@ function CustomForm({
       <h3>Main muscles (optional)</h3>
       <div class="chip-wrap">
         {MUSCLE_GROUPS.map((g) => (
-          <button type="button" class={`filter ${picked.includes(g) ? 'on' : ''}`} aria-pressed={picked.includes(g)} onClick={() => toggle(g)}>
+          <button type="button" class={`filter group ${picked.includes(g) ? 'on' : ''}`} style={groupStyle(g)} aria-pressed={picked.includes(g)} onClick={() => toggle(g)}>
             <MuscleIcon group={g} size={12} />
             {MUSCLE_LABELS[g]}
           </button>

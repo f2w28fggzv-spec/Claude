@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'preact/hooks';
 import { getExercise } from '../data/exercises';
 import { isBodyweight } from '../data/filters';
-import { MUSCLE_GROUPS, MUSCLE_LABELS } from '../data/types';
+import { MUSCLE_LABELS, type MuscleGroup } from '../data/types';
 import { addCorrective, easyWeekActive, insights, nextDayIndex, planSuggestion, startEasyWeek, type Insight } from '../log/coach';
 import { emptyWorkout, repeatWorkout, startFromPlan, startRoutine } from '../log/session';
 import { dayKey, exerciseHistory, finished, formatWeight, weekStart, workoutsByDay } from '../log/stats';
@@ -20,6 +20,8 @@ import { PlanDays, planSubtitle } from './ProgramView';
 import { RenameSheet } from './RenameSheet';
 
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+/** One group per plate colour: legs red, pull blue, push yellow, core green. */
+const HERO_GROUPS: MuscleGroup[] = ['quads', 'back', 'chest', 'core'];
 const elapsed = (iso: string) => Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
@@ -109,8 +111,8 @@ function CoachToday({ workouts, technique, unit, begin, refresh, useOwn }: PaneP
       <>
         <section class="hero">
           <div class="hero-icons" aria-hidden="true">
-            {MUSCLE_GROUPS.slice(0, 5).map((g) => (
-              <MuscleIcon group={g} size={34} />
+            {HERO_GROUPS.map((g) => (
+              <MuscleIcon group={g} size={46} />
             ))}
           </div>
           <h2>Get a plan built for you</h2>
@@ -254,6 +256,11 @@ function SelfToday({ workouts, technique, unit, begin }: PaneProps) {
   return (
     <>
       <section class="card self-start">
+        <span class="plates" aria-hidden="true">
+          {(['red', 'blue', 'yellow', 'green'] as const).map((c, i) => (
+            <i style={{ background: `var(--${c})`, height: i === 1 || i === 2 ? '30px' : '22px' }} />
+          ))}
+        </span>
         <h2>Log a workout</h2>
         <p class="muted small">Add exercises as you go: weight and reps, or body weight plus any added weight.</p>
         <button type="button" class="big" onClick={() => begin(emptyWorkout())}>
