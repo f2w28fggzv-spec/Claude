@@ -5,14 +5,17 @@ import { deleteAll, exportAll, importAll, loadBodyweight, loadUnit, saveUnit } f
 import { ageOf, formatHeight, loadProfile } from '../profile';
 import { deleteAllSets, deleteAllVideos, loadSets } from '../sets/sets';
 import type { Unit } from '../log/types';
-import { navigate } from '../router';
+import { lastTab, navigate } from '../router';
 import { loadTheme, saveTheme, type ThemePref } from '../theme';
 import { downloadJson } from '../ui/download';
 import { showToast } from '../ui/toast';
 import { Icon, type IconName } from './icons';
-import { PRIVACY, Screen } from './Layout';
+import { PRIVACY, Screen, type Tab } from './Layout';
 
 export const APP_VERSION = '0.8';
+
+/** Settings opens from every tab; back returns to the one you came from. */
+const TAB_OF = { '': 'plan', log: 'log', library: 'exercises' } as const satisfies Record<string, Tab>;
 
 const THEMES: { id: ThemePref; label: string; icon: IconName }[] = [
   { id: 'system', label: 'Automatic', icon: 'phone' },
@@ -24,6 +27,7 @@ const THEMES: { id: ThemePref; label: string; icon: IconName }[] = [
 export function SettingsScreen() {
   const [unit, setUnit] = useState<Unit>(loadUnit);
   const [theme, setTheme] = useState<ThemePref>(loadTheme);
+  const from = lastTab();
   const file = useRef<HTMLInputElement>(null);
   const taps = useRef<number[]>([]);
 
@@ -67,7 +71,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <Screen title="Settings" back="log" tab="log">
+    <Screen title="Settings" back={from} tab={TAB_OF[from]}>
       <h2 class="field">Weight unit</h2>
       <div class="segmented-2">
         {(['kg', 'lb'] as const).map((u) => (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { exerciseName } from '../log/exercises';
 import { formRating, formText } from '../log/form';
 import { dayKey, exerciseHistory, finished, formatSetShort, formatWeight, toUnit, weekStart, weekStreak, workoutMinutes, workoutSets, workoutVolume, workoutsByDay } from '../log/stats';
@@ -13,14 +13,26 @@ import { Icon } from './icons';
 import { Screen } from './Layout';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const fromKey = (k: string) => new Date(Number(k.slice(0, 4)), Number(k.slice(5, 7)) - 1, Number(k.slice(8, 10)));
+
+// The day whose sheet was open when you followed a link out of it (a
+// workout, a replay), so coming back to the Log tab shows it again.
+let reopenDay: string | null = null;
 
 /** Log tab: calendar of training days, monthly stats and progress per exercise. */
 export function LogScreen() {
   const workouts = useMemo(loadWorkouts, []);
   const unit = useMemo(loadUnit, []);
   const today = new Date();
-  const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(() => {
+    const day = reopenDay;
+    reopenDay = null;
+    return day;
+  });
+  const [month, setMonth] = useState(() => {
+    const d = selected ? fromKey(selected) : today;
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
   const [weekOf, setWeekOf] = useState(() => new Date());
   const plan = useMemo(() => (loadMode() === 'self' ? null : (loadPrograms()[0] ?? null)), []);
   const thisWeek = dayKey(weekStart(weekOf)) === dayKey(weekStart(today));
@@ -42,8 +54,7 @@ export function LogScreen() {
     return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth();
   });
   const volume = inMonth.reduce((s, w) => s + workoutVolume(w), 0);
-  const selectedDate = selected ? new Date(Number(selected.slice(0, 4)), Number(selected.slice(5, 7)) - 1, Number(selected.slice(8, 10))) : null;
-  const shown: Workout[] = selected ? (byDay.get(selected) ?? []) : finished(workouts).slice(0, 6);
+  const recent: Workout[] = finished(workouts).slice(0, 6);
 
   const exercises = [...new Set(finished(workouts).flatMap((w) => w.entries.map((e) => e.exerciseId)))];
 
@@ -80,7 +91,8 @@ export function LogScreen() {
                   selected === dayKey(c) ? 'sel' : '',
                 ].join(' ')}
                 aria-label={`${c.toLocaleDateString()}${byDay.has(dayKey(c)) ? ', trained' : ''}`}
-                onClick={() => setSelected(selected === dayKey(c) ? null : dayKey(c))}
+                aria-haspopup="dialog"
+                onClick={() => setSelected(dayKey(c))}
               >
                 {c.getDate()}
               </button>
@@ -121,19 +133,15 @@ export function LogScreen() {
         <BodyHeatmap weeks={weekMuscles(workouts, plan, weekOf)} />
       </section>
 
-      <h2>{selectedDate ? selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : 'Recent workouts'}</h2>
-      {(!selected || selected <= dayKey(today)) && (
-        <a class="button secondary log-past" href={`#/edit/new${selected ? `?date=${selected}` : ''}`}>
-          <Icon name="plus" size={18} /> {selected ? (selected === dayKey(today) ? 'Log a workout for today' : 'Log a workout for this day') : 'Log a past workout'}
-        </a>
-      )}
-      {selected ? (
-        <DayDetail workouts={shown} sets={sets.filter((m) => dayKey(m.at) === selected)} unit={unit} />
-      ) : shown.length === 0 ? (
+      <h2>Recent workouts</h2>
+      <a class="button secondary log-past" href="#/edit/new">
+        <Icon name="plus" size={18} /> Log a past workout
+      </a>
+      {recent.length === 0 ? (
         <p class="muted">No workouts yet. Start one from the Train tab, or log one you’ve already done.</p>
       ) : (
         <ul class="rows card">
-          {shown.map((w, i) => (
+          {recent.map((w, i) => (
             <li style={{ '--i': String(i) }}>
               <a href={`#/session/${w.id}`}>
                 <span class="row-main">
@@ -180,7 +188,71 @@ export function LogScreen() {
           <Icon name="settings" size={14} /> Settings and data
         </a>
       </p>
+
+      {selected && (
+        <DaySheet
+          day={selected}
+          workouts={byDay.get(selected) ?? []}
+          sets={sets.filter((m) => dayKey(m.at) === selected)}
+          unit={unit}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </Screen>
+  );
+}
+
+/** Bottom sheet for a tapped calendar day: its workouts, sets, notes and technique checks. */
+function DaySheet({ day, workouts, sets, unit, onClose }: { day: string; workouts: Workout[]; sets: SavedSetMeta[]; unit: Unit; onClose: () => void }) {
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    close.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    document.body.classList.add('no-scroll');
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.classList.remove('no-scroll');
+    };
+  }, []);
+  const date = fromKey(day);
+  const label = date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const done = finished(workouts);
+  const totalSets = done.reduce((n, w) => n + workoutSets(w), 0);
+  const isToday = day === dayKey(new Date());
+  return (
+    <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div
+        class="sheet day-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        onClick={(e) => {
+          // Following a link out of the sheet: show this day again on return.
+          if ((e.target as Element).closest('a[href^="#/"]')) reopenDay = day;
+        }}
+      >
+        <header class="sheet-head">
+          <h2>{label}</h2>
+          <button type="button" class="link" ref={close} onClick={onClose}>
+            Close
+          </button>
+        </header>
+        <p class="muted small day-summary">
+          {done.length
+            ? `${done.length} workout${done.length === 1 ? '' : 's'} · ${totalSets} sets · ${formatWeight(done.reduce((v, w) => v + workoutVolume(w), 0), unit)}`
+            : sets.length
+              ? 'No workout logged, but you checked your technique.'
+              : 'No workout logged this day.'}
+        </p>
+        <DayDetail workouts={done} sets={sets} unit={unit} />
+        {day <= dayKey(new Date()) && (
+          <a class="button secondary log-past" href={`#/edit/new?date=${day}`}>
+            <Icon name="plus" size={18} /> {isToday ? 'Log a workout for today' : 'Log a workout for this day'}
+          </a>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -237,7 +309,6 @@ function DayDetail({ workouts, sets, unit }: { workouts: Workout[]; sets: SavedS
   const others = sets.filter((m) => !used.has(m.id));
   return (
     <>
-      {workouts.length === 0 && others.length === 0 && <p class="muted">No workout logged this day.</p>}
       {cards}
       {others.length > 0 && (
         <section class="card">

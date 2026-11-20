@@ -39,6 +39,23 @@ const depthOf = (r: Route) => DEPTH[r.path[0] ?? ''] ?? 1;
 
 export type NavDirection = 'forward' | 'back' | 'tab';
 
+/** The three tab screens, by route ('' = Train). */
+export type TabRoute = '' | 'log' | 'library';
+const TAB_ROUTES: readonly string[] = ['', 'log', 'library'];
+let lastTabRoute: TabRoute = '';
+
+/** Remembers the tab screen a route belongs to, if it is one. */
+export function rememberTab(route: Route): void {
+  const p = route.path[0] ?? '';
+  if (route.path.length <= 1 && TAB_ROUTES.includes(p)) lastTabRoute = p as TabRoute;
+}
+
+/**
+ * The tab the user was last on. Screens reached from every tab (Settings)
+ * go back to it instead of a fixed tab. Kept in memory only.
+ */
+export const lastTab = (): TabRoute => lastTabRoute;
+
 export function navDirection(from: Route, to: Route): NavDirection {
   const a = depthOf(from);
   const b = depthOf(to);
@@ -62,13 +79,18 @@ type ViewTransitionDoc = Document & {
 };
 
 export function useRoute(): Route {
-  const [route, setRoute] = useState(parse);
+  const [route, setRoute] = useState(() => {
+    const first = parse();
+    rememberTab(first);
+    return first;
+  });
   const current = useRef(route);
   const shownHash = useRef(location.hash);
   useEffect(() => {
     const on = () => {
       shownHash.current = location.hash;
       const next = parse();
+      rememberTab(next);
       const dir = navDirection(current.current, next);
       current.current = next;
       document.documentElement.dataset.nav = dir;
