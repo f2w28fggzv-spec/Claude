@@ -121,7 +121,7 @@ export function ProfileScreen({ setup = false }: { setup?: boolean }) {
       <div class="figure-choice" role="radiogroup" aria-label="Body drawing">
         {(['female', 'male'] as const).map((f) => (
           <button type="button" role="radio" aria-checked={shownFigure === f} class={shownFigure === f ? 'on' : ''} onClick={() => setFigure(f)}>
-            <BodyFigure view="front" figure={f} class="muscle-icon" muscleClass={(g) => (g === 'chest' ? 'mi-on push' : g === 'quads' ? 'mi-on legs' : 'mi-off')} />
+            <BodyFigure view="front" figure={f} class="muscle-icon" muscleClass={(g) => (g === 'chest' || g === 'quads' ? 'mi-on' : 'mi-off')} />
             <span>{f === 'female' ? 'Female body' : 'Male body'}</span>
           </button>
         ))}

@@ -6,16 +6,24 @@ import { ageOf, formatHeight, loadProfile } from '../profile';
 import { deleteAllSets, deleteAllVideos, loadSets } from '../sets/sets';
 import type { Unit } from '../log/types';
 import { navigate } from '../router';
+import { loadTheme, saveTheme, type ThemePref } from '../theme';
 import { downloadJson } from '../ui/download';
 import { showToast } from '../ui/toast';
-import { Icon } from './icons';
+import { Icon, type IconName } from './icons';
 import { PRIVACY, Screen } from './Layout';
 
-export const APP_VERSION = '0.7';
+export const APP_VERSION = '0.8';
 
-/** Units, data backup and the hidden developer tools. */
+const THEMES: { id: ThemePref; label: string; icon: IconName }[] = [
+  { id: 'system', label: 'Automatic', icon: 'phone' },
+  { id: 'light', label: 'Light', icon: 'sun' },
+  { id: 'dark', label: 'Dark', icon: 'moon' },
+];
+
+/** Units, appearance, data backup and the hidden developer tools. */
 export function SettingsScreen() {
   const [unit, setUnit] = useState<Unit>(loadUnit);
+  const [theme, setTheme] = useState<ThemePref>(loadTheme);
   const file = useRef<HTMLInputElement>(null);
   const taps = useRef<number[]>([]);
 
@@ -69,6 +77,25 @@ export function SettingsScreen() {
           </button>
         ))}
       </div>
+
+      <h2 class="field">Appearance</h2>
+      <div class="segmented-3 theme-choice" role="radiogroup" aria-label="Appearance">
+        {THEMES.map((t) => (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={theme === t.id}
+            class={theme === t.id ? 'on' : ''}
+            onClick={() => {
+              setTheme(t.id);
+              saveTheme(t.id);
+            }}
+          >
+            <Icon name={t.icon} size={18} /> {t.label}
+          </button>
+        ))}
+      </div>
+      <p class="muted small">Automatic follows your phone’s light or dark setting.</p>
 
       <h2 class="field">Profile</h2>
       <ul class="rows card">

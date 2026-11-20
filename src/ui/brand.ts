@@ -1,44 +1,42 @@
-// fitee brand colours. The four plate colours come from the logo (a barbell
-// with red, blue, yellow and green plates); Ink is the type colour. The same
-// values are CSS variables in style.css (--red, --blue, --yellow, --green, --ink).
-import type { MuscleGroup } from '../data/types';
+// fitee "heat" palette, from the user's two brand sheets: Paper (light) and
+// Molten (dark). Four plates run hot from amber to red; Ink / Chrome are the
+// type colours. The same values are CSS variables in style.css, defined per
+// theme; this file holds the ones drawn on canvas and in static icons.
 
-export const PLATE = {
-  red: '#D7262B',
-  blue: '#1F57C3',
-  yellow: '#F7C42B',
-  green: '#1E9A55',
+/** Light theme ("Paper"). */
+export const PAPER = {
+  amber: '#F2A21A',
+  orange: '#EC7518',
+  flame: '#DD4A1B',
+  red: '#B5241D',
+  oxblood: '#7A1A16',
+  paper: '#FFF9F4',
+  ink: '#1E1412',
+  bar: '#A8A099',
+  collar: '#6B625B',
 } as const;
-export const INK = '#17181C';
 
-export type Plate = keyof typeof PLATE;
+/** Dark theme ("Molten"). */
+export const MOLTEN = {
+  amber: '#F7B23B',
+  orange: '#F48A32',
+  flame: '#EF6235',
+  red: '#E5443A',
+  crimson: '#C9303D',
+  bronze: '#B08D57',
+  chrome: '#D9DDE1',
+  oxide: '#1B1D20',
+  bar: '#9DA1A6',
+} as const;
 
 /**
- * Each muscle group keeps one plate colour everywhere it appears (tiles,
- * chips, icons), grouped the way lifters split training: legs red, pull
- * blue, push yellow, core green.
+ * Colours drawn over camera video and replays (always on black, whatever the
+ * theme): the skeleton in amber, unreliable landmarks in red, and result
+ * rings green for a passed check and red for a fault.
  */
-export const GROUP_PLATE: Record<MuscleGroup, Plate> = {
-  quads: 'red',
-  hamstrings: 'red',
-  glutes: 'red',
-  calves: 'red',
-  back: 'blue',
-  biceps: 'blue',
-  chest: 'yellow',
-  shoulders: 'yellow',
-  triceps: 'yellow',
-  core: 'green',
-};
-
-/** Text colour that reads on a filled plate (WCAG AA): white on red and blue, ink on yellow and green. */
-export const ON_PLATE: Record<Plate, string> = { red: '#FFFFFF', blue: '#FFFFFF', yellow: INK, green: INK };
-/** Same for large text (19px+ bold, 3:1): white also works on green. */
-export const ON_PLATE_LARGE: Record<Plate, string> = { ...ON_PLATE, green: '#FFFFFF' };
-
-/** Inline CSS variables for an element coloured by a muscle group (`--g` fill, `--g-on` / `--g-on-lg` text on it). */
-export const groupStyle = (g: MuscleGroup): Record<string, string> => ({
-  '--g': PLATE[GROUP_PLATE[g]],
-  '--g-on': ON_PLATE[GROUP_PLATE[g]],
-  '--g-on-lg': ON_PLATE_LARGE[GROUP_PLATE[g]],
-});
+export const ON_VIDEO = {
+  bone: MOLTEN.amber,
+  weak: MOLTEN.red,
+  pass: '#6CCB94',
+  fail: MOLTEN.red,
+} as const;

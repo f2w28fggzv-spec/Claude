@@ -2,7 +2,6 @@ import { useState } from 'preact/hooks';
 import { MUSCLE_GROUPS, MUSCLE_LABELS, type MuscleGroup } from '../data/types';
 import { navigate } from '../router';
 import { loadGroups, saveGroups } from '../storage';
-import { groupStyle } from '../ui/brand';
 import { Icon, MuscleIcon } from './icons';
 import { Screen } from './Layout';
 
@@ -35,7 +34,7 @@ export function Groups() {
             <button
               type="button"
               class={`muscle-tile ${on ? 'on' : ''}`}
-              style={{ '--i': String(i), ...groupStyle(g) }}
+              style={{ '--i': String(i) }}
               aria-pressed={on}
               onClick={() => toggle(g)}
             >
