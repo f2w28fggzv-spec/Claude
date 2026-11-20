@@ -20,7 +20,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
     <Screen title="Welcome to fitee">
       <section class="hero welcome">
         <div class="welcome-brand">
-          <Logo height={44} />
+          <Logo height={46} heat />
           <p>Train with a plan, log every set, check your technique.</p>
         </div>
         <ul class="welcome-list">

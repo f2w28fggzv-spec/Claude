@@ -5,24 +5,39 @@ import { BodyFigure } from './anatomy';
 
 const fmt = (n: number) => String(Math.round(n * 2) / 2);
 
-// One colour, blended from the untrained muscle grey to plate green by how
-// much of the weekly target a group got. Any training at all starts at 30% so
-// a single set is visible; the target (or more) is full strength.
-const OFF: [number, number, number] = [0xcd, 0xd1, 0xd7];
-const ON: [number, number, number] = [0x1e, 0x9a, 0x55];
+// A heat map: untrained muscles stay grey; any training starts at amber and
+// gets hotter (orange, flame, red) as the group nears its weekly target. One
+// colour family (the brand's four plates), so "more" always reads as "hotter".
+// The stops are theme variables, so the map follows light and dark.
 const START = 0.3;
-const hex = (c: number[]) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
-const mix = (t: number) => hex(OFF.map((o, i) => o + (ON[i] - o) * t));
+const STOPS = ['var(--amber)', 'var(--orange)', 'var(--flame)', 'var(--red)'];
 
 /** Shading strength 0–1 for a group's week. */
 export function heatStrength(w: Pick<MuscleWeek, 'sets' | 'share'> | undefined): number {
   if (!w || w.sets <= 0) return 0;
   return START + (1 - START) * Math.min(1, w.share);
 }
-export const heatColour = (w: Pick<MuscleWeek, 'sets' | 'share'> | undefined) => mix(heatStrength(w));
+/** CSS colour for a group's week: `var(--hm0)` untrained, else a blend between two heat stops. */
+export function heatColour(w: Pick<MuscleWeek, 'sets' | 'share'> | undefined): string {
+  return heatAt(heatStrength(w));
+}
+
+/** CSS colour at a shading strength (0 = untrained, START..1 = amber to red). */
+export function heatAt(strength: number): string {
+  if (strength <= 0) return 'var(--hm0)';
+  const t = (Math.max(START, Math.min(1, strength)) - START) / (1 - START) * (STOPS.length - 1);
+  const i = Math.min(STOPS.length - 2, Math.floor(t));
+  const f = Math.round((t - i) * 100);
+  if (f === 0) return STOPS[i];
+  if (f === 100) return STOPS[i + 1];
+  return `color-mix(in oklab, ${STOPS[i + 1]} ${f}%, ${STOPS[i]})`;
+}
+
+/** Legend: untrained grey, then the four heat stops. */
+const LEGEND = 'linear-gradient(90deg, var(--hm0) 0%, var(--hm0) 8%, var(--amber) 12%, var(--orange) 41%, var(--flame) 70%, var(--red) 100%)';
 
 /**
- * Front and back of the body, each muscle group shaded greener the more of
+ * Front and back of the body, each muscle group shaded hotter the more of
  * its weekly set target it got. Tap a muscle or a row for its sets and the
  * exercises that trained it; the list is the same data as text.
  */
@@ -76,7 +91,7 @@ export function BodyHeatmap({ weeks, compact = false }: { weeks: MuscleWeek[]; c
       </div>
       <div class="heat-scale" aria-hidden="true">
         <span>Not trained</span>
-        <i style={{ background: `linear-gradient(90deg, ${mix(0)} 0%, ${mix(0)} 8%, ${mix(START)} 12%, ${mix(1)} 100%)` }} />
+        <i style={{ background: LEGEND }} />
         <span>Weekly target</span>
       </div>
       <p class="heat-detail" aria-live="polite">
@@ -90,7 +105,7 @@ export function BodyHeatmap({ weeks, compact = false }: { weeks: MuscleWeek[]; c
         ) : (
           <>
             <strong>{summary}</strong>
-            <small>The more sets a muscle gets, the greener it is. Tap one for details.</small>
+            <small>The more sets a muscle gets, the hotter it glows. Tap one for details.</small>
           </>
         )}
       </p>

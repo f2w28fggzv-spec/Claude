@@ -20,7 +20,7 @@ import { PlanDays, planSubtitle } from './ProgramView';
 import { RenameSheet } from './RenameSheet';
 
 const DOW = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-/** One group per plate colour: legs red, pull blue, push yellow, core green. */
+/** A few groups to show on the empty Train tab. */
 const HERO_GROUPS: MuscleGroup[] = ['quads', 'back', 'chest', 'core'];
 const elapsed = (iso: string) => Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -257,8 +257,8 @@ function SelfToday({ workouts, technique, unit, begin }: PaneProps) {
     <>
       <section class="card self-start">
         <span class="plates" aria-hidden="true">
-          {(['red', 'blue', 'yellow', 'green'] as const).map((c, i) => (
-            <i style={{ background: `var(--${c})`, height: i === 1 || i === 2 ? '30px' : '22px' }} />
+          {[1, 2, 3, 4].map((n) => (
+            <i class={`lm-p${n}`} />
           ))}
         </span>
         <h2>Log a workout</h2>

@@ -5,6 +5,10 @@ import { render } from 'preact';
 import '@fontsource-variable/bricolage-grotesque/opsz.css';
 import './style.css';
 import { App } from './app';
+import { applyTheme } from './theme';
+
+// Light or dark as chosen in Settings (default: follow the phone).
+applyTheme();
 
 // Browsers with the View Transitions API animate navigation natively; the
 // CSS fallback animation is only used without it.

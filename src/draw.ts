@@ -1,12 +1,12 @@
 import { PoseLandmarker, type NormalizedLandmark } from '@mediapipe/tasks-vision';
-import { PLATE } from './ui/brand';
+import { ON_VIDEO } from './ui/brand';
 
 /** Below this visibility a landmark is drawn as unreliable. */
 export const MIN_VISIBILITY = 0.5;
 
-// Plate green and plate red from the fitee palette (src/ui/brand.ts).
-const GOOD = PLATE.green;
-const WEAK = PLATE.red;
+// Drawn over video, so the same in both themes (src/ui/brand.ts).
+const GOOD = ON_VIDEO.bone;
+const WEAK = ON_VIDEO.weak;
 
 export function drawSkeleton(
   ctx: CanvasRenderingContext2D,

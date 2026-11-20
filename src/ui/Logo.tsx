@@ -1,33 +1,33 @@
-// fitee logo: a barbell with four plates (red, blue | yellow, green) on a
-// grey bar, and the wordmark in Bricolage Grotesque ExtraBold. The same mark
-// is drawn in public/favicon.svg and the app icons.
-import { INK, PLATE } from './brand';
+// fitee logo: four plates side by side (amber, orange, flame, red) between
+// two collars on a bar, and the wordmark in Bricolage Grotesque ExtraBold.
+// Colours come from CSS (`.lm-*`, `.wm-*`), so the mark follows the theme.
+// public/favicon.svg and the app icons draw the same mark.
 
-const BAR = '#A2A7AF';
-const COLLAR = '#6E737B';
-
-/** The barbell mark on its own (twice as wide as it is tall). */
+/** The barbell mark on its own (1.28 × as wide as it is tall). */
 export function LogoMark({ height = 24 }: { height?: number }) {
   return (
-    <svg class="logo-mark" viewBox="0 0 64 32" width={height * 2} height={height} aria-hidden="true">
-      <rect x={1} y={14.5} width={62} height={3} rx={1.5} fill={BAR} />
-      <rect x={9} y={7} width={5.5} height={18} rx={1.6} fill={PLATE.red} />
-      <rect x={15.5} y={3} width={5.5} height={26} rx={1.6} fill={PLATE.blue} />
-      <rect x={22} y={11.5} width={2.5} height={9} rx={1} fill={COLLAR} />
-      <rect x={39.5} y={11.5} width={2.5} height={9} rx={1} fill={COLLAR} />
-      <rect x={43} y={3} width={5.5} height={26} rx={1.6} fill={PLATE.yellow} />
-      <rect x={49.5} y={7} width={5.5} height={18} rx={1.6} fill={PLATE.green} />
+    <svg class="logo-mark" viewBox="0 0 128 100" width={height * 1.28} height={height} aria-hidden="true">
+      <rect class="lm-bar" x={0} y={45.5} width={128} height={9} rx={4.5} />
+      <rect class="lm-collar" x={2} y={28} width={8} height={44} rx={2} />
+      <rect class="lm-p1" x={14} y={0} width={14} height={100} rx={7} />
+      <rect class="lm-p2" x={31} y={0} width={14} height={100} rx={7} />
+      <rect class="lm-p3" x={48} y={0} width={14} height={100} rx={7} />
+      <rect class="lm-p4" x={65} y={0} width={14} height={100} rx={7} />
+      <rect class="lm-collar" x={83} y={28} width={8} height={44} rx={2} />
     </svg>
   );
 }
 
-/** Mark + wordmark. `height` is the mark's height; the wordmark scales with it. */
-export function Logo({ height = 24, stacked = false }: { height?: number; stacked?: boolean }) {
+/**
+ * Mark + wordmark. `height` is the mark's height; the wordmark scales with it.
+ * `heat` colours each letter from amber to red, like the brand sheet's hero.
+ */
+export function Logo({ height = 24, heat = false, mark = true }: { height?: number; heat?: boolean; mark?: boolean }) {
   return (
-    <span class={`logo ${stacked ? 'stacked' : ''}`} role="img" aria-label="fitee" style={{ '--logo-h': `${height}px`, color: INK }}>
-      <LogoMark height={height} />
+    <span class={`logo ${heat ? 'heat' : ''}`} role="img" aria-label="fitee" style={{ '--logo-h': `${height}px` }}>
+      {mark && <LogoMark height={height} />}
       <span class="wordmark" aria-hidden="true">
-        fitee
+        {heat ? ['f', 'i', 't', 'e', 'e'].map((c, i) => <span class={`wm-${i + 1}`}>{c}</span>) : 'fitee'}
       </span>
     </span>
   );
