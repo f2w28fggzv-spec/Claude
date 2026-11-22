@@ -217,7 +217,6 @@ export function swing(): Demo {
 export function nordic(): Demo {
   // Shins flat on the floor (their front on it), feet pointed back.
   const knee: Vec = { x: 0, y: FLOOR - BODY.shinFront };
-  const ankle = along(knee, 270, L.shin);
   const lowest = 66; // body lean at the turnaround
   return {
     view: 'side',
@@ -251,28 +250,23 @@ export function lyingLegCurl(): Demo {
   const thigh = 270 - (Math.asin((BODY.torsoFront - BODY.thighFront) / L.thigh) * 180) / Math.PI;
   const knee = along(hip, thigh, L.thigh);
   const shoulder = along(hip, 90, L.torso);
-  // Handles on a post in front of the pad.
-  const handle: Vec = { x: shoulder.x + 0.06, y: 0.11 };
+  const shin0 = thigh + 10; // knees just unlocked at the start
+  // The pad runs from just above the knees to the chest; the hands hold handles low in front of it.
+  const padFront = shoulder.x - 0.1;
+  const handle: Vec = { x: shoulder.x + 0.05, y: 0.24 };
   return {
     view: 'side',
     floor: 0.4,
     pose: (s) => {
-      const shin = thigh + lerp(10, 115, s);
-      return {
-        torso: 90,
-        head: 84,
-        leg: { thigh, shin, foot: shin - 90 },
-        arm: gripTo(shoulder, handle, { x: -1, y: 0.4 }),
-        anchor: 'hip',
-        at: hip,
-      };
+      const shin = shin0 + 105 * s;
+      return { torso: 90, head: 84, leg: { thigh, shin, foot: shin - 90 }, arm: gripTo(shoulder, handle, BACK), anchor: 'hip', at: hip };
     },
     props: [
-      { kind: 'bench', points: [{ x: knee.x + 0.05, y: PAD }, { x: shoulder.x - 0.07, y: PAD }] },
-      { kind: 'line', from: { x: handle.x, y: handle.y }, to: { x: handle.x, y: 0.4 }, width: 0.018 },
+      { kind: 'bench', points: [{ x: knee.x + 0.05, y: PAD }, { x: padFront, y: PAD }] },
+      { kind: 'line', from: { x: padFront, y: handle.y }, to: handle, width: 0.016 },
       { kind: 'bar', at: handle },
-      // Roller on the back of the ankles.
-      { kind: 'pad', at: 'ankle', offset: { x: 0.045, y: -0.062 } },
+      // Roller on the backs of the ankles (placed for the start: a pad can't turn with the shin).
+      { kind: 'pad', at: 'ankle', offset: add(along(O, shin0 + 180, 0.04), along(O, shin0 + 90, 0.045 + ROLLER)) },
     ],
   };
 }
@@ -285,11 +279,12 @@ export function seatedLegCurl(): Demo {
   const shoulder = along(hip, torso, L.torso);
   const behind = (t: number) => add(along(hip, torso, t), along(O, torso - 90, BODY.glute + PAD));
   const handle: Vec = { x: hip.x + 0.1, y: -0.035 };
+  const shin0 = 94; // legs out straight at the start
   return {
     view: 'side',
     floor: 0.4,
     pose: (s) => {
-      const shin = lerp(94, 200, s);
+      const shin = lerp(shin0, 200, s);
       return { torso, head: torso + 4, leg: { thigh: 90, shin, foot: shin - 90 }, arm: gripTo(shoulder, handle, BACK), anchor: 'hip', at: hip };
     },
     props: [
@@ -298,9 +293,9 @@ export function seatedLegCurl(): Demo {
       { kind: 'line', from: { x: hip.x - 0.02, y: 0.05 }, to: { x: hip.x - 0.02, y: 0.4 }, width: 0.03 },
       { kind: 'line', from: { x: hip.x - 0.14, y: 0.392 }, to: { x: hip.x + 0.1, y: 0.392 }, width: 0.016 },
       { kind: 'bar', at: handle },
-      // Thigh pad over the knees, roller behind the ankles.
+      // Thigh pad over the knees; roller under the backs of the ankles (placed for the start: a pad can't turn with the shin).
       { kind: 'pad', at: 'knee', offset: { x: -0.07, y: 0.06 - (BODY.thighFront + ROLLER) } },
-      { kind: 'pad', at: 'ankle', offset: { x: -0.06, y: 0.045 } },
+      { kind: 'pad', at: 'ankle', offset: add(along(O, shin0 + 180, 0.04), along(O, shin0 + 90, 0.045 + ROLLER)) },
     ],
   };
 }
@@ -310,36 +305,36 @@ export function backExtension(): Demo {
   const legDeg = 225; // hip → ankle: the body line is at 45°
   const ankle: Vec = { x: 0, y: -0.24 };
   const pose = (s: number): DemoPose => {
-    const torso = lerp(legDeg - 180, legDeg - 180 + 92, s);
+    // From a straight line down to 88° of hip bend, back flat.
+    const torso = lerp(legDeg - 180, legDeg - 180 + 88, s);
     // Arms crossed on the chest.
     return { torso, head: torso, leg: { thigh: legDeg, shin: legDeg, foot: legDeg - 90 }, arm: { upper: torso + 146, fore: torso + 356 }, anchor: 'ankle', at: ankle };
   };
   const hip = along(ankle, legDeg - 180, L.shin + L.thigh);
   const front = legDeg - 90; // the way the front of the legs faces
   const onThigh = (fromHip: number, out: number) => along(along(hip, legDeg, fromHip), front, out);
-  // Thigh pad: under the front of the thighs, ending just below the hip crease.
-  const padTop = onThigh(0.075, BODY.thighFront + PAD);
-  const padLow = onThigh(0.25, BODY.thighFront + PAD);
+  // Thigh pad under the front of the thighs, from the knees to a hand's width below the hip crease (the hips bend freely).
+  const padTop = onThigh(0.1, BODY.thighFront + PAD);
+  const padLow = onThigh(L.thigh, BODY.thighFront + PAD);
   // Foot plate under the soles.
   const sole = along(ankle, legDeg, L.ankleHeight + 0.01);
-  const plateA = along(sole, front + 180, 0.05);
-  const plateB = along(sole, front, 0.13);
-  // Frame: a beam under the legs from the foot plate to the thigh pad, on two posts.
-  const beamLow = along(plateB, legDeg, 0.0);
-  const beamHigh = onThigh(0.2, 0.17);
+  const plateBack = along(sole, front + 180, 0.05);
+  const plateFront = along(sole, front, 0.15);
+  // Frame: a beam parallel to the legs from the foot plate to under the pad, on two posts.
+  const beamHigh = onThigh(0.17, 0.15);
   return {
     view: 'side',
     pose,
     props: [
-      { kind: 'line', from: beamLow, to: beamHigh, width: 0.03 },
+      { kind: 'line', from: plateFront, to: beamHigh, width: 0.03 },
       { kind: 'line', from: beamHigh, to: { x: beamHigh.x, y: FLOOR }, width: 0.03 },
-      { kind: 'line', from: plateB, to: { x: plateB.x, y: FLOOR }, width: 0.03 },
-      { kind: 'line', from: { x: plateB.x - 0.08, y: FLOOR - 0.008 }, to: { x: beamHigh.x + 0.08, y: FLOOR - 0.008 }, width: 0.016 },
-      { kind: 'line', from: plateA, to: plateB, width: 0.02 },
-      { kind: 'line', from: padTop, to: onThigh(0.2, 0.17), width: 0.02 },
+      { kind: 'line', from: plateFront, to: { x: plateFront.x, y: FLOOR }, width: 0.03 },
+      { kind: 'line', from: { x: plateFront.x - 0.06, y: FLOOR - 0.008 }, to: { x: beamHigh.x + 0.06, y: FLOOR - 0.008 }, width: 0.016 },
+      { kind: 'line', from: plateBack, to: plateFront, width: 0.02 },
+      { kind: 'line', from: onThigh(0.17, BODY.thighFront + PAD), to: beamHigh, width: 0.02 },
       { kind: 'bench', points: [padLow, padTop], legs: false },
-      // Ankle roller behind the lower calves.
-      { kind: 'pad', at: 'ankle', offset: sub(along(along(O, legDeg - 180, 0.045), legDeg + 90, 0.04 + ROLLER), O) },
+      // Ankle roller behind the lower calves, just above the heels.
+      { kind: 'pad', at: 'ankle', offset: add(along(O, legDeg - 180, 0.045), along(O, legDeg + 90, 0.04 + ROLLER)) },
     ],
   };
 }
