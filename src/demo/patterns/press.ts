@@ -223,26 +223,44 @@ export function lyingPress(o: { implement: Implement; incline?: number; floor?: 
 }
 
 /**
- * Dumbbell fly on a flat bench, palms facing: the arms open out to the sides
- * as one piece (elbows softly bent) until the upper arms are just below level,
- * then close over the chest. From the side the arms swing toward the camera,
- * so the hands drop straight down and the arms look short at the bottom.
+ * Dumbbell fly on a flat bench, palms facing (light dumbbells held along the
+ * body): from over the chest the arms open out to the sides as one piece,
+ * elbows softly bent, in a plane angled toward the feet (not straight out
+ * from the shoulders), until the upper arms are just below level and the
+ * dumbbells sit beside the lower chest, between the bench and the chest's
+ * height; then they hug back together over the chest. From the side the near
+ * arm reaches toward the camera, so it looks short at the bottom, the elbow
+ * lowest.
  */
 export function fly(): Demo {
   const body = lying({});
   const S = body.shoulder;
   const bend = 20; // elbows bent this much throughout
-  const lean = 6; // upper arms tilted this far toward the feet
+  const lean = 8; // at the top the arms lean this far toward the feet: the dumbbells over the chest
+  const plane = 24; // the arms open this far toward the feet from straight out to the side
+  // Directions in 3D on the bench: [toward the feet, up, out to the near side]. The arms move in the plane
+  // through `up` and `out`; the side view sees the first two (screen y points down).
+  const up = [Math.sin(rad(lean)), Math.cos(rad(lean)), 0];
+  const wide = [Math.sin(rad(plane)), 0, Math.cos(rad(plane))];
+  const k = wide[0] * up[0] + wide[1] * up[1];
+  const o = wide.map((v, i) => v - k * up[i]);
+  const out = o.map((v) => v / Math.hypot(...o));
+  /** A segment `len` long at `deg` in that plane (0 = up, 90 = level out to the side), as the side view sees it. */
+  const seenAt = (deg: number, len: number): Vec => {
+    const [c, s] = [Math.cos(rad(deg)), Math.sin(rad(deg))];
+    return { x: len * (c * up[0] + s * out[0]), y: -len * (c * up[1] + s * out[1]) };
+  };
   return {
     view: 'side',
     pose: (s) => {
-      // Upper arm: 0 = straight up, 90 = level out to the side.
-      const phi = lerp(-3, 100, s);
-      const elbow = { x: S.x + L.upperArm * Math.sin(rad(lean)), y: S.y - L.upperArm * Math.cos(rad(lean)) * Math.cos(rad(phi)) };
-      const hand = { x: elbow.x, y: elbow.y - REACH * Math.cos(rad(phi - bend)) };
-      return body.pose(armThrough(S, elbow, hand));
+      // Upper arm from just past upright (hands together over the chest) to just below level.
+      const phi = lerp(-2, 98, s);
+      const elbow = add(S, seenAt(phi, L.upperArm));
+      const hand = add(elbow, seenAt(phi - bend, REACH));
+      // The handle runs along the body all the way: the fist is drawn upright over it.
+      return body.pose({ ...armThrough(S, elbow, hand), hand: 0 });
     },
-    props: [...body.props, ...handProp('dumbbell', 'wrist', { lengthwise: true })],
+    props: [...body.props, { kind: 'dumbbell', at: 'wrist', lengthwise: true, light: true }],
   };
 }
 
