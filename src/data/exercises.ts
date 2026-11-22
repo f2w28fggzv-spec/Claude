@@ -889,7 +889,7 @@ const DRAFT_EXERCISES: Exercise[] = [
   ex({
     id: 'dumbbell-bent-over-row',
     name: 'Dumbbell bent-over row',
-    summary: 'Hinged forward with a dumbbell in each hand, row both to the ribs.',
+    summary: 'Hinged forward with a dumbbell in each hand, row both up beside the waist.',
     primary: ['back'],
     secondary: ['biceps'],
     equipment: ['dumbbell'],

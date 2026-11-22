@@ -470,42 +470,42 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'With the dumbbells over the shoulders the arms hold them with almost no moment arm; as the arms open, the dumbbells move out to the sides and the moment arm about the shoulders grows to its maximum at the bottom, where the chest is also longest. The fly is therefore hardest at the bottom and loses almost all tension at the top.',
   },
-  // Hinged forward about 70 degrees with soft knees, barbell hanging at nearly straight arms below the shoulders -> Bar pulled in to the belly at about navel height (the summary says lower ribs), elbows bent and raised above the back, torso still hinged about 70 degrees
+  // Hinged about 70 degrees forward with a flat back and bent knees, barbell hanging at straight arms under the shoulders, overhand grip a little wider than the shoulders -> Bar rowed up in front of the knees and thighs until it touches the lower ribs, elbows bent to about 50 degrees, flared out and raised to about the level of the back; torso still hinged at 70 degrees
   'barbell-row': {
     profile: [0.4, 0.65, 1],
     muscles: [
-      { group: 'back', role: 'main', peak: 1, note: 'pulls the elbows back and squeezes the shoulder blades; the lower back holds the hinge' },
-      { group: 'biceps', role: 'assist', peak: 0.55, profile: [0.2, 1, 0.6], note: 'bend the elbows, most mid-pull' },
-      { group: 'hamstrings', role: 'stabilize', peak: 0.45, profile: [1, 0.8, 0.55], note: 'hold the hips in the hinge' },
+      { group: 'back', role: 'main', peak: 1, note: 'pulls the elbows up and back and squeezes the shoulder blades; the lower back holds the hinge' },
+      { group: 'biceps', role: 'assist', peak: 0.55, profile: [0.1, 0.8, 1], note: 'bend the elbows as the bar comes up' },
+      { group: 'hamstrings', role: 'stabilize', peak: 0.45, profile: [1, 0.9, 0.8], note: 'hold the hips in the hinge' },
     ],
-    why: 'Hanging straight below the shoulders the bar has almost no lever about the shoulder, so the upper back mainly holds the shoulder blades while the lower back and hamstrings hold the hinge; as the elbows travel past the torso the bar\'s lever about the shoulder grows to its longest at the top, where the lats, rhomboids and trapezius are also shortest, so the top is hardest. The elbow flexors work most mid-pull, when the forearm slants furthest from vertical, and the hinge gets a little easier to hold as the bar comes in toward the hips (with a bar of about 0.6 body weight the hip moment falls to about 0.55 of the start in the demo).',
+    why: 'At the hang the bar sits under the shoulders with no lever about them, so the upper back only holds the shoulder blades while the lower back holds the hinge; as the bar rises it moves behind the shoulders, its lever is longest at the top and the lats, rhomboids and trapezius are shortest there, so the top is hardest. Because the bar path stays in front of the thighs the forearms slant about 35 to 40 degrees from mid-pull on, so the elbow flexors\' load rises quickly and stays high to the top, where they are also shortest, while the hip moment the hamstrings hold eases only a little (to about 0.8 of the start) as the bar comes in.',
   },
-  // Torso nearly level (about 80 degrees forward) with one hand and knee on a bench, dumbbell hanging at a nearly straight arm below the shoulder -> Dumbbell pulled up beside the hip, elbow bent and raised above the back
+  // Far knee and far hand on a flat bench, near foot on the floor, torso about 76 degrees forward (nearly level), dumbbell hanging at a straight arm under the shoulder -> Dumbbell rowed up beside the hip, elbow bent to about 65 degrees and raised above the back, forearm still hanging straight down
   'one-arm-dumbbell-row': {
-    profile: [0.3, 0.6, 1],
+    profile: [0.3, 0.7, 1],
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'pulls the elbow back and squeezes the shoulder blade in' },
-      { group: 'biceps', role: 'assist', peak: 0.55, profile: [0.2, 1, 0.6], note: 'bends the elbow, most mid-pull' },
+      { group: 'biceps', role: 'assist', peak: 0.5, profile: [0.1, 0.6, 1], note: 'bends the elbow and holds it bent' },
     ],
-    why: 'The bench props the torso, so at the hang the back only holds the shoulder blade against a dumbbell that hangs with almost no lever about the shoulder; the lever grows as the elbow travels back and is longest at the top, where the lats and mid-back are shortest, so that is the hardest point. The elbow flexors work most mid-pull, when the forearm slants furthest from vertical, and less at the top, where the forearm hangs almost under the elbow.',
+    why: 'The bench props the torso, so at the hang the back only holds the shoulder blade against a dumbbell hanging straight under the shoulder. The upper arm then swings back through about 115 degrees, so the dumbbell\'s lever about the shoulder is already about 0.85 of its maximum at mid-pull and peaks as the elbow passes the back; the top, with the lats and mid-back shortest, is hardest. The forearm hangs plumb throughout, so the elbow flexors carry little turning load and mainly bend the elbow and hold it bent, most near the top.',
   },
-  // Hinged forward about 58 degrees with soft knees, a dumbbell in each hand hanging at nearly straight arms below the shoulders -> Dumbbells pulled up to the sides of the waist, elbows bent and drawn back past the torso
+  // Hinged about 58 degrees forward with a flat back and bent knees, a dumbbell in each hand hanging at straight arms under the shoulders, palms facing in -> Dumbbells rowed up beside the hips, elbows bent to about 85 degrees and drawn back past the line of the back, forearms hanging straight down
   'dumbbell-bent-over-row': {
-    profile: [0.4, 0.65, 1],
+    profile: [0.35, 0.65, 1],
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'pulls the elbows back and squeezes the shoulder blades; the lower back holds the hinge' },
-      { group: 'biceps', role: 'assist', peak: 0.55, profile: [0.2, 1, 0.6], note: 'bend the elbows, most mid-pull' },
+      { group: 'biceps', role: 'assist', peak: 0.5, profile: [0.1, 0.6, 1], note: 'bend the elbows and hold them bent' },
     ],
-    why: 'Same mechanics as the barbell row: little lever about the shoulder at the hang, where the lower back already works to hold the unsupported hinge, and the longest lever at the top, where the upper back is shortest. The elbow flexors work most mid-pull, when the forearms slant furthest from vertical.',
+    why: 'As in the barbell row the unsupported hinge keeps the lower back working from the start (a little less here, with the more upright torso and lighter load), while the dumbbells hang with no lever about the shoulders; their lever grows as the upper arms swing back (about 0.75 of its maximum at mid-pull) and is longest at the top, where the upper back is also shortest. The forearms hang plumb, so the elbow flexors mostly bend the elbows and hold them bent, most near the top.',
   },
-  // Chest on an incline bench, torso about 50 degrees forward, dumbbells hanging at nearly straight arms below the shoulders -> Dumbbells pulled up beside the waist, elbows bent and drawn back past the torso
+  // Chest on an incline pad with the torso about 50 degrees forward, legs reaching back to the balls of the feet, dumbbells hanging at straight arms under the shoulders, palms in -> Dumbbells rowed up beside the hips, elbows bent to about 95 degrees and drawn back just past the line of the back, forearms hanging straight down
   'chest-supported-dumbbell-row': {
     profile: [0.3, 0.6, 1],
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'pulls the elbows back and squeezes the shoulder blades' },
-      { group: 'biceps', role: 'assist', peak: 0.55, profile: [0.2, 1, 0.6], note: 'bend the elbows, most mid-pull' },
+      { group: 'biceps', role: 'assist', peak: 0.5, profile: [0.1, 0.6, 1], note: 'bend the elbows and hold them bent' },
     ],
-    why: 'The pad carries the torso, so the lower back is off and at the hang the upper back only holds the shoulder blades; the dumbbells\' lever about the shoulder grows as the elbows travel back and is longest at the top, where the lats, rhomboids and trapezius are shortest. The elbow flexors work most mid-pull.',
+    why: 'The pad carries the torso, so the lower back rests and at the hang the upper back only holds the shoulder blades. The upper arms sweep back through about 85 degrees, so the dumbbells\' lever about the shoulders grows steadily (about 0.7 of its maximum at mid-pull) and is longest at the top, where the lats, rhomboids and trapezius are shortest. The forearms hang plumb, so the elbow flexors mostly bend the elbows and hold them bent.',
   },
   // Dead hang from an overhand grip, arms nearly straight overhead, body vertical -> Chin over the bar, elbows fully bent, shoulders just below and behind the bar, body leaning back about 18 degrees
   'pull-up': {
@@ -536,40 +536,40 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'The pull-up played from the top: holding the chin over the bar, with the lats and mid-back at their shortest, is the hardest point, and effort falls as the body lowers to a dead hang, where the straight arms carry it with little muscle work. In practice the lifter steps or jumps back to the top, so the return half of the loop (drawn as lifting) overstates the work.',
   },
-  // Dead hang, arms straight overhead, shoulders shrugged up toward the ears -> Shoulder blades pulled down so the body rises (about 10 cm in the demo) and the chest lifts slightly; the demo also bends the elbows to about 107 degrees, which the real exercise does not
+  // Dead hang with straight arms, shoulders shrugged up toward the ears -> Shoulder blades pulled down and back so the body rises about 6 cm and the chest lifts, trunk leaning back about 9 degrees; arms still straight
   'scapular-pull-up': {
-    profile: [0.3, 0.8, 1],
+    profile: [0.3, 0.85, 1],
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'pulls the shoulder blades down to lift the body' },
     ],
-    why: 'In a dead hang the shoulder girdle hangs on passive structures; pulling the shoulder blades down lifts the whole body on the lower trapezius and lats, a near-constant load that gets harder as these muscles shorten, so the fully pulled-down position is hardest.',
+    why: 'In the shrugged dead hang the shoulder girdle hangs on passive tissue. Once the shoulder blades start to pull down, the lower trapezius and lats carry the whole body weight at every point of the short range, and they get shorter and weaker toward the top, so the fully pulled-down position is hardest and the middle is not far behind.',
   },
-  // Hanging under a bar at about hip height with the arms extended, heels on the floor, body straight and about 10 degrees above horizontal -> Chest pulled up close to the bar with the elbows sharply bent, body straight and about 26 degrees above horizontal (demo glitch: at exactly s = 1 the elbow flips to the head side of the bar)
+  // Lying face up under a bar set at about hip height, heels on the floor, body straight and about 22 degrees above the floor, arms straight reaching up and slightly toward the feet to an overhand grip a little wider than the shoulders -> Body pivoted on the heels to about 40 degrees until the lower chest touches the bar, elbows bent to about 45 degrees, driven down and out and finishing just past the line of the back
   'inverted-row': {
-    profile: [0.3, 0.6, 1],
+    profile: [0.3, 0.85, 1],
     muscles: [
-      { group: 'back', role: 'main', peak: 1, note: 'pulls the elbows back and squeezes the shoulder blades' },
-      { group: 'biceps', role: 'assist', peak: 0.55, profile: [0.2, 1, 0.6], note: 'bend the elbows, most mid-pull' },
-      { group: 'core', role: 'stabilize', peak: 0.3, note: 'keeps the body in one line from heels to shoulders' },
+      { group: 'back', role: 'main', peak: 1, note: 'pulls the elbows down and back and squeezes the shoulder blades' },
+      { group: 'biceps', role: 'assist', peak: 0.55, profile: [0.1, 0.7, 1], note: 'bend the elbows as the chest rises' },
+      { group: 'core', role: 'stabilize', peak: 0.3, note: 'braces the trunk so the body moves in one piece' },
     ],
-    why: 'A row with the heels on the floor: at the bottom the straight arms hang in line with the bar, so the back only holds the shoulder blades, and the top, with the elbows back and the back muscles shortest, is hardest; as the body rises a little more of its weight shifts to the heels (about 78% to 72% of body weight on the bar in the demo), which only slightly flattens that rise. In the demo the elbows stay in front of the chest through the pull, whereas a real inverted row finishes with them beside the torso.',
+    why: 'A row with the heels on the floor: at the bottom the straight arms can pass the bar\'s pull along their length, so the back mainly holds the shoulder blades. Once the elbows bend, most of the body\'s weight hangs from the bar and, because the arms start angled toward the feet, its lever about the shoulders is largest early in the pull and shrinks toward the top; the shoulder-blade muscles, though, are shortest at the top with the elbows past the back, so effort builds early and stays high to the finish. Pulling the chest toward the bar loads the elbow flexors more and more as the elbows bend.',
   },
-  // Seated with the thighs under the pad, leaning back about 14 degrees, arms straight overhead holding the bar, weight stack lifted -> Bar pulled down in front of the face to about chin height, elbows bent and pointing down (the summary says upper chest; the demo stops a little short)
+  // Seated with the thighs under the pad and the trunk leaning back about 12 degrees, arms straight overhead on a wide overhand bar under the pulley, weight stack lifted -> Bar pulled down in front of the face to the upper chest just below the collarbones, elbows sharply bent and pointing down and out under the shoulders
   'lat-pulldown': {
     profile: [0.3, 0.8, 1],
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'pulls the elbows down and the shoulder blades down and back' },
-      { group: 'biceps', role: 'assist', peak: 0.6, profile: [0.1, 1, 0.7], note: 'bend the elbows' },
+      { group: 'biceps', role: 'assist', peak: 0.6, profile: [0.1, 1, 0.5], note: 'bend the elbows, most early in the pull' },
     ],
-    why: 'A seated pull-up: with straight arms overhead the cable pulls in line with the arms and the back mainly holds the shoulder blades; the cable\'s lever about the shoulder grows as the bar comes down and is longest at the bottom, where the lats are shortest, so bringing the bar all the way down is the hardest part. The elbow flexors work most mid-pull, when the forearms slant most, and less at the bottom, where they are nearly vertical under the bar.',
+    why: 'With straight arms overhead the shoulder girdle hangs on the cable much as in a dead hang, so the back mainly holds the shoulder blades. With the wide grip the cable\'s lever about the shoulders is near its maximum from mid-pull to the chest while the lats shorten, so bringing the bar to the chest is hardest. The forearms slant most in the first half of the pull, where the elbow flexors work most; at the chest the hands sit ahead of the elbows and the cable barely loads the elbow flexors.',
   },
-  // Standing, leaning forward about 18 degrees, straight arms raised up and forward above head height holding the cable bar -> Straight arms swept down so the bar is at the front of the thighs
+  // Standing a step back from a high pulley, hips back with the torso leaning forward about 30 degrees and the knees soft, nearly straight arms reaching up and forward along the cable, hands a little above head height -> Arms swept down, still nearly straight, until the bar touches the front of the thighs
   'straight-arm-pulldown': {
-    profile: [0.3, 1, 0.8],
+    profile: [0.1, 1, 0.9],
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'sweeps the straight arms down to the thighs' },
     ],
-    why: 'With a high pulley the cable starts nearly in line with the raised arms, so its lever about the shoulder is short; the lever is longest around mid-sweep, where the arms cross the cable at about a right angle, and eases toward the thighs, where the lats are shortest, so effort stays high to the finish. In the current demo the pulley is drawn almost level with the hands and far in front, so at the start the cable would pull the arms down rather than resist them; a pulley above head height and closer to the lifter fixes that.',
+    why: 'At the start the arms point along the cable, so it has almost no lever about the shoulders and the lats carry next to nothing. The lever is longest at mid-sweep, where the arms cross the cable at about a right angle, and at the thighs it is still about two thirds of that while the lats are near their shortest, so effort stays high to the finish.',
   },
   // On a 45-degree back-extension bench, ankles under the roller and thighs on the pad, body straight from heels to head along the 45-degree line, arms crossed on the chest -> Trunk lowered from the hips (hips bent about 88 degrees) until it points about 45 degrees below horizontal, back kept straight
   'back-extension': {
@@ -814,7 +814,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'The band is barely stretched at the start, so although it pulls nearly square to the near-level forearms the load is small. It pulls harder the more it stretches while its lever about the elbows stays long until the last third, so effort builds through the push and peaks over the last quarter. At lockout the band lines up with the forearms and its lever shrinks to about a third, but the pull is at its strongest and the triceps at their shortest, so the finish stays close to the hardest.',
   },
-  // Forearm plank: elbows under the shoulders, body straight from shoulders to ankles, about 12 degrees above horizontal -> Same position (a hold)
+  // Forearm plank: elbows under the shoulders, forearms flat, on the balls of the feet, body in one straight line about 10 degrees above horizontal -> Same position (a hold)
   'plank': {
     profile: [1, 1, 1],
     muscles: [
@@ -822,7 +822,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'A hold: gravity pulls the middle of the body toward the floor between the forearms and toes, so the abdominals and obliques work isometrically to keep the spine and pelvis from sagging into an arch; the demand is steady while the position holds.',
   },
-  // Side plank on one forearm and the side of the feet, body straight and about 18 degrees above the floor, top arm resting along the body -> Same position (a hold)
+  // Side plank facing the camera on the left forearm (elbow under the shoulder) and the outside edge of the stacked feet, body in one straight line about 20 degrees above the floor, top hand resting on the hip with the elbow up -> Same position (a hold)
   'side-plank': {
     profile: [1, 1, 1],
     muscles: [
@@ -839,46 +839,46 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'A hold: the raised straight legs pull the pelvis toward an arch through the hip flexors, and the raised shoulders and arms lean back on the upper trunk, so the abdominals work isometrically from both ends to keep the lower back on the floor; the demand is steady while the position holds.',
   },
-  // Lying on the back, hips and knees bent 90 degrees with the shins level (tabletop), both arms pointing straight up -> One leg straightened out nearly level just above the floor and one arm reaching back overhead, the other limbs still in place (the demo moves the near arm and near leg; the exercise pairs opposite limbs)
+  // Lying on the back with the lower back flat, hips and knees bent 90 degrees with the shins level (tabletop), both arms pointing straight up -> Near leg straightened out until the heel hovers just off the floor while the opposite (far) arm reaches back overhead to hover above the floor; the other arm and leg stay in place
   'dead-bug': {
     profile: [0.4, 0.8, 1],
     muscles: [
-      { group: 'core', role: 'main', peak: 1, note: 'keeps the lower back flat as the leg reaches out' },
+      { group: 'core', role: 'main', peak: 1, note: 'keeps the lower back flat as the leg and arm reach out' },
     ],
-    why: 'In the tabletop the thighs are vertical, so the legs\' weight has a short lever about the hips; as one leg straightens toward the floor its lever grows (the legs\' combined moment about the hips more than doubles in the demo), and the hip flexors holding it pull the pelvis toward an arch that the abdominals must resist, so the extended position is hardest.',
+    why: 'In the tabletop the thighs are vertical, so only the shins\' weight has a lever about the hips; as one leg straightens toward the floor its lever grows (the legs\' combined moment about the hips about 2.4 times the tabletop\'s in the demo), and the hip flexors holding it pull the pelvis toward an arch that the abdominals must resist, with the arm reaching overhead adding a little more. So the extended position is hardest.',
   },
-  // Lying on the back, knees bent with the feet flat, arms crossed on the chest, head and shoulders resting on the floor -> Upper back curled about 45 degrees off the floor so the shoulder blades clear it, lower back still down
+  // Lying on the back, knees bent about 90 degrees with the feet flat, arms crossed on the chest, head and shoulders resting on the floor -> Upper back curled about 34 degrees up so the shoulder blades clear the floor, chin tucked toward the chest, lower back and feet still down
   'crunch': {
     profile: [1, 0.9, 0.8],
     restAtStart: true,
     muscles: [
       { group: 'core', role: 'main', peak: 1, note: 'curls the ribs toward the pelvis' },
     ],
-    why: 'Lying flat the floor carries the upper body; the moment the shoulders lift, the head and upper trunk hang on their longest lever, and as the trunk curls up the lever shortens (to about 60% at 45 degrees in the demo) while the shortened abdominals lose some force, so effort stays high but eases a little toward the top.',
+    why: 'Lying flat the floor carries the upper body; the moment the shoulders lift, the head and upper trunk hang on their longest lever, and as the trunk curls up the lever shortens (to about three quarters at the top of the demo\'s curl) while the shortening abdominals lose a little force, so effort stays high but eases slightly toward the top.',
   },
-  // Dead hang from the bar, legs straight down -> Knees raised to hip height with the thighs about level and the shins hanging down
+  // Dead hang from an overhand grip, arms straight, legs hanging straight down -> Knees raised above hip height (thighs about 25 degrees above level) with the shins hanging down and the pelvis tucked under, hips drawn back so the body stays balanced under the bar
   'hanging-knee-raise': {
     profile: [0.1, 0.7, 1],
     muscles: [
-      { group: 'core', role: 'main', peak: 1, note: 'holds the pelvis against the hip flexors\' pull as the knees rise' },
+      { group: 'core', role: 'main', peak: 1, note: 'holds the pelvis against the hip flexors\' pull, then curls it up at the top' },
     ],
-    why: 'In a dead hang the legs hang straight below the hips with no lever; raising the knees carries the thighs forward until they are level, where their lever is longest, so the top is hardest. The hip flexors lift the legs and the abdominals hold the pelvis against their pull, curling it up only if the knees go higher.',
+    why: 'In the dead hang the legs hang straight below the hips with no lever. As the knees rise the legs\' weight moves ahead of the hips (its lever about 0.7 of the maximum halfway up, near the maximum once the thighs pass level), and over the last part the pelvis tucks under, so the abdominals shorten while they lift the pelvis and legs, whose weight is then furthest ahead of the waist: the top is hardest. The hip flexors do the lifting; the abdominals hold the pelvis against their pull and then curl it.',
   },
-  // Dead hang from the bar, legs straight down -> Straight legs raised to horizontal, hips bent 90 degrees
+  // Dead hang from an overhand grip, arms straight, legs hanging straight down -> Straight legs raised a little past level (about 20 degrees above horizontal) with the pelvis tucked under, hips drawn back so the body stays balanced under the bar
   'hanging-leg-raise': {
     profile: [0.1, 0.7, 1],
     muscles: [
-      { group: 'core', role: 'main', peak: 1, note: 'holds the pelvis against the hip flexors\' pull as the legs rise' },
+      { group: 'core', role: 'main', peak: 1, note: 'holds the pelvis against the hip flexors\' pull, then curls it up at the top' },
     ],
-    why: 'As in the knee raise, the legs have no lever in the dead hang and the longest one at the top, here with the straight legs level (about 40% more hip moment than the knee raise\'s top in the demo), so the top is hardest. The hip flexors lift the legs and the abdominals hold the pelvis steady against their pull.',
+    why: 'As in the knee raise the legs have no lever in the dead hang; with the knees straight their lever about the hips is about a third longer than in the knee raise and close to its maximum from the time the legs pass level, and over the last part the pelvis tucks under, so the top, with the abdominals shortest and the legs\' weight furthest ahead of the waist, is hardest.',
   },
-  // Kneeling below a high pulley with the rope held at the ears, torso nearly upright (leaning about 16 degrees) -> Spine curled forward until the upper trunk is about level and the head points at the floor, hips only slightly more bent
+  // Kneeling below a high pulley with the toes tucked and the hips high over the knees, torso leaning about 16 degrees forward with a straight spine, rope held beside the head -> Spine curled forward about 64 degrees so the upper trunk is about level and the head points at the floor, hips bent only about 14 degrees more
   'cable-crunch': {
-    profile: [0.15, 0.65, 1],
+    profile: [0.1, 0.85, 1],
     muscles: [
       { group: 'core', role: 'main', peak: 1, note: 'curls the ribs toward the hips against the cable' },
     ],
-    why: 'Upright, the cable runs almost through the spine, so it barely bends the trunk and the abdominals only brace; as the spine curls the hands move ahead of the waist and the cable\'s lever grows (to about 0.17 of body height in the demo), outgrowing the help from the trunk\'s own weight, so the fully curled position, with the abdominals shortest, is hardest.',
+    why: 'Upright, the cable runs nearly through the spine and its small backward pull about the waist roughly cancels the forward lean of the upper body, so the abdominals only brace. As the spine curls the hands move well ahead of the waist, the cable\'s lever grows fast and outgrows the help from the trunk\'s own weight, so the net load on the abdominals is near its peak by mid-curl and stays there to the end, where the abdominals are shortest and the curl is hardest.',
   },
 };
 
