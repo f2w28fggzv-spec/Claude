@@ -1258,7 +1258,7 @@ const DRAFT_EXERCISES: Exercise[] = [
     primary: ['biceps'],
     equipment: ['dumbbell'],
     role: 'isolation',
-    demo: D.curl({ implement: 'dumbbell' }),
+    demo: D.curl({ implement: 'dumbbell', neutral: true }),
     placement: P.sideStanding,
     tracking: up('wrist'),
     checks: [C.rom('elbow', 100)],
