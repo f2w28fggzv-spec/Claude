@@ -122,6 +122,18 @@ export function levelOf(use: MuscleUse, spec: Engagement, m: Moment, t = 0): num
   return clamp01(use.peak * demand * lowering);
 }
 
+/** Muscle groups that belong to one side's arm or leg (the rest are shared by the trunk). */
+export const LIMB_GROUPS: readonly MuscleGroup[] = ['shoulders', 'biceps', 'triceps', 'glutes', 'quads', 'hamstrings', 'calves'];
+/** Share of its level a resting limb keeps in a one-sided exercise (it still braces a little). */
+export const RESTING_SIDE = 0.2;
+
+/** The levels for the side that isn't working in a one-sided exercise: its limb muscles near rest. */
+export function restingSide(levels: Levels): Levels {
+  const out = { ...levels };
+  for (const g of LIMB_GROUPS) out[g] = levels[g] * RESTING_SIDE;
+  return out;
+}
+
 /** Levels of all ten muscle groups at a moment (groups the exercise doesn't use stay 0). */
 export function levelsAt(spec: Engagement, m: Moment, t = 0): Levels {
   const out = Object.fromEntries(MUSCLE_GROUPS.map((g) => [g, 0])) as Levels;

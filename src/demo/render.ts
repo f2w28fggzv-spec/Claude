@@ -72,7 +72,7 @@ export function frameMarkup(demo: Demo, s: number, levels: Levels, box: FrameBox
   const fig = figureAt(demo, s);
   const floor = floorOf(demo);
   const eq = drawEquipment(demo.props ?? [], fig, floor);
-  const body = drawBody(fig, { level: levels, heat: engageColour, id });
+  const body = drawBody(fig, { level: levels, heat: engageColour, id, working: demo.working });
   const ground =
     floor === null
       ? ''

@@ -71,4 +71,11 @@ export interface Demo {
    * the near arm and what it holds pass behind the near leg.
    */
   armBehindLegs?: boolean;
+  /**
+   * One-sided exercises (one-arm row, single-leg moves, side-lying hip
+   * abduction): the side whose arm and leg do the work, `a` = near (side
+   * view) or the lifter's right (front view), `b` = the other side. The other
+   * side's limb muscles stay near rest; trunk muscles are shared.
+   */
+  working?: 'a' | 'b';
 }

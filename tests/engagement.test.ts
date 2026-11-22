@@ -2,7 +2,7 @@
 // profile, where a moment falls in the rep, and the level each role shows.
 import { describe, expect, it } from 'vitest';
 import { EXERCISES } from '../src/data/exercises';
-import { defaultEngagement, demandAt, engageColour, levelOf, levelsAt, momentAt, peakLevels, type Engagement, type Moment } from '../src/demo/engagement';
+import { LIMB_GROUPS, RESTING_SIDE, defaultEngagement, demandAt, engageColour, levelOf, levelsAt, momentAt, peakLevels, restingSide, type Engagement, type Moment } from '../src/demo/engagement';
 import { progressAt, timeline } from '../src/demo/timeline';
 
 const byId = (id: string) => EXERCISES.find((e) => e.id === id)!;
@@ -140,5 +140,15 @@ describe('engagement colour', () => {
     expect(engageColour(5)).toBe('var(--red)');
     expect(engageColour(0.6)).toBe('color-mix(in oklab, var(--flame) 50%, var(--orange))');
     expect(engageColour(0.07)).toBe('color-mix(in oklab, var(--amber) 50%, var(--an-muscle))');
+  });
+});
+
+describe('one-sided exercises', () => {
+  it('keep the resting arm and leg near rest and share the trunk', () => {
+    const levels = peakLevels(defaultEngagement(byId('one-arm-dumbbell-row')));
+    const rest = restingSide(levels);
+    for (const g of LIMB_GROUPS) expect(rest[g]).toBeCloseTo(levels[g] * RESTING_SIDE);
+    for (const g of ['chest', 'back', 'core'] as const) expect(rest[g]).toBe(levels[g]);
+    expect(levels.back).toBeGreaterThan(0);
   });
 });

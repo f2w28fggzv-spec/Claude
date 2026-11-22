@@ -4,7 +4,7 @@
 // PLACEHOLDER: a plain mannequin with the final interface. The real figure
 // replaces the drawing below.
 import type { Arm, Figure, Leg, Side, Vec } from './figure';
-import type { Levels } from './engagement';
+import { restingSide, type Levels } from './engagement';
 
 /** A pose with every optional part filled in. */
 export interface ResolvedPose {
@@ -23,7 +23,14 @@ export interface BodyFigure extends Figure {
   pose: ResolvedPose;
 }
 export interface BodyContext {
+  /** Muscle levels; for a one-sided exercise these are the working side's. */
   level: Levels;
+  /**
+   * One-sided exercise: the side whose limbs work (`a` or `b`, see
+   * Demo.working). The other side's arm and leg use `restingSide(level)`;
+   * the trunk always uses `level`.
+   */
+  working?: 'a' | 'b';
   /** Colour for an engagement level. */
   heat: (level: number) => string;
   /** Unique per drawn figure: prefix for any ids in <defs>. */
@@ -76,8 +83,12 @@ const n = (v: number) => v.toFixed(4);
 const line = (a: Vec, b: Vec, w: number, colour: string) =>
   `<line x1="${n(a.x)}" y1="${n(a.y)}" x2="${n(b.x)}" y2="${n(b.y)}" stroke="${colour}" stroke-width="${w}" stroke-linecap="round"/>`;
 
-function sideLimbs(s: Side, leg: Leg, arm: Arm, c: BodyContext, body: string) {
-  const { level, heat } = c;
+/** The levels one side's limbs are drawn with: the working side (or both) at full, the other near rest. */
+const limbLevels = (c: BodyContext, side: 'a' | 'b'): Levels => (c.working && c.working !== side ? restingSide(c.level) : c.level);
+
+function sideLimbs(s: Side, which: 'a' | 'b', leg: Leg, arm: Arm, c: BodyContext, body: string) {
+  const { heat } = c;
+  const level = limbLevels(c, which);
   const thighFront = dir(leg.thigh - 90);
   const shinFront = dir(leg.shin - 90);
   const armFront = dir(arm.upper - 90);
@@ -108,8 +119,8 @@ export function drawBody(fig: BodyFigure, c: BodyContext): BodyLayers {
     const hip = fig.a.hip;
     const sh = fig.a.shoulder;
     const front = dir(p.torso + 90);
-    const far = sideLimbs(fig.b, p.leg2, p.arm2, c, 'var(--line-strong)');
-    const near = sideLimbs(fig.a, p.leg, p.arm, c, body);
+    const far = sideLimbs(fig.b, 'b', p.leg2, p.arm2, c, 'var(--line-strong)');
+    const near = sideLimbs(fig.a, 'a', p.leg, p.arm, c, body);
     const core =
       line(hip, sh, 0.12, body) +
       line(add(lerpV(hip, sh, 0.65), mul(front, 0.035)), add(lerpV(hip, sh, 0.9), mul(front, 0.035)), 0.04, heat(level.chest)) +
@@ -119,10 +130,11 @@ export function drawBody(fig: BodyFigure, c: BodyContext): BodyLayers {
     return { far: far.arms + far.legs, core, nearLeg: near.legs, nearArm: near.arms };
   }
   let s = `<polygon points="${[fig.a.shoulder, fig.b.shoulder, fig.b.hip, fig.a.hip].map((q) => `${n(q.x)},${n(q.y)}`).join(' ')}" fill="${body}" stroke="${body}" stroke-width="0.06" stroke-linejoin="round"/>`;
-  for (const side of [fig.a, fig.b]) {
-    s += line(side.hip, side.knee, 0.075, heat(level.quads)) + line(side.knee, side.ankle, 0.055, body) + line(side.heel, side.toe, 0.03, body);
-    s += line(side.shoulder, side.elbow, 0.05, heat(level.biceps)) + line(side.elbow, side.wrist, 0.04, body);
-    s += `<circle cx="${n(side.shoulder.x)}" cy="${n(side.shoulder.y)}" r="0.035" fill="${heat(level.shoulders)}"/>`;
+  for (const [side, which] of [[fig.a, 'a'], [fig.b, 'b']] as const) {
+    const lv = limbLevels(c, which);
+    s += line(side.hip, side.knee, 0.075, heat(lv.quads)) + line(side.knee, side.ankle, 0.055, body) + line(side.heel, side.toe, 0.03, body);
+    s += line(side.shoulder, side.elbow, 0.05, heat(lv.biceps)) + line(side.elbow, side.wrist, 0.04, body);
+    s += `<circle cx="${n(side.shoulder.x)}" cy="${n(side.shoulder.y)}" r="0.035" fill="${heat(lv.shoulders)}"/>`;
   }
   s += `<circle cx="${n(fig.head.x)}" cy="${n(fig.head.y)}" r="0.058" fill="${body}"/>`;
   return { far: '', core: s, nearLeg: '', nearArm: '' };
