@@ -108,9 +108,16 @@ export function squat(o: {
 
 // ── Feet and hands ───────────────────────────────────────────────────────
 
-/** From the ankle to the toe point / heel point of a foot pointing `foot` degrees (see ../figure). */
-const toeFrom = (foot: number): Vec => add(mul(dir(foot), L.foot), mul(dir(foot + 90), L.ankleHeight));
+/** A foot on the ground or in the air: its ankle, the heel-to-ball direction, and the toes (unset = in line). */
+type Foot = { ankle: Vec; foot: number; toes?: number };
+
+/** From the ankle to the heel point / ball of a foot pointing `foot` degrees (see ../figure). */
 const heelFrom = (foot: number): Vec => add(mul(dir(foot), -L.heel), mul(dir(foot + 90), L.ankleHeight));
+const ballFrom = (foot: number): Vec => add(mul(dir(foot), L.ball), mul(dir(foot + 90), L.ankleHeight));
+/** The lowest point of a foot's sole below its ankle (heel, ball or toe tip). */
+const soleDepth = (foot: number, toes = foot) => Math.max(heelFrom(foot).y, ballFrom(foot).y, ballFrom(foot).y + dir(toes).y * (L.foot - L.ball));
+/** A leg whose foot may bend at the ball. */
+const withToes = (leg: Leg, toes: number | undefined): Leg => (toes === undefined ? leg : { ...leg, toes });
 
 /** The upper point where circles around a and b (radii ra, rb) meet. */
 function circlesMeet(a: Vec, ra: number, b: Vec, rb: number): Vec {
@@ -151,13 +158,13 @@ function through(v0: number, v1: number, v2: number, a: number, easeIn = false):
  * A stepping foot: from one planted position to another, lifted in an arc so
  * neither the heel nor the toe touches the floor on the way.
  */
-function stepFoot(from: { ankle: Vec; foot: number }, to: { ankle: Vec; foot: number }, u: number, lift: number) {
+function stepFoot(from: Foot, to: Foot, u: number, lift: number): Foot {
   const e = smooth(u);
   const foot = lerp(from.foot, to.foot, e);
+  const toes = lerp(from.toes ?? from.foot, to.toes ?? to.foot, e);
   const ankle = add(lerpV(from.ankle, to.ankle, e), { x: 0, y: -lift * Math.sin(Math.PI * Math.min(1, Math.max(0, u))) });
   // Keep the sole above the floor while the foot turns.
-  const low = Math.max(heelFrom(foot).y, toeFrom(foot).y);
-  return { ankle: { x: ankle.x, y: Math.min(ankle.y, FLOOR - low) }, foot };
+  return { ankle: { x: ankle.x, y: Math.min(ankle.y, FLOOR - soleDepth(foot, toes)) }, foot, toes };
 }
 
 /** A leg from hip to ankle whose knee bends forward, whichever way the leg points. */
@@ -184,8 +191,9 @@ const KNEE_GAP = 0.05;
 /**
  * Split stance, near (front) foot flat at the origin. At the bottom the front
  * thigh is parallel to the floor and the back knee hovers just above it; the
- * hips drop straight down between the feet. The back foot stays on its toes
- * (pivoting as the knee drops) or rests on its laces on a bench.
+ * hips drop straight down between the feet. The back foot stays on its ball
+ * with the toes flat (the heel rising as the knee drops) or rests on its
+ * laces on a bench.
  *
  * `step` starts each rep from standing: stepping back into the lunge (reverse
  * lunge) or forward into it (walking lunge), and back again.
@@ -207,7 +215,6 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
   const kneeR = { x: hipB.x - Math.sqrt(L.thigh ** 2 - (kneeY - hipB.y) ** 2), y: kneeY };
   // A low flat bench (about 40 cm).
   const benchTop = FLOOR - 0.23;
-  type Foot = { ankle: Vec; foot: number };
   let rearAt: (s: number) => Foot;
   let hipAt: (s: number) => Vec;
   let frontAt = (_s: number): Foot => ({ ankle: O, foot: 90 });
@@ -220,24 +227,24 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
     rearAt = () => ({ ankle, foot: 262 });
     hipAt = (s) => lerpV(hipTop, hipB, s);
   } else {
-    // On the toes: the toe point stays planted while the heel rises and falls.
-    const footB = 172;
-    const ankleB = { x: 0, y: FLOOR - toeFrom(footB).y };
+    // On the ball of the foot: the ball and the flat toes stay planted while the heel rises and falls.
+    const footB = 158;
+    const ankleB = { x: 0, y: FLOOR - ballFrom(footB).y };
     ankleB.x = kneeR.x - Math.sqrt(L.shin ** 2 - (ankleB.y - kneeR.y) ** 2);
-    const toe = add(ankleB, toeFrom(footB));
-    const footTop = 140;
-    const ankleTop = sub(toe, toeFrom(footTop));
+    const ball = add(ankleB, ballFrom(footB));
+    const footTop = 128;
+    const ankleTop = sub(ball, ballFrom(footTop));
     // Top of the split stance: both knees nearly straight.
     const hipTop = circlesMeet(O, LEG_LEN * 0.985, ankleTop, LEG_LEN * 0.985);
-    // The back foot pivots on its toes from `footTop` (heel low) to `footB` (heel high).
-    const toes = (foot: number): Foot => ({ ankle: sub(toe, toeFrom(foot)), foot });
+    // The back foot pivots on its ball from `footTop` (heel low) to `footB` (heel high), toes flat on the floor.
+    const toes = (foot: number): Foot => ({ ankle: sub(ball, ballFrom(foot)), foot, toes: 90 });
     const onToes = (u: number) => toes(lerp(footTop, footB, u));
     const split = (u: number) => lerpV(hipTop, hipB, u);
     const a = o.step ? 0.4 : 0; // share of the way out spent stepping
     const lower = (u: number) => (u - a) / (1 - a);
     if (o.step === 'back') {
       // Standing on both feet, the back foot reaches back and lands on its
-      // toes while the front knee bends steadily; then straight down.
+      // ball while the front knee bends steadily; then straight down.
       const stand = { x: 0.005, y: -LEG_LEN * 0.998 };
       const polar = (p: Vec) => ({ deg: Math.atan2(p.x, -p.y) * (180 / Math.PI), r: Math.hypot(p.x, p.y) });
       const [p0, p1, p2] = [polar(stand), polar(hipTop), polar(hipB)];
@@ -249,7 +256,7 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
       // Standing with the feet together behind; the front foot steps forward
       // while the body moves over the back foot, whose heel peels up only as
       // far as it must to keep that knee nearly straight.
-      const start = sub(toe, toeFrom(90));
+      const start = sub(ball, ballFrom(90));
       const stand = { x: start.x + 0.005, y: -LEG_LEN * 0.998 };
       const x = through(stand.x, hipTop.x, hipB.x, a);
       const y = through(stand.y, hipTop.y, hipB.y, a, true); // hips stay high until the body is over the back foot
@@ -284,8 +291,8 @@ function lungeDemo(
   o: { lean?: number },
   imp: Implement,
   hipAt: (s: number) => Vec,
-  rearAt: (s: number) => { ankle: Vec; foot: number },
-  frontAt: (s: number) => { ankle: Vec; foot: number },
+  rearAt: (s: number) => Foot,
+  frontAt: (s: number) => Foot,
   bench: Prop | undefined,
 ): Demo {
   const pose = (s: number): DemoPose => {
@@ -297,8 +304,8 @@ function lungeDemo(
       torso,
       // Dumbbells hang straight down at the sides; without them, hands on the hips.
       arm: imp === 'none' ? handsOnHips(hip, torso) : HANG,
-      leg: kneeForward(hip, front.ankle, front.foot),
-      leg2: kneeForward(hip, rear.ankle, rear.foot),
+      leg: withToes(kneeForward(hip, front.ankle, front.foot), front.toes),
+      leg2: withToes(kneeForward(hip, rear.ankle, rear.foot), rear.toes),
       anchor: 'hip',
       at: hip,
     };
@@ -313,7 +320,7 @@ function lungeDemo(
 /**
  * Lead (near) foot flat on a knee-high box, lead knee bent about 90°, trailing
  * foot flat on the floor. Drive up through the lead leg to stand tall on the
- * box; the trailing foot rolls onto its toes, swings up over the box's edge and
+ * box; the trailing foot rolls onto its ball, swings up over the box's edge and
  * lands next to the lead foot. Stepping down is the same path in reverse.
  */
 export function stepUp(o: { implement?: Implement }): Demo {
@@ -322,9 +329,9 @@ export function stepUp(o: { implement?: Implement }): Demo {
   const lead: Vec = { x: 0, y: top - L.ankleHeight };
   const edge = -0.12; // the box's near edge
   const trail: Vec = { x: -0.3, y: 0 };
-  const toe = add(trail, toeFrom(90));
-  const pushFoot = 128; // trailing foot on its toes just before it leaves the floor
-  const lift = { ankle: sub(toe, toeFrom(pushFoot)), foot: pushFoot };
+  const ball = add(trail, ballFrom(90));
+  const pushFoot = 128; // trailing foot on its ball, toes flat, just before it leaves the floor
+  const lift = { ankle: sub(ball, ballFrom(pushFoot)), foot: pushFoot };
   const hipStart: Vec = { x: -0.25, y: -LEG_LEN * 0.985 };
   const hipTop: Vec = { x: lead.x + 0.005, y: lead.y - LEG_LEN * 0.998 };
   // Swing over the box's edge: a curve through a point well above it.
@@ -336,15 +343,17 @@ export function stepUp(o: { implement?: Implement }): Demo {
     const c = e * e;
     return { x: a * lift.ankle.x + b * over.x + c * lead.x, y: a * lift.ankle.y + b * over.y + c * lead.y };
   };
-  const trailAt = (s: number): { ankle: Vec; foot: number } => {
+  const trailAt = (s: number): Foot => {
     if (s < 0.25) {
-      // Heel rises, toes stay down.
+      // Heel rises, the ball and toes stay down.
       const foot = lerp(90, pushFoot, smooth(s / 0.25));
-      return { ankle: sub(toe, toeFrom(foot)), foot };
+      return { ankle: sub(ball, ballFrom(foot)), foot, toes: 90 };
     }
     if (s < 0.85) {
+      // The toes leave the floor last and relax into line with the foot.
       const u = (s - 0.25) / 0.6;
-      return { ankle: bezier(u), foot: lerp(pushFoot, 90, smooth(u)) };
+      const foot = lerp(pushFoot, 90, smooth(u));
+      return { ankle: bezier(u), foot, toes: lerp(90, foot, smooth(u / 0.3)) };
     }
     return { ankle: lead, foot: 90 };
   };
@@ -355,7 +364,7 @@ export function stepUp(o: { implement?: Implement }): Demo {
     return {
       torso: lerp(16, 2, smooth(s)),
       leg: kneeForward(hip, lead, 90),
-      leg2: kneeForward(hip, t.ankle, t.foot),
+      leg2: withToes(kneeForward(hip, t.ankle, t.foot), t.toes),
       arm: HANG,
       anchor: 'hip',
       at: hip,
