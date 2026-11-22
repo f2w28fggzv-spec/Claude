@@ -152,3 +152,14 @@ describe('one-sided exercises', () => {
     expect(levels.back).toBeGreaterThan(0);
   });
 });
+
+describe('exercises built around the lowering', () => {
+  it('show full effort while lowering instead of the usual dip', () => {
+    const muscles = [{ group: 'hamstrings' as const, role: 'main' as const, peak: 1 }];
+    const usual: Engagement = { profile: [1, 1, 1], muscles };
+    const eccentric: Engagement = { ...usual, lowering: 1 };
+    const mid: Moment = { phase: 'out', s: 0.5, u: 0.5, action: 'lowering' };
+    expect(levelsAt(usual, mid).hamstrings).toBeCloseTo(0.8);
+    expect(levelsAt(eccentric, mid).hamstrings).toBeCloseTo(1);
+  });
+});

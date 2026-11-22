@@ -5,14 +5,16 @@
 // BODY) on straight arms, and bodies lie on their pads.
 import { BODY } from '../body';
 import { PLATE_R } from '../equipment';
-import { L, GRIP, add, along, dir, gripTo, lerp, mul, palmTo, sub, twoLink, type Arm, type DemoPose, type Leg, type Vec } from '../figure';
+import { L, GRIP, add, along, dir, gripTo, lerp, mul, palmTo, solve, sub, twoLink, type Arm, type DemoPose, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
-import { O, FLOOR, BACK, DOWN, chainUp } from './shared';
+import { O, FLOOR, BACK, DOWN, centreOfMass, chainUp, solveFor } from './shared';
 
 /** Shoulder to the middle of the fist, arm straight. */
 const REACH = L.upperArm + L.forearm + GRIP;
 /** Sizes as ../equipment draws them: a bar's end, a dumbbell's head, a pad's half-thickness, a roller pad. */
 const BAR_R = 0.02;
+/** A good-morning bar, as a share of body weight. */
+const BACK_BAR = 0.4;
 const DB_R = 0.04;
 const PAD = 0.023;
 const ROLLER = 0.035;
@@ -89,12 +91,12 @@ export function hinge(o: {
   knee: number;
   singleLeg?: boolean;
 }): Demo {
-  // Standing tall with soft knees: shin and thigh a few degrees off vertical.
+  // Standing tall with soft knees: shin and thigh a few degrees off vertical. `lean` tips the whole body at the ankles.
   const top = { shin: 2, thigh: 4 };
-  const pose = (s: number): DemoPose => {
-    const torso = o.torso * s;
-    const shin = 180 + lerp(top.shin, o.knee, s);
-    const thigh = 180 - lerp(top.thigh, o.hipsBack, s);
+  const posed = (s: number, lean: number): DemoPose => {
+    const torso = o.torso * s + lean;
+    const shin = 180 + lerp(top.shin, o.knee, s) + lean;
+    const thigh = 180 - lerp(top.thigh, o.hipsBack, s) + lean;
     const { knee, hip, shoulder } = chainUp(O, shin, thigh, torso);
     let arm: Arm;
     if (o.implement === 'backBar') {
@@ -115,6 +117,15 @@ export function hinge(o: {
     const free: Leg | undefined = o.singleLeg ? freeLeg(torso, s) : undefined;
     return { torso, head: headFor(torso), leg: { thigh, shin, foot: 90 }, leg2: free, arm, anchor: 'ankle', at: O };
   };
+  // A bar on the back sits behind the shoulders, which would put body plus bar behind the heels when standing
+  // tall: the whole body tips forward at the ankles just enough to keep them over mid-foot.
+  const midfoot = (L.foot - L.heel) / 2;
+  const massX = (p: DemoPose) => {
+    const f = solve('side', p);
+    return centreOfMass(f, [{ at: f.a.hand, share: BACK_BAR }]).x;
+  };
+  const balanced = (s: number) => solveFor(-15, 20, (lean) => massX(posed(s, lean)), midfoot);
+  const pose = (s: number): DemoPose => posed(s, o.implement === 'backBar' ? balanced(s) : 0);
   const props: Prop[] =
     o.implement === 'cable'
       ? // Low pulley behind the lifter; the rope runs between the legs.

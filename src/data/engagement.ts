@@ -161,39 +161,39 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'Open-chain knee extension: the knee extensors are strongest around 60 to 70 degrees of knee bend and weakest near full extension, so against a roughly constant machine torque (plus the lower leg\'s own weight, which acts most when the shin is level) the effort climbs toward the top; quadriceps activity in the knee extension is greatest near full extension (Escamilla et al. 1998). At the start the selected plates rest on the stack, so the quads are off until the pad moves, then hold it with good leverage; the exact curve depends on the machine\'s cam.',
   },
-  // Standing tall, barbell hanging at arm's length against the front of the thighs, knees soft -> Hips pushed back and torso about 78 degrees forward, knees slightly bent, bar at about knee height
+  // Standing tall with soft knees, barbell hanging at arm's length against the front of the thighs -> Hips pushed back, torso about 72 degrees forward (about 18 degrees above horizontal), knees bent about 30 degrees, bar just above the knees, still against the legs
   'romanian-deadlift': {
-    profile: [0.2, 0.6, 1],
+    profile: [0.25, 0.65, 1],
     muscles: [
       { group: 'hamstrings', role: 'main', peak: 1, note: 'lengthen under load, then extend the hip' },
       { group: 'glutes', role: 'main', peak: 0.9, note: 'extend the hip' },
       { group: 'back', role: 'stabilize', peak: 0.5, note: 'keeps the spine neutral as the torso tips forward' },
     ],
-    why: 'The moment arm of the bar and torso about the hips grows with the forward lean, so demand rises from almost nothing standing to its maximum at the bottom (static estimate about 0.1, 0.6, 1.0 of the bottom), where the hamstrings are also at their longest. The erectors hold the spine still against the same growing moment.',
+    why: 'The moment arm of the bar and upper body about the hips grows with the forward lean. In a static model of the animated path (bar about 0.9 times body weight) the hip moment is about 0.28, 0.65 and 1.0 of its maximum at the start, middle and bottom (lower back about 0.35 at the start): standing tall the bar hangs in front of the thighs, so the hips already carry some load. The bottom is also where the hamstrings are longest. The erectors hold the spine still against the same growing moment.',
   },
-  // Standing tall, a dumbbell in each hand against the front of the thighs, knees soft -> Hips pushed back and torso about 76 degrees forward, knees slightly bent, dumbbells at about knee height
+  // Standing tall with soft knees, a dumbbell in each hand hanging against the front of the thighs -> Hips pushed back, torso about 72 degrees forward, knees bent about 30 degrees, dumbbells just above knee height in front of the legs
   'dumbbell-romanian-deadlift': {
-    profile: [0.2, 0.6, 1],
+    profile: [0.25, 0.65, 1],
     muscles: [
       { group: 'hamstrings', role: 'main', peak: 1, note: 'lengthen under load, then extend the hip' },
       { group: 'glutes', role: 'main', peak: 0.9, note: 'extend the hip' },
       { group: 'back', role: 'stabilize', peak: 0.5, note: 'keeps the spine neutral as the torso tips forward' },
     ],
-    why: 'Same hinge as the barbell Romanian deadlift: the moment arm of the dumbbells and torso about the hips grows with the lean, so the hip extensors work hardest at the bottom, where the hamstrings are longest. The erectors hold the spine isometrically against that moment.',
+    why: 'Same hinge and path as the barbell Romanian deadlift. With two dumbbells of about 0.2 times body weight each, the static hip moment is about 0.23, 0.66 and 1.0 of its maximum at the start, middle and bottom, so the hip extensors work hardest at the bottom, where the hamstrings are longest. The erectors hold the spine isometrically against that moment.',
   },
-  // Standing tall on the working leg, the other foot just touching the floor beside it, dumbbell hanging in front of the thighs -> Hinged on the standing leg to about 75 degrees, free leg reaching straight back in line with the torso, dumbbell at about knee height
+  // Standing tall on the near (working) leg with a soft knee, the free foot just off the floor behind with its knee bent, a dumbbell in the far hand hanging in front of the thigh -> Hinged on the standing leg until the torso is about 80 degrees forward (nearly horizontal), standing knee bent about 25 degrees, free leg straight back in line with the trunk, dumbbell hanging straight below the shoulder at about mid-shin height
   'single-leg-rdl': {
-    profile: [0.2, 0.7, 1],
+    profile: [0.15, 0.65, 1],
     muscles: [
       { group: 'hamstrings', role: 'main', peak: 1, note: 'standing leg: lengthen under load, then extend the hip' },
-      { group: 'glutes', role: 'main', peak: 0.95, note: 'extend the hip and keep the pelvis level on one leg' },
+      { group: 'glutes', role: 'main', peak: 0.95, profile: [0.35, 0.7, 1], note: 'extend the hip and keep the pelvis level on one leg' },
       { group: 'core', role: 'stabilize', peak: 0.4, note: 'keeps the hips square and the trunk from twisting' },
     ],
-    why: 'One hip carries the torso and dumbbell, whose moment grows with the hinge; the free leg reaching back counterbalances part of it, so demand climbs early and flattens near the bottom (static estimate about 0.1, 0.7, 1.0). Balancing on one leg also makes the glute medius and the trunk resist tipping and twisting once the free foot leaves the floor.',
+    why: 'The standing hip carries the torso and the dumbbell, whose moment grows with the hinge, while the free leg reaching back counterbalances part of it: in a static model of the animated path the stance-hip moment is about 0.13, 0.64 and 1.0 of its maximum. The glutes get their own, higher start because on one leg the glute medius already holds the pelvis level while standing tall and keeps doing so through the hinge. The trunk resists the twist from the dumbbell held in the opposite hand.',
   },
-  // Bar resting on the floor against the shins, hips just above knee height behind it, torso about 62 degrees forward, arms straight -> Locked out standing tall, hips and knees straight, bar hanging at the top of the thighs
+  // Bar resting on the floor over mid-foot against the shins (shins tilted about 10 degrees), hips above the knees and below the shoulders, torso about 70 degrees forward (about 20 degrees above horizontal), shoulders just ahead of the bar, arms straight -> Locked out standing tall, hips and knees straight, bar hanging at arm's length against the top of the thighs
   'deadlift': {
-    profile: [1, 0.75, 0.25],
+    profile: [1, 0.8, 0.25],
     restAtStart: true,
     muscles: [
       { group: 'back', role: 'main', peak: 1, profile: [1, 0.8, 0.4], note: 'holds the spine rigid and the shoulders over the bar' },
@@ -202,11 +202,11 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'quads', role: 'assist', peak: 0.6, profile: [1, 0.5, 0.05], note: 'straighten the knees to break the bar off the floor' },
       { group: 'core', role: 'stabilize', peak: 0.45, note: 'braces the trunk' },
     ],
-    why: 'Just off the floor the bar and the inclined torso have their longest moment arm about the hips and lower back, so the pull is hardest at the start and eases as the torso rises (static hip moment about 1.0, 0.7, 0.1); the knee extension moment is largest at lift-off and gone by the time the bar passes the knees. The back works isometrically the whole way and, with the traps holding the shoulders, still carries the bar at lockout.',
+    why: 'Just off the floor the bar and the inclined torso have their longest moment arm about the hips and lower back, so the pull is hardest at the start and eases as the torso rises. In a static model of the animated path (bar about 1.5 times body weight) the hip moment is about 1.0, 0.8 and 0.25 and the lower-back moment about 1.0, 0.8 and 0.3 at the floor, at the knees and at lockout (the bar still hangs in front of the hips when standing). The quads straighten the knees while the bar leaves the floor and are done by the time it passes the knees; in this drawing the combined centre of mass sits almost under the knees at lift-off, so a static model gives them little, and their early-only assist follows known deadlift mechanics. The back works isometrically the whole way and, with the traps holding the shoulders, still carries the bar at lockout.',
   },
-  // Bar resting on the floor, hips low behind it, torso more upright than the conventional pull (about 54 degrees forward), arms straight -> Locked out standing tall, hips and knees straight, bar hanging at the top of the thighs
+  // Wide stance, hands inside the knees, bar resting on the floor against the shins with the shoulders right over it, knees bent about 87 degrees, hips a little above knee height, torso about 60 degrees forward, arms straight -> Locked out standing tall, hips and knees straight, bar hanging at arm's length against the top of the thighs
   'sumo-deadlift': {
-    profile: [1, 0.75, 0.25],
+    profile: [1, 0.8, 0.25],
     restAtStart: true,
     muscles: [
       { group: 'glutes', role: 'main', peak: 1, note: 'extend the hip and keep the knees pushed out' },
@@ -214,43 +214,44 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'hamstrings', role: 'main', peak: 0.85, note: 'extend the hip' },
       { group: 'back', role: 'stabilize', peak: 0.5, note: 'keeps the spine neutral' },
     ],
-    why: 'As in the conventional pull, the moment about the hips and lower back peaks just off the floor and falls toward lockout; the wide stance and more upright torso put more of the start on knee extension, so the quads stay involved further up. An EMG comparison (Escamilla et al. 2002) found more quadriceps activity in the sumo than in the conventional deadlift.',
+    why: 'As in the conventional pull, the moment about the hips and lower back is largest just off the floor and falls toward lockout (static estimate for the animated path about 1.0, 0.9 and 0.25; the side view draws the thighs at full length, which overstates how far behind the bar the hips sit in a wide stance, so the middle value is kept at the conventional 0.8). The deeper knee bend at the start and the more upright torso put more of the early work on knee extension, so the quads stay involved further up. An EMG comparison (Escamilla et al. 2002) found more vastus medialis and lateralis activity in the sumo than in the conventional deadlift.',
   },
-  // Standing tall, barbell across the upper back -> Hips pushed back and torso hinged about 72 degrees forward, knees slightly bent, bar still on the back
+  // Standing tall with soft knees, barbell across the upper back, hands on the bar -> Hips pushed back, torso about 70 degrees forward (about 20 degrees above horizontal), knees bent about 30 degrees with the shins vertical, bar still on the upper back
   'good-morning': {
-    profile: [0.2, 0.55, 1],
+    profile: [0.2, 0.5, 1],
     muscles: [
       { group: 'hamstrings', role: 'main', peak: 1, note: 'lengthen under load, then extend the hip' },
       { group: 'glutes', role: 'assist', peak: 0.65, note: 'help extend the hip' },
       { group: 'back', role: 'stabilize', peak: 0.5, note: 'holds the spine neutral under the bar' },
     ],
-    why: 'With the bar on the upper back, its moment arm about the hips and lower back grows with the forward lean, from almost none standing (bar right over the hips) to the maximum at the bottom (static estimate about 0, 0.55, 1.0). Because the bar sits far from the hips, the lower back resists a large moment through the whole descent.',
+    why: 'With the bar on the upper back, its moment arm about the hips and lower back grows with the forward lean, from almost none standing (the bar sits over or just behind the hips) to the maximum at the bottom: a static model of the animated path gives about 0, 0.48 and 1.0 at the hips. The start value reflects carrying the bar on stacked joints. Because the bar sits a full trunk length from the hips, the lower back resists a large moment through the whole descent.',
   },
-  // Kneeling upright on a pad with the ankles anchored, body straight from knees to head -> Body tipped forward about 52 degrees from the knees, hips kept straight, hands ready to catch
+  // Kneeling upright on a pad, ankles held under a roller, body straight from knees to head, hands up in front of the chest -> Body lowered forward in one straight line about 66 degrees from upright, hips kept straight, hands reaching toward the floor ready to catch
   'nordic-curl': {
-    profile: [0.1, 0.65, 1],
+    profile: [0.05, 0.65, 1],
+    lowering: 1,
     muscles: [
       { group: 'hamstrings', role: 'main', peak: 1, note: 'brake the knee as the body tips forward' },
     ],
-    why: 'Upright, the body is balanced over the knees; as it tips forward the moment of everything above the knees grows with the sine of the lean (static estimate about 0.05, 0.6, 1.0), so the hamstrings work hardest at the deepest point shown. The lowering is the working phase of this exercise.',
+    why: 'Upright, the body is balanced over the knees. As it tips forward, the moment of everything above the knees grows with the sine of the lean (static estimate for the animated path about 0.03, 0.6 and 1.0), so the hamstrings work hardest at the deepest point shown, where they are also longest. The middle value sits a little above the static 0.6 because the hamstrings are shorter and weaker with the knees more bent. The lowering is the working phase of this exercise.',
   },
-  // Lying face up, legs straight, heels on sliders, hips held just off the floor -> Hips bridged high and heels pulled in, knees bent to about 75 degrees of flexion
+  // Lying face up, arms on the floor, legs long with the knees almost straight, heels on sliders, hips held just off the floor -> Heels pulled in under the knees (knees bent about 110 degrees), hips lifted into a full bridge with shoulders, hips and knees in line
   'slider-leg-curl': {
-    profile: [1, 0.85, 0.45],
+    profile: [1, 0.8, 0.3],
     muscles: [
       { group: 'hamstrings', role: 'main', peak: 1, note: 'pull the heels in and hold the hips up' },
       { group: 'glutes', role: 'stabilize', peak: 0.5, note: 'hold the hips up' },
     ],
-    why: 'On sliders the floor can only push straight up at the heels, so the hamstrings hold the knee against a lever that is longest with the legs straight and the heels far out (static knee moment about 1.0, 0.8, 0.25, plus a hip moment that eases less); pulling the heels in under the knees shortens it, so the curled position is the easiest. The glutes keep the hips off the floor throughout.',
+    why: 'On sliders the floor can only push straight up at the heels, so the hamstrings hold the knee against a lever that is longest with the legs long and the heels far out. In the animated path the static knee-flexion moment falls from 1.0 to about 0.65 halfway and to almost nothing at the top, where the heels sit under the knees; the hip-extension moment eases from 1.0 to about 0.55. The middle stays at 0.8 because the hamstrings are weaker with the knees more bent; at the top they mostly help the glutes hold the bridge from a short position. The hip angle changes by less than 20 degrees (the pelvis rises because the knees bend), so the glutes hold the hips up isometrically.',
   },
-  // Face down on the bench, legs straight, pad on the back of the lower legs, stack resting -> Knees bent past 90 degrees (about 105 degrees of flexion), heels curled up toward the glutes
+  // Face down on the machine, knees just unlocked (about 10 degrees bent), roller on the backs of the ankles, weight stack at rest -> Heels curled up toward the glutes, knees bent about 115 degrees
   'lying-leg-curl': {
     profile: [0.5, 0.7, 1],
     restAtStart: true,
     muscles: [
       { group: 'hamstrings', role: 'main', peak: 1, note: 'bend the knee' },
     ],
-    why: 'The machine\'s resistance about the knee is roughly even through the range, but with the hips flat the hamstrings shorten at both ends as the heels approach the glutes and lose much of their strength, so the fully curled position is the hardest to hold.',
+    why: 'The machine\'s resistance about the knee is roughly even through the range (the lower leg\'s own weight adds to it early and helps slightly past 90 degrees). With the hips extended, the hamstrings are already short at the hip, and curling the knee past 90 degrees shortens them further, so they lose much of their strength and the fully curled position is the hardest to hold.',
   },
   // Seated, legs straight out in front, pad on the back of the lower legs, stack resting -> Knees bent past 90 degrees (about 110 degrees of flexion), heels pulled down and back under the seat
   'seated-leg-curl': {
@@ -261,7 +262,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'Sitting flexes the hips, so the hamstrings work from a lengthened position and lose less strength as the knee bends than in the lying curl; demand still rises toward the fully curled position, but the curve is flatter.',
   },
-  // Hinged with the torso about 68 degrees forward, kettlebell swung back between the thighs -> Standing tall with the hips locked out, arms straight out in front, bell floating at chest height
+  // Hinged with the torso about 64 degrees forward, hips back, knees bent about 35 degrees, kettlebell hiked back between the thighs under the hips -> Standing tall with the hips locked out, straight arms a little below horizontal, bell floating at about chest height
   'kettlebell-swing': {
     profile: [1, 0.85, 0.3],
     muscles: [
@@ -270,29 +271,27 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'back', role: 'stabilize', peak: 0.45, note: 'keeps the spine neutral in the hinge' },
       { group: 'core', role: 'stabilize', peak: 0.4, note: 'braces the trunk and stops a lean back at the top' },
     ],
-    why: 'A ballistic hinge: the hips work hardest at the bottom, where the bell\'s momentum is stopped and reversed, and through the hip drive while the bell swings under the body; at the top the hips are locked out and the bell floats, so little load remains. A static model would wrongly put a big load at the top, so the profile follows the swing\'s momentum instead.',
+    why: 'A ballistic hinge. The hips work hardest at the bottom, where the bell\'s momentum is stopped and reversed, and through the hip drive, which in the animation is complete by about s = 0.6 while the bell swings forward. After that the bell floats up on its own, so little load remains at the top. A static model would put a sizable load at the top (the bell held at arm\'s length in front), so the profile follows the swing\'s momentum instead.',
   },
-  // Upper back on the bench, hips down by the floor, barbell resting across the hips, feet flat -> Hips driven up level with the shoulders and knees, shins vertical, bar held on the hips
+  // Upper back across the bench edge, feet flat, hips lowered until the glutes are a few centimetres off the floor (hips bent about 90 degrees, knees about 115 degrees), barbell held in the hip crease -> Hips driven up until the trunk is level and in line with the thighs, shins about vertical, bar still in the hip crease
   'hip-thrust': {
     profile: [0.7, 0.8, 1],
-    restAtStart: true,
     muscles: [
       { group: 'glutes', role: 'main', peak: 1, note: 'drive the hips up; hardest at lockout' },
       { group: 'hamstrings', role: 'assist', peak: 0.5, profile: [1, 0.7, 0.45], note: 'help extend the hip, most low in the range' },
     ],
-    why: 'With the back on the bench and the feet planted, the external hip moment stays fairly even through the range (static estimate within about 15%), but the glutes are shortest and weakest at full hip extension, so lockout is the hardest point. With the knees bent and the shins vertical at the top, the hamstrings are short and the knee needs no flexor work there, so their share fades as the hips rise.',
+    why: 'At the bottom the hips hover a few centimetres off the floor and the plates never touch it, so the bar is held on the hips from the start. The external hip moment changes little through the range because the hips barely move horizontally between the bench and the feet: a static model stays within about 15% if the bench pushes straight up; if it pushes square to the sloping back, the bottom comes out somewhat higher. The glutes are shortest and weakest at full hip extension, so lockout is the hardest point. At the bottom the feet are ahead of the knees, so the hamstrings also hold the knee; at the top the shins are vertical and the hamstrings are short, so their share fades as the hips rise.',
   },
-  // Upper back on the bench, hips down by the floor, dumbbell resting across the hips, feet flat -> Hips driven up level with the shoulders and knees, shins vertical, dumbbell held on the hips
+  // Upper back across the bench edge, feet flat, hips lowered until the glutes are a few centimetres off the floor (hips bent about 90 degrees), a dumbbell held across the hips -> Hips driven up until the trunk is level and in line with the thighs, shins about vertical, dumbbell still held on the hips
   'dumbbell-hip-thrust': {
     profile: [0.7, 0.8, 1],
-    restAtStart: true,
     muscles: [
       { group: 'glutes', role: 'main', peak: 1, note: 'drive the hips up; hardest at lockout' },
       { group: 'hamstrings', role: 'assist', peak: 0.5, profile: [1, 0.7, 0.45], note: 'help extend the hip, most low in the range' },
     ],
-    why: 'Same mechanics as the barbell hip thrust with a lighter load: the external hip moment is fairly even through the range, while the glutes are weakest at full hip extension, so lockout is hardest. The hamstrings help most low in the range and fade as the hips rise with the knees bent.',
+    why: 'Same mechanics as the barbell hip thrust with a lighter load. The hips hover just off the floor at the bottom, so the load is held from the start. The external hip moment changes little through the range while the glutes are weakest at full hip extension, so lockout is hardest. The hamstrings help most low in the range, where they also hold the knee, and fade as the hips rise with the shins vertical.',
   },
-  // Lying face up, knees bent, feet flat, hips resting on the floor -> Hips raised until shoulders, hips and knees are almost in line
+  // Lying face up, knees bent with the feet flat a little ahead of the knees, arms on the floor by the sides, hips resting on the floor -> Hips lifted until shoulders, hips and knees form a straight line, shins about vertical
   'glute-bridge': {
     profile: [0.7, 0.8, 1],
     restAtStart: true,
@@ -300,9 +299,9 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'glutes', role: 'main', peak: 1, note: 'lift the hips; hardest at the top' },
       { group: 'hamstrings', role: 'assist', peak: 0.5, profile: [1, 0.7, 0.45], note: 'help extend the hip, most low in the range' },
     ],
-    why: 'Supported at the shoulders and feet, the hip moment from body weight stays nearly even through the range (static estimate within about 15%), but the glutes are weakest at full hip extension, so the top is the hardest point. With the feet close to the hips and the knees well bent, the hamstrings are short and help mostly as the hips leave the floor.',
+    why: 'Supported at the shoulders and feet, the hip moment from body weight is nearly constant once the hips leave the floor (static estimate within about 5% through the animated range), but the glutes are weakest at full hip extension, so the top is the hardest point. With the feet close and the knees bent about 110 to 125 degrees the hamstrings are short; their knee job (the feet are ahead of the knees) is largest as the hips leave the floor (static knee-flexion moment about 1.0, 0.45, 0.3), so they help mostly early.',
   },
-  // Lying face up, one foot flat with the knee bent, the other leg held straight in line with its thigh, hips on the floor -> Hips raised on one leg until shoulders, hips and knee are almost in line, free leg still straight
+  // Lying face up, the working foot flat with the knee bent, the free leg held straight in line with the working thigh, hips resting on the floor -> Hips lifted on one leg until shoulders, hips and the working knee are in line, free leg still straight along the thigh line
   'single-leg-glute-bridge': {
     profile: [0.7, 0.8, 1],
     restAtStart: true,
@@ -310,70 +309,69 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'glutes', role: 'main', peak: 1, note: 'lift the hips and keep the pelvis level' },
       { group: 'hamstrings', role: 'assist', peak: 0.55, profile: [1, 0.7, 0.45], note: 'help extend the hip, most low in the range' },
     ],
-    why: 'One leg lifts the hips and also carries the raised leg, so the hip moment is larger than in the two-leg bridge and stays even through the range; the glutes are weakest at full extension, which makes the top the hardest. On one leg the glute medius also keeps the pelvis from dropping on the free side.',
+    why: 'One hip lifts the pelvis and also carries the raised leg, so its moment is larger than each hip\'s in the two-leg bridge and stays nearly even through the range (static estimate 0.94 to 1.0); the glutes are weakest at full extension, which makes the top the hardest. On one leg the glute medius also keeps the pelvis from dropping on the free side. Only the working leg is coloured.',
   },
-  // Lying on the side (seen from the front), top leg resting on the bottom leg, head on the lower arm -> Top leg raised about 36 degrees with the knee straight
+  // Lying on the left side (seen from the front), body in one line, head resting on the outstretched bottom arm, top hand on the hip, top leg resting on the bottom leg -> Top leg lifted straight about 40 degrees above the bottom leg (about 34 degrees above horizontal), pelvis not rolling back
   'side-lying-hip-abduction': {
-    profile: [0.8, 0.9, 1],
+    profile: [0.7, 0.85, 1],
     restAtStart: true,
     muscles: [
       { group: 'glutes', role: 'main', peak: 1, note: 'the glute medius lifts the leg' },
     ],
-    why: 'The leg\'s weight has its longest lever about the hip just as it leaves the other leg (about 0.8 of that at the top), but the glute medius gets weaker as it shortens, so the effort keeps rising to the top of the lift.',
+    why: 'The leg\'s weight has its longest lever about the hip just after it leaves the other leg (it starts about horizontal) and about 0.83 of that at the top of the 40-degree lift. The hip abductors get markedly weaker as they shorten (here from about neutral to about 43 degrees of abduction from the trunk line), so the effort keeps rising to the top of the lift.',
   },
-  // Facing away from a low pulley, hinged with the torso about 70 degrees forward, hands holding the rope between the legs just below knee height -> Standing tall with the hips through, hands at the front of the hips, cable running back between the legs
+  // Facing away from a low pulley, hinged with the torso about 62 degrees forward, hips back, knees bent about 30 degrees, both hands on the rope between the thighs a little above knee height -> Standing tall with the hips through, arms hanging straight with the hands on the rope in front of the upper thighs, the cable running back between the legs
   'cable-pull-through': {
     profile: [1, 0.65, 0.25],
     muscles: [
       { group: 'glutes', role: 'main', peak: 1, note: 'extend the hip' },
       { group: 'hamstrings', role: 'main', peak: 0.9, note: 'extend the hip' },
     ],
-    why: 'The forward-leaning torso and the cable pulling the hands back toward the low pulley both have their longest moment arm about the hips in the hinged position (static estimate about 1.0, 0.65, 0.1). Standing tall, the cable line passes just below the hips, so only a small backward pull is left for the glutes to hold at lockout.',
+    why: 'The forward-leaning torso and the cable pulling the hands back toward the low pulley both have their longest moment arm about the hips in the hinged position. A static model of the animated path (cable 0.3 to 0.6 times body weight) gives about 1.0, 0.62 and 0.15 to 0.22 at the start, middle and lockout. Standing tall, the cable still passes below the hips and pulls the hands back between the legs, so a small backward pull is left for the glutes to hold at lockout.',
   },
-  // Standing tall, a dumbbell in each hand at the sides, feet flat -> Up on the balls of the feet, heels lifted (ankles about 30 degrees past flat)
+  // Standing tall with straight knees, a dumbbell hanging at each side, feet flat -> Up on the balls of the feet with the toes flat, heels high (feet about 40 degrees from the floor), body still tall over the balls of the feet
   'standing-calf-raise': {
     profile: [0.65, 0.8, 1],
     restAtStart: true,
     muscles: [
       { group: 'calves', role: 'main', peak: 1, note: 'lift the heels' },
     ],
-    why: 'With the heels down the body and dumbbells rest on the heels and the calves are nearly off; once the heels lift, the whole load acts through the ball of the foot with a lever that shrinks only slightly as the ankle extends, while the calf shortens and weakens, so the top is the hardest position to hold.',
+    why: 'With the heels down, the heels carry the body and dumbbells and the calves only keep the balance; once the heels lift, the whole load acts through the balls of the feet. That lever (ankle to the ball of the foot, measured along the floor) shrinks as the heels rise, to under half at the top of this 40-degree rise. Calf strength falls even faster as the muscle shortens (at 30 to 40 degrees of pointing the ankle it is roughly half or less of its strength near neutral), so the top is still the hardest position to hold.',
   },
-  // Standing on one foot with the heel down, the other foot tucked up behind -> Up on the ball of the standing foot, heel lifted (ankle about 30 degrees past flat)
+  // Standing tall on the near foot, heel down, the free knee bent with that foot lifted behind, one hand flat on a wall -> Up on the ball of the standing foot with the toes flat, heel high (foot about 40 degrees from the floor)
   'single-leg-calf-raise': {
     profile: [0.65, 0.8, 1],
     restAtStart: true,
     muscles: [
       { group: 'calves', role: 'main', peak: 1, note: 'lift the heel' },
     ],
-    why: 'One calf lifts the whole body: the heel carries the weight at the start, the load comes on as the heel lifts, and the top is the hardest because the calf is shortest and weakest there.',
+    why: 'One calf lifts the whole body. The heel carries the weight at the start, and the load comes on through the ball of the foot as the heel lifts. That lever shrinks toward the top, but the calf weakens faster as it shortens, so the top is the hardest. Only the standing leg is coloured.',
   },
-  // Standing tall on both feet, heels down, arms at the sides -> Up on the balls of both feet, heels lifted (ankles about 30 degrees past flat)
+  // Standing tall on both feet, heels down, arms relaxed at the sides -> Up on the balls of both feet with the toes flat, heels high (feet about 40 degrees from the floor)
   'bodyweight-calf-raise': {
     profile: [0.65, 0.8, 1],
     restAtStart: true,
     muscles: [
       { group: 'calves', role: 'main', peak: 1, note: 'lift the heels' },
     ],
-    why: 'Body weight rests on the heels until they lift; from then on it acts through the ball of the foot with a lever that shrinks only slightly, and the top is the hardest because the calves are shortest and weakest there.',
+    why: 'Body weight rests on the heels until they lift; from then on it acts through the balls of the feet with a lever that shrinks toward the top, but the calves weaken faster as they shorten, so the top is the hardest.',
   },
-  // Perched on a tall box with the legs almost straight down to the floor, dumbbell on the knees, feet flat (as drawn; a seated raise normally bends the knees to about 90 degrees) -> Heels lifted (ankles about 34 degrees past flat), knees bending slightly
+  // Sitting on a bench, thighs level and shins vertical (knees bent about 90 degrees), feet flat, a dumbbell stood on end on each lower thigh, steadied by the hands -> Heels raised high on the balls of the feet (feet about 40 degrees from the floor), knees and dumbbells lifted a few centimetres
   'seated-calf-raise': {
     profile: [0.65, 0.8, 1],
     restAtStart: true,
     muscles: [
       { group: 'calves', role: 'main', peak: 1, note: 'lift the heels; with bent knees mostly the soleus' },
     ],
-    why: 'The dumbbell on the knees, not the body, is the load: it rests through the heels until they lift, then acts through the ball of the foot, and the calf is shortest and weakest at the top. With the knees bent near 90 degrees, as a seated raise is normally done, the soleus does most of the work because the gastrocnemius is slack; the demo currently draws the legs nearly straight.',
+    why: 'The dumbbells on the knees, not the body, are the load. With the shins vertical they rest through the heels until the heels lift, then act through the balls of the feet. That lever shrinks toward the top, but the calf weakens faster, so the top is the hardest. With the knees bent about 90 degrees, the gastrocnemius is slack and the soleus does most of the work.',
   },
-  // Standing under the machine's shoulder pads, feet flat, heels down -> Up on the balls of the feet, heels lifted (ankles about 30 degrees past flat), pads pushed up
+  // Standing under the shoulder pads, hands on the handles, balls of the feet on the platform edge, heels dropped below it in a stretch (feet about 18 degrees below level) -> Up on the balls of the feet, heels well above the platform (feet about 40 degrees above level), pads pushed straight up
   'machine-calf-raise': {
     profile: [0.65, 0.8, 1],
-    restAtStart: true,
     muscles: [
       { group: 'calves', role: 'main', peak: 1, note: 'lift the heels' },
     ],
-    why: 'The pads load the shoulders and the load passes straight down the stacked joints to the heels until they lift; from then on it acts through the ball of the foot, and the top is the hardest because the calves are shortest and weakest there.',
+    why: 'The pads load the shoulders and the load passes down the straight body to the balls of the feet the whole time. At the start the heels hang below the platform, so the calves already hold the full load at their longest, helped by the stretch\'s passive tension. The lever from the ankle to the ball is longest there and shrinks toward the top while the calves weaken as they shorten, so the effort rises to the top, which is the hardest position to hold.',
   },
   // Lying on a flat bench, barbell held at arm's length straight above the shoulders, elbows straight. -> Bar lowered to touch the upper chest, elbows bent and level with the shoulders.
   'bench-press': {
@@ -531,6 +529,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
   // Holding the top of a pull-up: chin over the bar, elbows fully bent, body leaning back slightly -> Dead hang, arms nearly straight overhead, body vertical
   'negative-pull-up': {
     profile: [1, 0.8, 0.3],
+    lowering: 1,
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'lengthens under load to lower the body slowly' },
       { group: 'biceps', role: 'assist', peak: 0.65, profile: [0.7, 1, 0.1], note: 'let the elbows straighten slowly' },
@@ -572,15 +571,15 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'With a high pulley the cable starts nearly in line with the raised arms, so its lever about the shoulder is short; the lever is longest around mid-sweep, where the arms cross the cable at about a right angle, and eases toward the thighs, where the lats are shortest, so effort stays high to the finish. In the current demo the pulley is drawn almost level with the hands and far in front, so at the start the cable would pull the arms down rather than resist them; a pulley above head height and closer to the lifter fixes that.',
   },
-  // On a 45-degree bench with the ankles under the pad, body in one straight line, arms folded on the chest -> Torso lowered to hang nearly straight down over the pad (hips flexed to about 110 degrees), back still straight
+  // On a 45-degree back-extension bench, ankles under the roller and thighs on the pad, body straight from heels to head along the 45-degree line, arms crossed on the chest -> Trunk lowered from the hips (hips bent about 88 degrees) until it points about 45 degrees below horizontal, back kept straight
   'back-extension': {
-    profile: [0.8, 1, 0.35],
+    profile: [0.75, 1, 0.7],
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'keeps the spine straight against the torso\'s weight' },
       { group: 'glutes', role: 'assist', peak: 0.65, note: 'extend the hip' },
       { group: 'hamstrings', role: 'assist', peak: 0.6, note: 'extend the hip' },
     ],
-    why: 'The torso\'s weight has its longest moment arm about the hips and lower back when the torso is horizontal, which comes partway through the range on a 45-degree bench; it is a little less with the body straight at the top and much less hanging at the bottom (static estimate about 0.8, 1.0, 0.35).',
+    why: 'The upper body\'s weight has its longest moment arm about the hips and lower back when the trunk is horizontal, which comes halfway through the animated range. The trunk is about 45 degrees above horizontal at the top and about 43 degrees below it at the bottom, so the lever is about 0.7 of the maximum at both ends (static estimate about 0.74, 1.0, 0.69 at the hips and 0.75, 1.0, 0.68 at the lower back).',
   },
   // Standing tall, bar resting on the front of the shoulders at collarbone height, elbows down and in front of the bar. -> Bar pressed to straight arms overhead, over the shoulders and mid-foot.
   'overhead-press': {

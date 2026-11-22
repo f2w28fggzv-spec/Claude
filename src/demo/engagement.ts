@@ -38,6 +38,12 @@ export interface Engagement {
   profile: Profile;
   /** At s = 0 the load rests on the floor, pins or weight stack: muscles are off until the move begins. */
   restAtStart?: boolean;
+  /**
+   * Share of their level movers show mid-way through lowering (default 0.8).
+   * 1 for exercises built around the lowering (Nordic curl, negative
+   * pull-up), where lowering under control is the hard part.
+   */
+  lowering?: number;
   muscles: MuscleUse[];
   /** The mechanics behind the profile (for maintainers; not shown in the app). */
   why?: string;
@@ -118,7 +124,7 @@ export function levelOf(use: MuscleUse, spec: Engagement, m: Moment, t = 0): num
   }
   if (use.role === 'stabilize') return clamp01(use.peak * (STEADY + (1 - STEADY) * demand) * mixN(0.4, 1, on));
   // Movers dip while lowering, smoothly so the colour never jumps at a pause.
-  const lowering = m.action === 'lowering' ? 1 - (1 - LOWERING) * Math.sin(Math.PI * clamp01(m.u)) : 1;
+  const lowering = m.action === 'lowering' ? 1 - (1 - (spec.lowering ?? LOWERING)) * Math.sin(Math.PI * clamp01(m.u)) : 1;
   return clamp01(use.peak * demand * lowering);
 }
 
