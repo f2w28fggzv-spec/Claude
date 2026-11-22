@@ -1,16 +1,34 @@
 // Movement patterns: overhead presses, pike and handstand push-ups, raises. Conventions and helpers: ./shared.ts.
-import { add, along, armTo, dir, GRIP, gripTo, L, legTo, lerp, lerpV, mul, PALM, palmTo, type Leg, type Vec } from '../figure';
+//
+// Presses are seen from the side with the arms worked out in 3D: the forearms
+// stay stacked under what the hands hold (upright from the side), and an elbow
+// that flares out to the side, toward the camera, makes the upper arm look
+// short. Standing lifters keep the centre of pressure over the middle of the
+// foot, the weight included. A barbell travels up close in front of the face
+// while the head draws back, then the head and chest come through under it.
+// Hands pressing on the floor are flat with the fingers forward; the head
+// stops just off the floor (or touches it, in a handstand push-up).
 import { BODY } from '../body';
+import { skinPoints } from '../contact';
+import { GRIP, L, PALM, add, along, angleOf, armTo, dir, dist, legTo, lerp, lerpV, mul, solve, sub, twoLink, type Arm, type DemoPose, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
-import { O, FLOOR, LEG_LEN, ARM_LEN, BACK, between, handProp, standing, type Implement } from './shared';
+import { O, FLOOR, LEG_LEN, FWD, centreOfMass, restingPad, solveFor, type Implement } from './shared';
 
+/** The middle of a flat foot, ahead of the ankle. A standing lifter's centre of pressure sits a little behind it (as in ./legs). */
+const MIDFOOT = (L.foot - L.heel) / 2;
+const BALANCE = MIDFOOT - 0.01;
+/** Elbow to the middle of the fist. */
+const REACH = L.forearm + GRIP;
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+const rad = (deg: number) => (deg * Math.PI) / 180;
+const clamp01 = (u: number) => Math.min(1, Math.max(0, u));
 /** 0 → 1 smoothly as s goes from a to b. */
 const ramp = (s: number, a: number, b: number) => {
-  const u = Math.min(1, Math.max(0, (s - a) / (b - a)));
+  const u = clamp01((s - a) / (b - a));
   return u * u * (3 - 2 * u);
 };
-/** 0 → 1 → 0 as s goes from a to b (half a sine). */
-const bump = (s: number, a: number, b: number) => (s <= a || s >= b ? 0 : Math.sin((Math.PI * (s - a)) / (b - a)));
 
 /**
  * A smooth curve through keyframes [s, value] (cubic Hermite with
@@ -38,208 +56,440 @@ function curve(keys: readonly (readonly [number, number])[]): (s: number) => num
 /** The point `fwd` in front of and `up` above p, for a trunk leaning `torso` degrees. */
 const local = (p: Vec, torso: number, fwd: number, up: number): Vec => add(along(p, torso + 90, fwd), mul(dir(torso), up));
 
-/** Shoulder to bar (or handle) with the elbow locked out: 174° at the elbow. */
-const LOCKED = Math.sqrt(L.upperArm ** 2 + (L.forearm + GRIP) ** 2 + 2 * L.upperArm * (L.forearm + GRIP) * Math.cos((6 * Math.PI) / 180));
+/** Apparent share of a segment `len` long whose ends are `side` apart toward or away from the camera. */
+const seen = (len: number, side: number) => Math.sqrt(Math.max(0, len * len - side * side)) / len;
+
+/** Ball of the foot from the ankle, for a foot pointing `foot` degrees (heel to ball; see ../figure). */
+const ballFrom = (foot: number): Vec => add(mul(dir(foot), L.ball), mul(dir(foot + 90), L.ankleHeight));
+
+// ── Arms seen from the side ──────────────────────────────────────────────
 
 /**
- * Standing figure (side view, ankle at the origin, feet flat): hips `hipX`
- * ahead of the ankle and `dip` below standing height, knees forward.
+ * Arm closed on `grip` with the forearm leaning `tilt` degrees on screen
+ * (0 = upright, negative = the elbow ahead of the grip), the grip `out` to
+ * the side of the shoulder joint (a bar held just outside the shoulders). The
+ * elbow flares out to the side, toward the camera, only as far as the arm's
+ * lengths need, so the side view sees the upper arm (and the forearm, slanting
+ * in to the bar) shorter. A grip at the end of the arm's reach gets the
+ * straight arm.
  */
-function stance(hipX: number, dip = 0): { hip: Vec; leg: Leg } {
-  const hip = { x: hipX, y: -Math.sqrt(LEG_LEN ** 2 - hipX ** 2) + dip };
-  return { hip, leg: legTo(hip, O, { x: 1, y: 0 }) };
+function barArm(shoulder: Vec, grip: Vec, out: number, tilt: number): Arm {
+  const u = dir(tilt);
+  // f: the forearm's length on screen; the elbow sits f below the grip along the forearm.
+  const elbowAt = (f: number) => sub(grip, mul(u, f));
+  const fits = (f: number) => dist(elbowAt(f), shoulder) <= L.upperArm;
+  // What the upper arm's length leaves for the elbow to point out to the side; the forearm's 3D length must come out right.
+  const flare = (f: number) => Math.sqrt(Math.max(0, L.upperArm ** 2 - dist(elbowAt(f), shoulder) ** 2));
+  const miss = (f: number) => f * f + (flare(f) - out) ** 2 - REACH ** 2;
+  // From the forearm at full length, shorten it until the lengths fit: the least flared elbow.
+  let hi = REACH;
+  for (let k = 1; k <= 80; k++) {
+    const lo = REACH * (1 - k / 80);
+    if (fits(lo) && fits(hi) && miss(lo) < 0 && miss(hi) >= 0) {
+      const elbow = elbowAt(solveFor(lo, hi, miss, 0));
+      const f = dist(elbow, grip);
+      return { upper: angleOf(sub(elbow, shoulder)), scale: dist(elbow, shoulder) / L.upperArm, fore: tilt, foreScale: f / REACH };
+    }
+    hi = lo;
+  }
+  // Out of reach: the arm straight toward the grip.
+  const elbowOut = (out * L.upperArm) / (L.upperArm + REACH);
+  const scale = seen(L.upperArm, elbowOut);
+  const foreScale = seen(REACH, out - elbowOut);
+  const [upper, fore] = twoLink(shoulder, grip, L.upperArm * scale, REACH * foreScale, FWD);
+  return { upper, fore, scale, foreScale };
 }
+
+/**
+ * Arm holding a dumbbell (or a handle) straight above its elbow: the forearm
+ * upright from the side and from the front, so the side view sees it full
+ * length and the upper arm short by however far the elbow points out to the
+ * side, toward the camera.
+ */
+function stackedArm(shoulder: Vec, grip: Vec): Arm {
+  const elbow = add(grip, { x: 0, y: REACH });
+  const d = dist(elbow, shoulder);
+  if (d >= L.upperArm) return { ...armTo(shoulder, sub(grip, { x: 0, y: -GRIP }), FWD), foreScale: 1 };
+  return { upper: angleOf(sub(elbow, shoulder)), scale: d / L.upperArm, fore: 0, foreScale: 1 };
+}
+
+/**
+ * Where a fist held straight above its elbow sits, seen from the side,
+ * relative to the shoulder joint: `up` above it, with the upper arm `plane`
+ * degrees forward of pointing straight out to the side (about 30 is the
+ * scapular plane; 90 points straight ahead).
+ */
+function overElbow(up: number, plane: number): Vec {
+  const rise = Math.max(-1, Math.min(1, (up - REACH) / L.upperArm));
+  return { x: L.upperArm * Math.sqrt(1 - rise * rise) * Math.sin(rad(plane)), y: -up };
+}
+
+/**
+ * Arm pressing its palm flat on `palm`, fingers pointing `hand` degrees, the
+ * wrist `out` to the side of the shoulder joint and the elbow `elbowOut`
+ * (toward the camera), bending toward `toward`. Seen from the side, the more
+ * a segment points out to the side the shorter it looks.
+ */
+function palmArm(shoulder: Vec, palm: Vec, hand: number, toward: Vec, out: number, elbowOut: number): Arm {
+  const scale = seen(L.upperArm, elbowOut);
+  const foreScale = seen(L.forearm, out - elbowOut);
+  const wrist = along(palm, hand + 180, PALM * foreScale);
+  const [upper, fore] = twoLink(shoulder, wrist, L.upperArm * scale, L.forearm * foreScale, toward);
+  return { upper, fore, scale, foreScale, hand, flat: true };
+}
+
+/** How far to the side the elbow of a straight arm sits when its wrist is `out` to the side of the shoulder. */
+const straightOut = (out: number) => (out * L.upperArm) / (L.upperArm + L.forearm);
+
+// ── Standing ─────────────────────────────────────────────────────────────
+
+/**
+ * Standing with the feet flat (ankle at the origin): the hip joint `hipX`
+ * ahead of the ankle, the knees locked or, with `sink`, bent forward so the
+ * hips drop that far; the trunk leaning `lean` degrees (back when negative).
+ */
+function standingAt(hipX: number, lean: number, sink = 0): { leg: Leg; shoulder: Vec } {
+  const hip = { x: hipX, y: -Math.sqrt(LEG_LEN ** 2 - hipX ** 2) + sink };
+  return { leg: legTo(hip, O, FWD), shoulder: along(hip, lean, L.torso) };
+}
+
+/** x of a standing figure's centre of pressure: its centre of mass with the loads it holds. */
+const pressureX = (pose: DemoPose, loads: (f: ReturnType<typeof solve>) => { at: Vec; share: number }[]) => {
+  const f = solve('side', pose);
+  return centreOfMass(f, loads(f)).x;
+};
+
+// ── Overhead presses ─────────────────────────────────────────────────────
 
 export function overheadPress(o: { implement: Implement; seated?: boolean; dip?: boolean; machine?: boolean; arnold?: boolean }): Demo {
   if (o.seated) return machinePress();
   if (o.implement === 'barbell' || o.implement === 'ezbar') return barbellPress(!!o.dip);
-  return dumbbellPress(o.implement, !!o.arnold);
+  return dumbbellPress(!!o.arnold);
 }
+
+/** A working press weight, as a share of body weight. */
+const BAR_LOAD = 0.5;
+/** Fists just outside the shoulders: this far out to the side of the shoulder joints. */
+const BAR_OUT = 0.035;
+/** Bar resting on the front delts by the collarbones: this far in front of and above the shoulder joint. */
+const RACK = { fwd: 0.062, up: 0.016 };
+/** The bar locked out overhead: shoulder joint to bar with the elbows at 176°, as the side view sees it. */
+const LOCKED = Math.sqrt(L.upperArm ** 2 + REACH ** 2 + 2 * L.upperArm * REACH * Math.cos(rad(4)) - BAR_OUT ** 2);
 
 /**
  * Standing barbell press, side view: s = 0 with the bar resting on the front
- * delts (forearms near vertical, elbows a little in front of the bar), s = 1
- * locked out with the bar over the shoulders and mid-foot. The bar travels
- * straight up: the lifter leans back slightly and pulls the head back while it
- * passes the face, then moves the head and chest through under it.
- * With `dip` (push press): a short knee dip with the bar still on the
- * shoulders, then the legs drive it off and the arms finish the press.
+ * delts (forearms near upright, elbows a little in front of the bar), s = 1
+ * locked out over the shoulders and the middle of the foot. Legs locked, the
+ * trunk braced. The lifter leans back a few degrees by pushing the hips
+ * forward and draws the head back, so the bar rises close in front of the
+ * face; once it is past the forehead the head and chest come forward under it
+ * ("through the window"). The elbows flare out to the sides under the bar on
+ * the way up. Every frame keeps lifter and bar balanced over the middle of
+ * the foot. With `dip` (push press): a short dip of the knees with the trunk
+ * upright and the bar on the shoulders, then the legs drive it off and the
+ * arms finish the press.
  */
 function barbellPress(dip: boolean): Demo {
-  // When the bar leaves the shoulders, and how far the knees dip before that.
-  const leave = dip ? 0.16 : 0;
-  const dipDepth = (s: number) => (dip ? 0.045 * bump(s, 0, 2 * leave) : 0);
-  // Press progress: 0 on the shoulders, 1 locked out.
-  const press = (s: number) => (s <= leave ? 0 : (s - leave) / (1 - leave));
-  const hipX = curve([[0, 0.004], [0.3, 0.01], [0.7, 0.026], [1, 0.03]]);
-  const lean = curve(dip ? [[0, 0], [0.3, -4], [0.7, -1], [1, 1]] : [[0, -3], [0.3, -6], [0.7, -1], [1, 1]]);
-  const neck = curve([[0, 0], [0.12, -4], [0.32, -9], [0.55, -3], [0.75, 5], [1, 5]]);
-  const body = (s: number) => {
-    const { hip, leg } = stance(hipX(s), dipDepth(s));
-    const torso = lean(s);
-    return { hip, leg, torso, shoulder: along(hip, torso, L.torso) };
-  };
-  // Bar on the front delts, just in front of the throat.
-  const rack = (s: number) => {
-    const b = body(s);
-    return local(b.shoulder, b.torso, 0.062, 0.016);
-  };
-  const start = rack(leave);
-  const end = add(body(1).shoulder, { x: 0.004, y: -LOCKED });
-  const bar = (s: number): Vec => {
-    if (s <= leave) return rack(s);
+  // The dip and drive take the first part of the rep, the bar still on the shoulders.
+  const leave = dip ? 0.4 : 0;
+  const press = (s: number) => clamp01((s - leave) / (1 - leave));
+  // Hips sink about 5% of height, then drive back up to locked knees.
+  const sink = dip ? curve([[0, 0], [leave * 0.55, 0.05], [leave, 0]]) : () => 0;
+  // Trunk lean (back when negative) and the head against the trunk, by press progress.
+  const lean = dip
+    ? curve([[0, 0], [0.25, -3], [0.5, -2.5], [0.8, 0], [1, 1]])
+    : curve([[0, -3], [0.2, -6], [0.45, -6], [0.75, -1], [1, 1]]);
+  const neck = curve([[0, 0], [0.15, -8], [0.4, -11], [0.6, -3], [0.85, 6], [1, 6]]);
+  // Forearms: elbows a little in front of the bar on the shoulders, under it once it moves.
+  const tilt = (p: number) => lerp(-12, 0, ramp(p, 0, 0.4));
+
+  type Place = (shoulder: Vec, torso: number) => Vec;
+  const onShoulders: Place = (sh, torso) => local(sh, torso, RACK.fwd, RACK.up);
+  const overhead: Place = (sh) => add(sh, { x: 0, y: -LOCKED });
+  const build = (s: number, hipX: number, bar: Vec | Place) => {
     const p = press(s);
-    // Straight up; it settles over the shoulders once past the head.
-    return { x: lerp(start.x, end.x, ramp(p, 0.45, 1)), y: lerp(start.y, end.y, p) };
+    const torso = lean(p);
+    const { leg, shoulder } = standingAt(hipX, torso, sink(s));
+    const at = typeof bar === 'function' ? bar(shoulder, torso) : bar;
+    const pose: DemoPose = { torso, head: torso + neck(p), leg, arm: barArm(shoulder, at, BAR_OUT, tilt(p)), anchor: 'ankle', at: O };
+    return { pose, bar: at };
   };
+  // The hips shift until lifter and bar balance over the middle of the foot.
+  const balanced = (s: number, bar: Vec | Place) => {
+    const hipX = solveFor(-0.1, 0.2, (h) => {
+      const b = build(s, h, bar);
+      return pressureX(b.pose, () => [{ at: b.bar, share: BAR_LOAD }]);
+    }, BALANCE);
+    return build(s, hipX, bar);
+  };
+  const from = balanced(leave, onShoulders).bar;
+  const to = balanced(1, overhead).bar;
+  // In between the bar rises in a line, kept forward while it passes the face, then settles back over the shoulders.
+  const barAt = (p: number): Vec => ({ x: lerp(from.x, to.x, ramp(p, 0.3, 0.9)), y: lerp(from.y, to.y, p) });
   return {
     view: 'side',
-    pose: (s) => {
-      const b = body(s);
-      // The elbows swing out toward the camera mid-press, so the arm looks a little shorter.
-      const scale = 1 - 0.1 * bump(press(s), 0.05, 0.9);
-      return {
-        torso: b.torso,
-        head: b.torso + neck(s),
-        leg: b.leg,
-        arm: gripTo(b.shoulder, bar(s), { x: 1, y: 0.4 }, scale),
-        anchor: 'ankle',
-        at: O,
-      };
-    },
-    props: handProp('barbell'),
+    pose: (s) => balanced(s, s <= leave ? onShoulders : s >= 1 ? overhead : barAt(press(s))).pose,
+    props: [{ kind: 'barbell', at: 'wrist' }],
   };
 }
 
+/** One dumbbell as a share of body weight. */
+const DUMBBELL = 0.12;
+
 /**
- * Standing dumbbell press, side view: s = 0 with the dumbbells at the sides of
- * the head, just above the shoulders (elbows out and a little forward, under
- * the hands), s = 1 locked out over the shoulders. The head stays still: the
- * dumbbells pass beside it.
+ * Standing dumbbell press, side view, palms forward (the dumbbells seen
+ * end-on): s = 0 with the dumbbells at the sides of the head about level with
+ * the chin, elbows out to the sides and a little forward, right under the
+ * hands; s = 1 locked out straight over the shoulders. The forearms stay
+ * upright all the way; the head stays still while the dumbbells pass beside
+ * it, the body braced and balanced over the middle of the foot.
  * `arnold`: starts lower and in front, palms facing the lifter and elbows
- * together in front of the chest; the elbows open out to the sides on the way up.
+ * together in front of the chest (like the top of a curl); the elbows open
+ * out to the sides as the dumbbells rise, turning the palms forward.
  */
-function dumbbellPress(implement: Implement, arnold: boolean): Demo {
-  const { hip, leg } = stance(0.004);
-  const torso = 0;
-  const shoulder = along(hip, torso, L.torso);
-  const bottom = arnold ? local(shoulder, torso, 0.1, 0.05) : local(shoulder, torso, 0.075, 0.06);
-  const top = local(shoulder, torso, 0.008, LOCKED);
-  // Apparent arm length: elbows out to the sides look shorter from the side.
-  const scale = arnold ? curve([[0, 1], [0.45, 0.78], [1, 1]]) : curve([[0, 0.82], [1, 1]]);
-  return {
-    view: 'side',
-    pose: (s) => {
-      const hand = { x: lerp(bottom.x, top.x, ramp(s, 0, 0.85)), y: lerp(bottom.y, top.y, s) };
-      return { torso, leg, arm: gripTo(shoulder, hand, { x: 1, y: 0.6 }, scale(s)), anchor: 'ankle', at: O };
-    },
-    props: handProp(implement),
+function dumbbellPress(arnold: boolean): Demo {
+  const up0 = arnold ? 0.045 : 0.07;
+  const up1 = L.upperArm + REACH - 0.0005;
+  // The upper arms' plane: straight ahead to the scapular plane (Arnold), or in the scapular plane.
+  const plane = arnold ? (s: number) => lerp(100, 30, ramp(s, 0, 0.6)) : () => 30;
+  const hand = (s: number) => overElbow(lerp(up0, up1, s), plane(s));
+  const build = (hipX: number, s: number): DemoPose => {
+    const { leg, shoulder } = standingAt(hipX, 0);
+    return { torso: 0, head: 0, leg, arm: stackedArm(shoulder, add(shoulder, hand(s))), anchor: 'ankle', at: O };
   };
+  // One stance for the whole rep: balanced half way up (the body doesn't sway with the dumbbells).
+  const hipX = solveFor(-0.1, 0.2, (h) => pressureX(build(h, 0.5), (f) => [{ at: f.a.hand, share: 2 * DUMBBELL }]), BALANCE);
+  return { view: 'side', pose: (s) => build(hipX, s), props: [{ kind: 'dumbbell', at: 'wrists' }] };
 }
 
 /**
- * Seated shoulder press machine, side view: back on the pad, feet flat, hands
- * on the handles just in front of the shoulders, pressed up to nearly straight arms.
+ * Seated shoulder press machine, side view: back against the upright pad,
+ * feet flat, hands on the handles just above and in front of the shoulders,
+ * elbows out to the sides under them. The handles ride a carriage straight up
+ * the machine's guide rail (beside the lifter), pressed to straight arms a
+ * little in front of the head.
  */
 function machinePress(): Demo {
-  const torso = -8;
+  const torso = -8; // back pad reclined a little
   const shoulder = along(O, torso, L.torso);
-  const bottom = local(shoulder, torso, 0.075, 0.03);
-  const top = local(shoulder, torso, 0.03, LOCKED - 0.004);
-  const scale = curve([[0, 0.85], [1, 1]]);
+  // Handles: wider than the shoulders, about chin high at the bottom; the rail runs straight up through them.
+  const out = 0.07;
+  const bottom = add(shoulder, { x: 0.065, y: -0.05 });
+  const reach = Math.sqrt(L.upperArm ** 2 + REACH ** 2 + 2 * L.upperArm * REACH * Math.cos(rad(4)) - out ** 2);
+  const top = { x: bottom.x, y: shoulder.y - Math.sqrt(reach ** 2 - (bottom.x - shoulder.x) ** 2) };
+  const lockTilt = angleOf(sub(top, shoulder));
   const leg: Leg = { thigh: 90, shin: 180, foot: 90 };
   const floor = L.shin + L.ankleHeight;
-  // Seat pad under the thighs; back pad behind the back, from the waist to the head.
-  const seatY = BODY.thighBack + 0.023;
-  const back = (t: number) => local(O, torso, -(BODY.torsoBack + 0.025), t);
+  const pose = (s: number): DemoPose => {
+    const grip = lerpV(bottom, top, s);
+    return { torso, head: torso, leg, arm: barArm(shoulder, grip, out, lerp(0, lockTilt, ramp(s, 0.5, 1))), anchor: 'hip', at: O };
+  };
+  // Back pad behind the trunk and up behind the head; the seat under the thighs.
+  const behind = mul(dir(torso - 90), BODY.torsoBack + 0.023);
+  const [b0, b1] = restingPad(pose, add(along(O, torso, 0.5), behind), add(along(O, torso, 0.03), behind), /hand|forearm|upper arm/);
+  const [s0, s1] = restingPad(pose, { x: -0.08, y: BODY.thighBack + 0.023 }, { x: 0.17, y: BODY.thighBack + 0.023 }, /hand|forearm|upper arm/);
+  const rail = bottom.x;
   const props: Prop[] = [
-    { kind: 'line', from: { x: back(0).x - 0.05, y: floor }, to: { x: back(0).x - 0.05, y: back(0.46).y - 0.02 }, width: 0.03 },
-    { kind: 'line', from: { x: 0.02, y: seatY }, to: { x: 0.02, y: floor }, width: 0.03 },
-    { kind: 'line', from: { x: back(0).x - 0.1, y: floor - 0.008 }, to: { x: 0.2, y: floor - 0.008 }, width: 0.016 },
-    { kind: 'bench', points: [back(0.07), back(0.46)], legs: false },
-    { kind: 'bench', points: [{ x: -0.1, y: seatY }, { x: 0.17, y: seatY }], legs: false },
-    { kind: 'attached', at: 'wrist', from: { x: 0, y: -0.035 }, to: { x: 0, y: 0.035 }, width: 0.022 },
+    // The guide rail beside the lifter, from the base frame to above the lockout, and the base along the floor.
+    { kind: 'line', from: { x: rail, y: floor - 0.01 }, to: { x: rail, y: top.y - 0.1 }, width: 0.026 },
+    { kind: 'line', from: { x: b0.x - 0.06, y: floor - 0.008 }, to: { x: rail + 0.06, y: floor - 0.008 }, width: 0.016 },
+    // Seat post, and the back pad's post down to the base.
+    { kind: 'line', from: { x: (s0.x + s1.x) / 2, y: s0.y }, to: { x: (s0.x + s1.x) / 2, y: floor - 0.01 }, width: 0.026 },
+    { kind: 'line', from: b0, to: { x: b0.x - 0.06, y: floor - 0.01 }, width: 0.026 },
+    { kind: 'bench', points: [b0, b1], legs: false },
+    { kind: 'bench', points: [s0, s1], legs: false },
+    // The carriage on the rail, and the handle across it under the fist (neutral grip, seen from the side).
+    { kind: 'attached', at: 'wrist', from: { x: 0, y: -0.045 }, to: { x: 0, y: 0.045 }, width: 0.034 },
+    { kind: 'attached', at: 'wrist', from: { x: -0.045, y: 0 }, to: { x: 0.045, y: 0 }, width: 0.02 },
   ];
-  return {
-    view: 'side',
-    floor,
-    pose: (s) => {
-      const hand = { x: lerp(bottom.x, top.x, ramp(s, 0, 0.85)), y: lerp(bottom.y, top.y, s) };
-      return { torso, leg, arm: gripTo(shoulder, hand, { x: 1, y: 0.6 }, scale(s)), anchor: 'hip', at: O };
-    },
-    props,
-  };
+  return { view: 'side', floor, pose, props };
 }
 
-/** Pike push-up: hips high; the head lowers toward the floor just in front of the hands. */
+// ── Pike and handstand push-ups ──────────────────────────────────────────
+
+/** The head stops this far off the floor at the bottom of a pike push-up. */
+const HEAD_CLEAR = 0.012;
+
+/** Lowest point of the head's skin (see ../contact) for a pose. */
+const headLow = (pose: DemoPose) =>
+  Math.max(...skinPoints({ view: 'side', pose: () => pose }, 0).filter((sp) => /^head/.test(sp.part)).map((sp) => sp.p.y));
+
+/**
+ * Pike push-up: hands flat on the floor about shoulder-width, fingers
+ * forward; feet walked in so the hips are high (an inverted V), on the balls
+ * of the feet with the toes bent and the legs straight. The elbows bend back
+ * toward the feet and the head lowers to just off the floor a little in front
+ * of the hands (head and hands make a triangle); the shoulders come forward
+ * over the hands while the hips stay high, then press back up to straight arms.
+ */
 export function pikePushUp(): Demo {
-  const toe: Vec = { x: -0.04, y: 0 };
-  const palm: Vec = { x: 0.62 + PALM, y: FLOOR - BODY.hand / 2 };
+  const ball: Vec = { x: 0, y: FLOOR };
+  // Hands to the balls of the feet: feet walked in toward the hands.
+  const palm: Vec = { x: 0.5, y: FLOOR - BODY.hand / 2 };
+  const out = 0.03; // hands a little wider than the shoulders
+  const wrist = along(palm, 270, PALM);
+  // The foot keeps this angle to the shin (heels up, about 20° pointed), pivoting on the ball.
+  const footFor = (legDeg: number) => legDeg + 110;
+  /** Hip, for the leg pointing `legDeg` from the ankle to the hip (0 = straight up, + toward the hands). */
+  const hipFor = (legDeg: number) => along(sub(ball, ballFrom(footFor(legDeg))), legDeg, LEG_LEN);
+  /** Leg direction that puts the hip a trunk's length from the shoulder (the higher of the two). */
+  const legFor = (shoulder: Vec) => solveFor(-30, 80, (d) => -dist(hipFor(d), shoulder), -L.torso);
+  const build = (shoulder: Vec, elbowOut: number): DemoPose => {
+    const legDeg = legFor(shoulder);
+    const hip = hipFor(legDeg);
+    const torso = angleOf(sub(shoulder, hip));
+    const foot = footFor(legDeg);
+    return {
+      torso,
+      head: torso,
+      leg: { thigh: legDeg + 180, shin: legDeg + 180, foot, toes: 90 },
+      // Elbows bend back toward the feet and a little out.
+      arm: palmArm(shoulder, palm, 90, { x: -1, y: -0.5 }, out, elbowOut),
+      anchor: 'hip',
+      at: hip,
+    };
+  };
+  // Top: arms straight, leaning back toward the feet in line with the trunk.
+  const straight = L.upperArm * seen(L.upperArm, straightOut(out)) + L.forearm * seen(L.forearm, out - straightOut(out)) - 0.002;
+  const top = along(wrist, -22, straight);
+  // Bottom: shoulders just ahead of the hands, lowered until the head is just off the floor.
+  const elbowLow = 0.07;
+  const bottomX = wrist.x + 0.035;
+  const bottomY = solveFor(top.y, FLOOR, (y) => headLow(build({ x: bottomX, y }, elbowLow)), FLOOR - HEAD_CLEAR);
+  const bottom = { x: bottomX, y: bottomY };
   return {
     view: 'side',
-    pose: (s) => {
-      const hip = lerpV({ x: 0.284, y: -0.445 }, { x: 0.36, y: -0.4 }, s);
-      const torso = lerp(125, 158, s);
-      const shoulder = along(hip, torso, L.torso);
-      const legDir = Math.atan2(toe.x - hip.x, -(toe.y - hip.y)) * (180 / Math.PI);
-      return {
-        torso,
-        head: torso + 20,
-        leg: { thigh: legDir, shin: legDir, foot: legDir - 80 },
-        arm: palmTo(shoulder, palm, 90, BACK),
-        anchor: 'hip',
-        at: hip,
-      };
-    },
+    pose: (s) => build(lerpV(top, bottom, s), lerp(straightOut(out), elbowLow, s)),
   };
 }
 
+/**
+ * Wall handstand push-up, back to the wall: hands flat on the floor about a
+ * hand's length from it, fingers pointing away, the body straight with the
+ * heels resting on the wall. The elbows bend back toward the wall and the head
+ * lowers until it touches the floor a little in front of the hands (a
+ * triangle with them), the heels sliding down the wall; then press back up to
+ * straight arms. Upside down the lifter faces left, so the wall is on the right.
+ */
 export function handstandPushUp(): Demo {
-  const wrist: Vec = { x: 0, y: FLOOR - 0.01 };
+  const palm: Vec = { x: 0, y: FLOOR - BODY.hand / 2 };
+  const hand = 270; // fingers pointing away from the wall
+  const wrist = along(palm, hand + 180, PALM);
+  const out = 0.04;
+  const wall = wrist.x + 0.12;
+  /** The straight body from the shoulder, leaning `deg` from vertical toward the wall (feet toward it). */
+  const build = (shoulder: Vec, deg: number, elbowOut: number): DemoPose => ({
+    torso: deg + 180,
+    head: deg + 180,
+    // Legs in line with the trunk; feet pointed a little.
+    leg: { thigh: deg, shin: deg, foot: deg - 60 },
+    arm: palmArm(shoulder, palm, hand, { x: 1, y: -0.4 }, out, elbowOut),
+    anchor: 'shoulder',
+    at: shoulder,
+  });
+  /** How far the back of the legs (calves and heels) reaches toward the wall. */
+  const legsBack = (p: DemoPose) => Math.max(...skinPoints({ view: 'side', pose: () => p }, 0).filter((sp) => /shin \(back\)|heel/.test(sp.part)).map((sp) => sp.p.x));
+  /** The lean that rests the heels on the wall. */
+  const leanFor = (shoulder: Vec, elbowOut: number) => solveFor(-10, 40, (d) => legsBack(build(shoulder, d, elbowOut)), wall);
+  // Top: arms straight and upright, shoulders over the wrists.
+  const straight = L.upperArm * seen(L.upperArm, straightOut(out)) + L.forearm * seen(L.forearm, out - straightOut(out)) - 0.002;
+  const top = { x: wrist.x, y: wrist.y - straight };
+  // Bottom: the top of the head touching the floor in front of the hands.
+  const elbowLow = 0.08;
+  const headX = palm.x - 0.07;
+  const shoulderFor = (deg: number): Vec => {
+    const head = { x: headX, y: FLOOR - BODY.head + 0.004 };
+    return sub(head, mul(dir(deg + 180), L.neck));
+  };
+  const degLow = solveFor(-10, 40, (d) => legsBack(build(shoulderFor(d), d, elbowLow)), wall);
+  const bottom = shoulderFor(degLow);
   return {
     view: 'side',
     pose: (s) => {
-      const shoulder = { x: lerp(0.005, 0.07, s), y: wrist.y - lerp(ARM_LEN * 0.985, 0.14, s) };
-      return {
-        torso: 178,
-        head: 178,
-        leg: { thigh: 0, shin: 0, foot: 270 },
-        arm: armTo(shoulder, wrist, { x: 1, y: 0 }),
-        anchor: 'shoulder',
-        at: shoulder,
-      };
+      const shoulder = lerpV(top, bottom, s);
+      const elbowOut = lerp(straightOut(out), elbowLow, s);
+      return build(shoulder, leanFor(shoulder, elbowOut), elbowOut);
     },
-    props: [{ kind: 'wall', x: -0.1, top: -1.1 }],
+    props: [{ kind: 'wall', x: wall, top: top.y - 0.95, facing: 'left' }],
   };
 }
 
+// ── Raises ───────────────────────────────────────────────────────────────
+
+/**
+ * Raises seen from the front: arms from hanging (elbows soft) out to the
+ * sides until level with the shoulders, leading with the elbows (hands no
+ * higher than them), no shrug, the body still. `oneArm` + `cable`: the right
+ * arm raises the handle of a low cable on the lifter's left, the cable across
+ * the front of the body, the free hand holding the machine. `bentOver`: hinged
+ * forward with soft knees (the trunk foreshortened), arms hanging under the
+ * shoulders and raised out to the sides level with the back.
+ */
 export function lateralRaise(o: { oneArm?: boolean; cable?: boolean; bentOver?: boolean }): Demo {
   const torsoScale = o.bentOver ? 0.42 : 1;
   const leg: Leg = o.bentOver ? { thigh: 186, shin: 178, foot: 0 } : { thigh: 184, shin: 180, foot: 0 };
   const leg2: Leg = o.bentOver ? { thigh: 174, shin: 182, foot: 0 } : { thigh: 176, shin: 180, foot: 0 };
+  // The lifter's right arm is on the image left (270 = out to the side). Hanging: beside the thighs, or
+  // bent over straight down under the shoulders; with the cable, in front of the hip.
+  const low = o.bentOver ? { upper: 182, fore: 180 } : o.cable ? { upper: 174, fore: 172 } : { upper: 188, fore: 185 };
+  const high = { upper: 268, fore: 262 };
+  const base: DemoPose = { torso: 0, torsoScale, leg, leg2, arm: low, anchor: 'ankle', at: O };
+  const arm = (s: number) => ({ upper: lerp(low.upper, high.upper, s), fore: lerp(low.fore, high.fore, s) });
+  const mirror = (a: { upper: number; fore: number }) => ({ upper: 360 - a.upper, fore: 360 - a.fore });
+  if (!o.cable) {
+    return {
+      view: 'front',
+      pose: (s) => ({ ...base, arm: arm(s), arm2: o.oneArm ? mirror(low) : mirror(arm(s)) }),
+      props: [{ kind: 'dumbbell', at: o.oneArm ? 'wrist' : 'wrists' }],
+    };
+  }
+  // Cable: the machine stands to the lifter's left, the pulley at its foot; the free hand holds the frame.
+  const f = solve('front', base);
+  const tower = f.b.hip.x + 0.24;
+  const pulley: Vec = { x: tower - 0.03, y: FLOOR - 0.06 };
+  const grab: Vec = { x: tower - 0.025, y: f.b.hip.y - 0.1 };
+  const free = armTo(f.b.shoulder, sub(grab, { x: GRIP, y: 0 }), { x: 0.3, y: 1 });
   return {
     view: 'front',
-    pose: (s) => ({
-      torso: 0,
-      torsoScale,
-      leg,
-      leg2,
-      // The lifter's right arm is on the image left (270 = out to the side).
-      arm: { upper: lerp(188, 268, s), fore: lerp(185, 262, s) },
-      arm2: o.oneArm ? { upper: 172, fore: 175 } : { upper: lerp(172, 92, s), fore: lerp(175, 98, s) },
-      anchor: 'ankle',
-      at: O,
-    }),
-    props: o.cable
-      ? [{ kind: 'cable', from: { x: 0.25, y: -0.02 }, at: 'wrist' }]
-      : [{ kind: 'dumbbell', at: o.oneArm ? 'wrist' : 'wrists' }],
+    pose: (s) => ({ ...base, arm: arm(s), arm2: free }),
+    props: [
+      { kind: 'line', from: { x: tower, y: FLOOR - 0.01 }, to: { x: tower, y: f.a.shoulder.y - 0.3 }, width: 0.04 },
+      { kind: 'cable', from: pulley, at: 'wrist' },
+    ],
+    working: 'a',
   };
 }
 
+/**
+ * Dumbbell front raise, side view, palms down (the dumbbells seen end-on):
+ * from resting on the front of the thighs, arms nearly straight, raise them
+ * in front to shoulder height and lower under control. The body stays still,
+ * braced and balanced over the middle of the foot; no swing.
+ */
 export function frontRaise(): Demo {
+  const bend = 8; // elbows soft
+  const build = (hipX: number, upper: number): DemoPose => {
+    const { leg } = standingAt(hipX, 0);
+    return { torso: 0, head: 0, leg, arm: { upper, fore: upper - bend }, anchor: 'ankle', at: O };
+  };
+  // Start: the fists resting on the front of the thighs.
+  const offThigh = (p: DemoPose) => {
+    const f = solve('side', p);
+    const ab = sub(f.a.knee, f.a.hip);
+    const t = clamp01(((f.a.hand.x - f.a.hip.x) * ab.x + (f.a.hand.y - f.a.hip.y) * ab.y) / (ab.x ** 2 + ab.y ** 2));
+    return dist(f.a.hand, add(f.a.hip, mul(ab, t))) - BODY.thighFront - BODY.hand;
+  };
+  const stance = (upperTop: number) => {
+    const startUpper = solveFor(150, 180, (u) => -offThigh(build(0.01, u)), 0);
+    const hipX = solveFor(-0.1, 0.2, (h) => pressureX(build(h, (startUpper + upperTop) / 2), (f) => [{ at: f.a.hand, share: 2 * DUMBBELL * 0.6 }]), BALANCE);
+    return { startUpper, hipX };
+  };
+  // Top: arms level with the shoulders.
+  const upperTop = 90 + bend / 2;
+  const { startUpper, hipX } = stance(upperTop);
   return {
     view: 'side',
-    pose: between(standing({ arm: { upper: 172, fore: 172 } }), standing({ arm: { upper: 92, fore: 95 } })),
-    props: [{ kind: 'dumbbell', at: 'wrist' }],
+    pose: (s) => build(hipX, lerp(startUpper, upperTop, s)),
+    props: [{ kind: 'dumbbell', at: 'wrists' }],
   };
 }
