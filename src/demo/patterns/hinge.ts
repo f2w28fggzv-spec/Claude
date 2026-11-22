@@ -45,13 +45,15 @@ function offLegs(p: Vec, hip: Vec, knee: Vec, ankle: Vec): number {
 function onLegs(shoulder: Vec, hip: Vec, knee: Vec, ankle: Vec, r: number): Vec {
   const held = (deg: number) => along(shoulder, deg, REACH);
   const clear = (deg: number) => offLegs(held(deg), hip, knee, ankle) - r;
+  // Sweep from arms straight forward (90°) back in 2° steps to the first contact, then refine.
   let lo = 90;
-  let hi = 90;
-  while (hi < 270 && clear(hi) > 0) {
+  if (clear(lo) <= 0) return held(lo);
+  let hi = lo + 2;
+  while (clear(hi) > 0) {
+    if (hi >= 270) return held(180);
     lo = hi;
     hi += 2;
   }
-  if (hi >= 270 || hi === 90) return held(180);
   for (let i = 0; i < 24; i++) {
     const m = (lo + hi) / 2;
     if (clear(m) > 0) lo = m;
@@ -227,12 +229,14 @@ export function nordic(): Demo {
       const shoulder = along(knee, lean, L.thigh + L.torso);
       // Hands up in front of the chest, then reaching for the floor in front.
       const chest = add(along(shoulder, lean + 180, 0.06), along(O, lean + 90, 0.2));
+      // Palms a few centimetres off the floor at the bottom, ahead of the shoulders.
       const catchAt: Vec = { x: shoulder.x + 0.1, y: FLOOR - BODY.hand / 2 - 0.03 };
       const reach = smooth((s - 0.35) / 0.65);
       const palm = add(mul(chest, 1 - reach), mul(catchAt, reach));
       return {
         torso: lean,
-        head: lean - 6,
+        // Neck neutral; eyes come up a little toward the floor ahead at the bottom.
+        head: lean - 6 * s,
         leg: { thigh: 180 + lean, shin: 270, foot: 262 },
         arm: palmTo(shoulder, palm, lerp(lean + 10, 90, reach), DOWN),
         anchor: 'knee',
