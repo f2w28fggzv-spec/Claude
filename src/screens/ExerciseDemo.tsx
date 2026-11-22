@@ -1,13 +1,9 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
-import type { Exercise } from '../data/types';
-import { attachPoints } from '../demo/attach';
-import { add, solve, type Figure, type Side, type Vec } from '../demo/figure';
-import { FLOOR } from '../demo/patterns';
-import { progressAt, timeline } from '../demo/timeline';
-import type { Demo, Prop } from '../demo/types';
-
-const LIMB = 0.034;
-const TORSO = 0.05;
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { engagementFor } from '../data/engagement';
+import { MUSCLE_LABELS, type Exercise } from '../data/types';
+import { ROLE_LABEL, engageColour, levelsAt, momentAt, peakLevels, type Engagement, type Levels, type Moment, type MuscleRole, type MuscleUse } from '../demo/engagement';
+import { demoBounds, frameMarkup, viewBoxOf } from '../demo/render';
+import { timeline } from '../demo/timeline';
 
 function reducedMotion(): boolean {
   try {
@@ -17,211 +13,197 @@ function reducedMotion(): boolean {
   }
 }
 
-/** Bounding box over the whole movement, so the view doesn't jump. */
-function bounds(demo: Demo): { x: number; y: number; w: number; h: number } {
-  const pts: Vec[] = [];
-  for (let k = 0; k <= 8; k++) {
-    const f = solve(demo.view, demo.pose(k / 8));
-    for (const side of [f.a, f.b]) pts.push(...Object.values(side));
-    pts.push(add(f.head, { x: -0.07, y: -0.07 }), add(f.head, { x: 0.07, y: 0.07 }));
-    for (const p of demo.props ?? []) {
-      if ('at' in p && typeof p.at === 'string') {
-        const r = p.kind === 'barbell' ? (p.plate ?? 0.125) : 0.06;
-        for (const q of attachPoints(f, p.at)) pts.push(add(q, { x: -r, y: -r }), add(q, { x: r, y: r }));
-      }
-    }
-  }
-  for (const p of demo.props ?? []) {
-    if (p.kind === 'bench') pts.push(...p.points);
-    if (p.kind === 'box') pts.push({ x: p.x, y: p.y }, { x: p.x + p.w, y: p.y + p.h });
-    if (p.kind === 'bar') pts.push(p.at);
-    if (p.kind === 'cable' || p.kind === 'band') pts.push(p.from);
-    if (p.kind === 'line') pts.push(p.from, p.to);
-    if (p.kind === 'wall') pts.push({ x: p.x, y: p.top });
-  }
-  const floor = demo.floor === undefined ? FLOOR : demo.floor;
-  if (floor !== null) pts.push({ x: pts[0].x, y: floor });
-  const xs = pts.map((p) => p.x);
-  const ys = pts.map((p) => p.y);
-  const pad = 0.08;
-  const x = Math.min(...xs) - pad;
-  const y = Math.min(...ys) - pad;
-  return { x, y, w: Math.max(...xs) + pad - x, h: Math.max(...ys) + pad - y };
+const ROLE_ORDER: Record<MuscleRole, number> = { main: 0, assist: 1, stabilize: 2 };
+/** Muscles as the legend lists them: the ones that move the weight first, hardest-working first. */
+export function legendOrder(spec: Engagement): MuscleUse[] {
+  return [...spec.muscles].sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || b.peak - a.peak);
 }
 
-const pts = (...p: Vec[]) => p.map((q) => `${q.x.toFixed(4)},${q.y.toFixed(4)}`).join(' ');
+/** "quads and glutes (main), hamstrings (assists), core (steadies)" for screen readers. */
+function musclesInWords(muscles: MuscleUse[]): string {
+  const parts: string[] = [];
+  for (const role of ['main', 'assist', 'stabilize'] as const) {
+    const names = muscles.filter((m) => m.role === role).map((m) => MUSCLE_LABELS[m.group].toLowerCase());
+    if (names.length) parts.push(`${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0]} (${ROLE_LABEL[role].toLowerCase()})`);
+  }
+  return parts.join(', ');
+}
 
-function Limbs({ s, cls }: { s: Side; cls: string }) {
+const AT_START: Moment = { phase: 'start', s: 0, u: 0, action: 'holding' };
+const AT_FAR: Moment = { phase: 'far', s: 1, u: 0, action: 'holding' };
+let instances = 0;
+
+/** The list under the figure: each working muscle, what it does, and a bar for how hard it works right now. */
+function MuscleLegend({ muscles, levels, bars }: { muscles: MuscleUse[]; levels: Levels; bars?: { current: (HTMLElement | null)[] } }) {
   return (
-    <g class={cls}>
-      <polyline points={pts(s.hip, s.knee, s.ankle)} stroke-width={LIMB} />
-      <polyline points={pts(s.heel, s.toe)} stroke-width={LIMB * 0.8} />
-      <polyline points={pts(s.shoulder, s.elbow, s.wrist)} stroke-width={LIMB * 0.85} />
-    </g>
-  );
-}
-
-function PropShape({ p, f, floor }: { p: Prop; f: Figure; floor: number | null }) {
-  switch (p.kind) {
-    case 'barbell':
-      return (
-        <g>
-          {attachPoints(f, p.at).map((c) => (
-            <>
-              <circle class="plate" cx={c.x} cy={c.y} r={p.plate ?? 0.125} stroke-width={0.012} />
-              <circle class="hub" cx={c.x} cy={c.y} r={0.018} />
-            </>
-          ))}
-        </g>
-      );
-    case 'dumbbell':
-      return (
-        <g>
-          {attachPoints(f, p.at).map((c) => {
-            const [w, h] = p.upright || f.view === 'front' ? [0.05, 0.1] : [0.1, 0.05];
-            return <rect class="weight" x={c.x - w / 2} y={c.y - h / 2} width={w} height={h} rx={0.012} />;
-          })}
-        </g>
-      );
-    case 'kettlebell':
-      return (
-        <g>
-          {attachPoints(f, p.at).map((c) => (
-            <>
-              <circle class="handle" cx={c.x} cy={c.y + 0.03} r={0.028} stroke-width={0.012} fill="none" />
-              <circle class="weight" cx={c.x} cy={c.y + 0.085} r={0.05} />
-            </>
-          ))}
-        </g>
-      );
-    case 'bench':
-      return (
-        <g class="equip">
-          <polyline points={pts(...p.points)} stroke-width={0.045} />
-          {p.legs !== false && floor !== null && (
-            <>
-              <line x1={p.points[0].x} y1={p.points[0].y} x2={p.points[0].x} y2={floor} stroke-width={0.02} />
-              <line x1={p.points[p.points.length - 1].x} y1={p.points[p.points.length - 1].y} x2={p.points[p.points.length - 1].x} y2={floor} stroke-width={0.02} />
-            </>
-          )}
-        </g>
-      );
-    case 'box':
-      return <rect class="box" x={p.x} y={p.y} width={p.w} height={p.h} rx={0.01} />;
-    case 'bar':
-      return <circle class="hub" cx={p.at.x} cy={p.at.y} r={0.024} />;
-    case 'wall':
-      return <line class="equip" x1={p.x} y1={p.top} x2={p.x} y2={floor ?? 0} stroke-width={0.025} />;
-    case 'cable':
-    case 'band':
-      return (
-        <g class={p.kind}>
-          {attachPoints(f, p.at).map((c) => (
-            <line x1={p.from.x} y1={p.from.y} x2={c.x} y2={c.y} stroke-width={0.008} />
-          ))}
-          {p.kind === 'cable' && <circle class="hub" cx={p.from.x} cy={p.from.y} r={0.025} />}
-        </g>
-      );
-    case 'pad':
-      return (
-        <g>
-          {attachPoints(f, p.at).map((c) => (
-            <circle class="padc" cx={c.x + (p.offset?.x ?? 0)} cy={c.y + (p.offset?.y ?? 0)} r={0.035} />
-          ))}
-        </g>
-      );
-    case 'attached':
-      return (
-        <g class="equip">
-          {attachPoints(f, p.at).map((c) => (
-            <line x1={c.x + p.from.x} y1={c.y + p.from.y} x2={c.x + p.to.x} y2={c.y + p.to.y} stroke-width={p.width ?? 0.02} />
-          ))}
-        </g>
-      );
-    case 'line':
-      return <line class="equip" x1={p.from.x} y1={p.from.y} x2={p.to.x} y2={p.to.y} stroke-width={p.width ?? 0.02} />;
-  }
-}
-
-const IN_FRONT = new Set<Prop['kind']>(['barbell', 'dumbbell', 'kettlebell', 'cable', 'band', 'pad', 'attached']);
-
-/** One frame of a demo as SVG content. */
-export function DemoFrame({ demo, s, box }: { demo: Demo; s: number; box: ReturnType<typeof bounds> }) {
-  const f = solve(demo.view, demo.pose(s));
-  const floor = demo.floor === undefined ? FLOOR : demo.floor;
-  const props = demo.props ?? [];
-  const side = demo.view === 'side';
-  return (
-    <g>
-      {floor !== null && <line class="floor" x1={box.x} y1={floor} x2={box.x + box.w} y2={floor} stroke-width={0.01} />}
-      {props.filter((p) => !IN_FRONT.has(p.kind)).map((p) => (
-        <PropShape p={p} f={f} floor={floor} />
-      ))}
-      <Limbs s={f.b} cls={side ? 'far' : 'near'} />
-      {side ? (
-        <line class="body" x1={(f.a.hip.x + f.b.hip.x) / 2} y1={(f.a.hip.y + f.b.hip.y) / 2} x2={f.a.shoulder.x} y2={f.a.shoulder.y} stroke-width={TORSO} />
-      ) : (
-        <polygon class="trunk" points={pts(f.a.shoulder, f.b.shoulder, f.b.hip, f.a.hip)} />
-      )}
-      <circle class="head" cx={f.head.x} cy={f.head.y} r={0.058} />
-      {side && <circle class="nose" cx={f.nose.x} cy={f.nose.y} r={0.012} />}
-      <Limbs s={f.a} cls="near" />
-      {props.filter((p) => IN_FRONT.has(p.kind)).map((p) => (
-        <PropShape p={p} f={f} floor={floor} />
-      ))}
-    </g>
+    <div class="demo-muscles">
+      <div class="dm-head">
+        <strong>Muscles working</strong>
+        <span class="dm-key" aria-hidden="true">
+          Resting <i /> Hardest
+        </span>
+      </div>
+      <ul>
+        {muscles.map((m, i) => (
+          <li>
+            <span class="dm-name">{MUSCLE_LABELS[m.group]}</span>
+            <span class="dm-role">{ROLE_LABEL[m.role]}</span>
+            <span class="dm-bar" aria-hidden="true">
+              <i
+                ref={(el) => {
+                  if (bars) bars.current[i] = el;
+                }}
+                style={{ transform: `scaleX(${levels[m.group].toFixed(3)})`, background: engageColour(levels[m.group]) }}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p class="muted small dm-note">Brighter and longer means working harder at that point of the rep. A guide to typical muscle use, not a measurement.</p>
+    </div>
   );
 }
 
 /**
  * Animated demo of the exercise, drawn from the same camera angle the setup
- * check asks for. Tap to pause. With reduced motion: start and turnaround
- * side by side.
+ * check asks for: a figure whose working muscles glow hotter the harder they
+ * work through the rep. Tap to pause. With reduced motion: the start and the
+ * turnaround side by side.
  */
 export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise; compact?: boolean }) {
   const demo = exercise.demo;
-  const box = useMemo(() => bounds(demo), [demo]);
+  const hold = exercise.tracking.kind === 'hold';
+  const box = useMemo(() => demoBounds(demo), [demo]);
   const tl = useMemo(() => timeline(exercise, demo.pauseFar), [exercise]);
+  const spec = useMemo(() => engagementFor(exercise), [exercise]);
+  const muscles = useMemo(() => legendOrder(spec), [spec]);
   const still = useMemo(reducedMotion, []);
+  const uid = useMemo(() => `demo${++instances}`, []);
   const [playing, setPlaying] = useState(true);
-  const [s, setS] = useState(0);
+  const svg = useRef<SVGSVGElement>(null);
+  const bars = useRef<(HTMLElement | null)[]>([]);
+  const lowering = useRef<HTMLElement>(null);
+  const lifting = useRef<HTMLElement>(null);
+  /** Seconds of animation shown so far, kept across pauses. */
+  const clock = useRef(0);
+
+  const view = demo.view === 'side' ? 'side view' : 'front view';
+  const viewBox = viewBoxOf(box);
+  const words = musclesInWords(muscles);
+
+  // Paints the frame for the current clock. Skips the work while nothing changes (the pauses of a rep).
+  const painted = useRef('');
+  const paint = () => {
+    const el = svg.current;
+    if (!el) return;
+    const t = clock.current;
+    const m = momentAt(exercise, tl, t);
+    const levels = levelsAt(spec, m, t);
+    const colours = muscles.map((u) => engageColour(levels[u.group]));
+    const key = `${m.s.toFixed(4)}|${colours.join()}`;
+    if (key !== painted.current) {
+      painted.current = key;
+      el.innerHTML = frameMarkup(demo, m.s, levels, box, uid);
+      muscles.forEach((u, i) => {
+        const bar = bars.current[i];
+        if (!bar) return;
+        bar.style.transform = `scaleX(${levels[u.group].toFixed(3)})`;
+        bar.style.background = colours[i];
+      });
+    }
+    lowering.current?.classList.toggle('on', m.action === 'lowering');
+    lifting.current?.classList.toggle('on', m.action === 'lifting');
+  };
+
+  useLayoutEffect(() => {
+    if (still) return;
+    painted.current = '';
+    paint();
+  }, [still, exercise, box]);
 
   useEffect(() => {
-    if (still || !playing || exercise.tracking.kind === 'hold') return;
+    if (still || !playing) return;
+    const el = svg.current;
+    if (!el) return;
     let raf = 0;
-    const start = performance.now() - tl.total * 1000 * 0.0;
+    let last = 0;
+    let visible = true;
     const tick = (now: number) => {
-      setS(progressAt(tl, (now - start) / 1000));
+      // Long gaps (tab in the background) don't jump the animation ahead.
+      if (last) clock.current += Math.min(0.1, (now - last) / 1000);
+      last = now;
+      paint();
       raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [still, playing, tl]);
+    const start = () => {
+      if (raf || !visible || document.hidden) return;
+      last = 0;
+      raf = requestAnimationFrame(tick);
+    };
+    const stop = () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    };
+    // Only animate while the demo is on screen.
+    const io =
+      typeof IntersectionObserver === 'function'
+        ? new IntersectionObserver(([entry]) => {
+            visible = entry.isIntersecting;
+            if (visible) start();
+            else stop();
+          })
+        : null;
+    io?.observe(el);
+    const onVisibility = () => (document.hidden ? stop() : start());
+    document.addEventListener('visibilitychange', onVisibility);
+    start();
+    return () => {
+      stop();
+      io?.disconnect();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [still, playing, exercise, box]);
 
-  const viewBox = `${box.x} ${box.y} ${box.w} ${box.h}`;
-  const label = `${exercise.name}: animated demo, ${demo.view === 'side' ? 'side view' : 'front view'}`;
-  if (still && exercise.tracking.kind !== 'hold') {
+  if (still) {
+    // Reduced motion: still pictures, each muscle at the level it has in that position.
+    const shots = hold ? [{ label: 'Hold', s: 0, levels: peakLevels(spec) }] : [{ label: 'Start', s: 0, levels: levelsAt(spec, AT_START) }, { label: 'Turnaround', s: 1, levels: levelsAt(spec, AT_FAR) }];
     return (
-      <figure class={`demo ${compact ? 'compact' : ''}`} aria-label={label}>
+      <figure class={`demo ${compact ? 'compact' : ''}`} aria-label={`${exercise.name}: demo, ${view}. Muscles working: ${words}.`}>
         <div class="demo-pair">
-          {[0, 1].map((k) => (
-            <svg viewBox={viewBox} role="img" aria-label={k === 0 ? 'Start' : 'Turnaround'}>
-              <DemoFrame demo={demo} s={k} box={box} />
-            </svg>
+          {shots.map((shot, k) => (
+            <svg viewBox={viewBox} role="img" aria-label={shot.label} dangerouslySetInnerHTML={{ __html: frameMarkup(demo, shot.s, shot.levels, box, `${uid}-${k}`) }} />
           ))}
         </div>
-        <figcaption class="muted small">Start and turnaround · {demo.view === 'side' ? 'side view' : 'front view'}</figcaption>
+        {!compact && <MuscleLegend muscles={muscles} levels={peakLevels(spec)} />}
+        <figcaption class="muted small">
+          {hold ? 'The hold' : 'Start and turnaround'} · {view}
+        </figcaption>
       </figure>
     );
   }
+
   return (
     <figure class={`demo ${compact ? 'compact' : ''}`}>
-      <button type="button" class="demo-stage" aria-label={`${label}. ${playing ? 'Tap to pause' : 'Tap to play'}`} onClick={() => setPlaying(!playing)}>
-        <svg viewBox={viewBox} role="img" aria-hidden="true">
-          <DemoFrame demo={demo} s={s} box={box} />
-        </svg>
+      <button
+        type="button"
+        class="demo-stage"
+        aria-label={`${exercise.name}: animated demo, ${view}. Muscles working: ${words}. ${playing ? 'Tap to pause' : 'Tap to play'}`}
+        onClick={() => setPlaying(!playing)}
+      >
+        <svg ref={svg} viewBox={viewBox} role="img" aria-hidden="true" />
+        <span class="demo-phase" aria-hidden="true">
+          {hold ? (
+            <b class="on">Hold</b>
+          ) : (
+            <>
+              <b ref={lowering}>Lowering</b>
+              <b ref={lifting}>Lifting</b>
+            </>
+          )}
+        </span>
         {!playing && <span class="demo-paused">Paused</span>}
       </button>
+      {!compact && <MuscleLegend muscles={muscles} levels={levelsAt(spec, hold ? { phase: 'hold', s: 0, u: 0, action: 'holding' } : AT_START)} bars={bars} />}
       {!compact && (
         <figcaption class="muted small">
           {demo.view === 'side' ? 'Side view' : 'Front view'}, the way your camera should see you · tap to {playing ? 'pause' : 'play'}
@@ -230,5 +212,3 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
     </figure>
   );
 }
-
-export { bounds };

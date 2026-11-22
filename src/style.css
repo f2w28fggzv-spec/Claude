@@ -68,6 +68,7 @@
   --equip: #6b625b;
   --equip-fill: #eadfd3;
   --equip-line: #8e8178;
+  --pad: #3d332e;
   --radius: 22px;
   --font: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-family: var(--font);
@@ -132,6 +133,7 @@
     --equip: #9da1a6;
     --equip-fill: #2d2f35;
     --equip-line: #6e727a;
+    --pad: #474a52;
   }
 }
 :root[data-theme='dark'] {
@@ -192,6 +194,7 @@
   --equip: #9da1a6;
   --equip-fill: #2d2f35;
   --equip-line: #6e727a;
+  --pad: #474a52;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); -webkit-text-size-adjust: 100%; }
@@ -515,38 +518,39 @@ select {
 .slider input[type='range'] { width: 100%; accent-color: var(--accent); }
 progress { width: 100%; height: 10px; accent-color: var(--accent); margin: 8px 0; }
 
-/* How-to demos: the figure in the text colour, barbell plates in flame. */
+/* How-to demos: a human figure whose working muscles glow on the heat ramp. */
 .demo { margin: 0 0 12px; }
-.demo svg { display: block; width: 100%; height: auto; max-height: 300px; }
-.demo.compact svg { max-height: 200px; }
+.demo svg { display: block; width: 100%; height: auto; max-height: 320px; }
+.demo.compact svg { max-height: 210px; }
 .demo-stage {
-  position: relative; display: block; width: 100%; padding: 8px; background: var(--card);
+  position: relative; display: block; width: 100%; padding: 8px; background: var(--card); color: var(--text);
   border: 0; border-radius: 20px; cursor: pointer; box-shadow: var(--shadow);
 }
 .card .demo-stage { background: var(--sunken); box-shadow: none; }
 .demo-paused {
-  position: absolute; right: 10px; top: 10px; font-size: 0.75rem; color: var(--muted);
-  background: var(--raised); padding: 2px 8px; border-radius: 999px;
+  position: absolute; right: 10px; top: 10px; font-size: 0.75rem; font-weight: 600; color: var(--muted);
+  background: var(--raised); padding: 2px 9px; border-radius: 999px;
 }
-.demo figcaption { margin-top: 6px; }
+/* Which half of the rep is playing: the word for the current one lights up. */
+.demo-phase { position: absolute; left: 10px; top: 10px; display: flex; gap: 4px; font-size: 0.72rem; }
+.demo-phase b { padding: 2px 9px; border-radius: 999px; font-weight: 600; color: var(--muted); background: var(--sunken); opacity: 0.55; transition: opacity 160ms, color 160ms, background-color 160ms; }
+.demo-phase b.on { opacity: 1; color: var(--accent-text); background: var(--accent-soft); }
+.demo figcaption { margin-top: 8px; }
 .demo-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; }
-.demo svg polyline, .demo svg line, .dev-cell svg polyline, .dev-cell svg line { fill: none; stroke-linecap: round; stroke-linejoin: round; }
-svg .near { stroke: var(--fig); }
-svg .far { stroke: var(--fig-far); }
-svg .body { stroke: var(--fig); stroke-linecap: round; }
-svg .trunk { fill: var(--fig); stroke: var(--fig); stroke-width: 0.03; stroke-linejoin: round; }
-svg .head { fill: var(--fig); }
-svg .nose { fill: var(--fig); }
-svg .floor { stroke: var(--floor); }
-svg .equip { stroke: var(--equip); }
-svg .box { fill: var(--equip-fill); stroke: var(--equip-line); stroke-width: 0.01; }
-svg .plate { fill: var(--flame); fill-opacity: 0.18; stroke: var(--flame); }
-svg .hub { fill: var(--equip); stroke: none; }
-svg .weight { fill: var(--equip); }
-svg .handle { stroke: var(--equip); }
-svg .padc { fill: var(--equip-line); stroke: none; }
-svg .cable { stroke: var(--equip-line); }
-svg .band { stroke: var(--orange); stroke-dasharray: 0.02 0.015; }
+.demo-pair svg { background: var(--card); border-radius: 16px; }
+/* The list under the figure: each muscle, what it does, and how hard it works right now. */
+.demo-muscles { margin: 10px 2px 0; }
+.dm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.dm-head strong { font-weight: 800; }
+.dm-key { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.72rem; }
+.dm-key i { display: block; width: 54px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--an-muscle), var(--amber) 22%, var(--orange) 50%, var(--flame) 76%, var(--red)); }
+.demo-muscles ul { list-style: none; padding: 0; margin: 0; }
+.demo-muscles li { display: grid; grid-template-columns: 6.2em 4.6em 1fr; align-items: center; gap: 8px; min-height: 30px; font-size: 0.92rem; }
+.dm-name { font-weight: 600; }
+.dm-role { color: var(--muted); font-size: 0.8rem; }
+.dm-bar { position: relative; height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
+.dm-bar i { position: absolute; inset: 0; transform-origin: left; border-radius: 4px; }
+.dm-note { margin: 6px 0 0; line-height: 1.4; }
 .dev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
 .dev-cell { background: var(--card); border-radius: 14px; padding: 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow); }
 .dev-cell svg { width: 100%; height: 110px; }
