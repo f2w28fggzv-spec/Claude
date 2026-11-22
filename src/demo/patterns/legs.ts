@@ -1,10 +1,10 @@
 // Movement patterns: squats, lunges and leg machines. Conventions and helpers: ./shared.ts.
 import { BODY } from '../body';
 import { attachPoints } from '../attach';
-import { PAD_HALF, skinPoints } from '../contact';
+import { PAD_HALF } from '../contact';
 import { L, PALM, add, along, armTo, dir, gripTo, legTo, lerp, lerpV, mul, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
-import { O, FLOOR, LEG_LEN, HANG, FWD, handProp, type Implement } from './shared';
+import { O, FLOOR, LEG_LEN, HANG, FWD, centreOfMass, handProp, restingPad, solveFor, type Implement } from './shared';
 
 // ── Balance ──────────────────────────────────────────────────────────────
 // A standing lift is balanced when its load sits over the middle of the foot:
@@ -12,40 +12,6 @@ import { O, FLOOR, LEG_LEN, HANG, FWD, handProp, type Implement } from './shared
 
 /** The middle of a flat foot, ahead of the ankle (heel to toe). */
 const MIDFOOT = (L.foot - L.heel) / 2;
-
-/** Segment masses as a share of body mass (Winter 2009). */
-const MASS = { head: 0.081, trunk: 0.497, upperArm: 0.028, forearm: 0.016, hand: 0.006, thigh: 0.1, shank: 0.0465, foot: 0.0145 };
-
-/** Centre of mass of the body plus held loads (`share` = load mass / body mass). */
-function centreOfMass(f: Figure, loads: { at: Vec; share: number }[] = []): Vec {
-  const parts: [number, Vec][] = [
-    [MASS.head, f.head],
-    [MASS.trunk, lerpV(lerpV(f.a.hip, f.b.hip, 0.5), lerpV(f.a.shoulder, f.b.shoulder, 0.5), 0.5)],
-  ];
-  for (const s of [f.a, f.b]) {
-    parts.push(
-      [MASS.upperArm, lerpV(s.shoulder, s.elbow, 0.436)],
-      [MASS.forearm, lerpV(s.elbow, s.wrist, 0.43)],
-      [MASS.hand, s.hand],
-      [MASS.thigh, lerpV(s.hip, s.knee, 0.433)],
-      [MASS.shank, lerpV(s.knee, s.ankle, 0.433)],
-      [MASS.foot, lerpV(s.heel, s.toe, 0.5)],
-    );
-  }
-  for (const l of loads) parts.push([l.share, l.at]);
-  const m = parts.reduce((a, [w]) => a + w, 0);
-  return { x: parts.reduce((a, [w, p]) => a + w * p.x, 0) / m, y: parts.reduce((a, [w, p]) => a + w * p.y, 0) / m };
-}
-
-/** The v in [lo, hi] where the increasing function f reaches target (bisection). */
-function solveFor(lo: number, hi: number, f: (v: number) => number, target: number): number {
-  for (let k = 0; k < 40; k++) {
-    const mid = (lo + hi) / 2;
-    if (f(mid) < target) lo = mid;
-    else hi = mid;
-  }
-  return (lo + hi) / 2;
-}
 
 // ── Squats ───────────────────────────────────────────────────────────────
 
@@ -456,32 +422,6 @@ export function wallSit(): Demo {
 }
 
 // ── Machines ─────────────────────────────────────────────────────────────
-
-/**
- * A pad (bench-prop points) along the line from a to b, moved along its
- * normal until the body just rests on it over the whole movement: no skin
- * point inside the pad, none hovering above it. `skip` names body parts that
- * pass beside the pad rather than over it (e.g. a hand on a side handle).
- */
-function restingPad(pose: (s: number) => DemoPose, a: Vec, b: Vec, skip?: RegExp): [Vec, Vec] {
-  const len = Math.hypot(b.x - a.x, b.y - a.y);
-  const u = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
-  // The pad's top side, as in ../contact: the normal pointing up the screen.
-  const n = u.x >= 0 ? { x: u.y, y: -u.x } : { x: -u.y, y: u.x };
-  let nearest = Infinity;
-  for (let k = 0; k <= 10; k++) {
-    for (const sp of skinPoints({ view: 'side', pose }, k / 10)) {
-      if (skip?.test(sp.part)) continue;
-      const d = sub(sp.p, a);
-      const t = d.x * u.x + d.y * u.y;
-      const h = d.x * n.x + d.y * n.y;
-      if (t >= 0 && t <= len && h > -0.04) nearest = Math.min(nearest, h);
-    }
-  }
-  if (!Number.isFinite(nearest)) return [a, b];
-  const shift = mul(n, nearest - PAD_HALF - 0.002);
-  return [add(a, shift), add(b, shift)];
-}
 
 /** Where the lines through a1-b1 and a2-b2 cross. */
 function crossing(a1: Vec, b1: Vec, a2: Vec, b2: Vec): Vec {
