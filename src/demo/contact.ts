@@ -96,7 +96,7 @@ function equipmentIssue(sp: SkinPoint, prop: Prop, tolerance: number): { kind: C
     if (inside > tolerance) return { kind: 'box', depth: inside };
   }
   if (prop.kind === 'wall') {
-    const inside = Math.min(sp.p.x - (prop.x - WALL_DEPTH), prop.x - sp.p.x);
+    const inside = prop.facing === 'left' ? Math.min(prop.x + WALL_DEPTH - sp.p.x, sp.p.x - prop.x) : Math.min(sp.p.x - (prop.x - WALL_DEPTH), prop.x - sp.p.x);
     if (inside > tolerance && sp.p.y > prop.top) return { kind: 'wall', depth: inside };
   }
   return null;

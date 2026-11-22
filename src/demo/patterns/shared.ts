@@ -33,17 +33,20 @@ export function mixLeg(a: Leg, b: Leg, s: number): Leg {
   return leg;
 }
 export function mixArm(a: Arm, b: Arm, s: number): Arm {
-  return {
-    upper: lerpAngle(a.upper, b.upper, s),
-    fore: lerpAngle(a.fore, b.fore, s),
-    ...((a.scale ?? 1) !== 1 || (b.scale ?? 1) !== 1 ? { scale: lerp(a.scale ?? 1, b.scale ?? 1, s) } : {}),
-  };
+  const arm: Arm = { upper: lerpAngle(a.upper, b.upper, s), fore: lerpAngle(a.fore, b.fore, s) };
+  if ((a.scale ?? 1) !== 1 || (b.scale ?? 1) !== 1) arm.scale = lerp(a.scale ?? 1, b.scale ?? 1, s);
+  if (a.foreScale !== undefined || b.foreScale !== undefined) arm.foreScale = lerp(a.foreScale ?? a.scale ?? 1, b.foreScale ?? b.scale ?? 1, s);
+  if (a.hand !== undefined || b.hand !== undefined) arm.hand = lerpAngle(a.hand ?? a.fore, b.hand ?? b.fore, s);
+  // An open hand stays open until the blend is past halfway.
+  if (s < 0.5 ? a.flat : b.flat) arm.flat = true;
+  return arm;
 }
 /** Interpolates two poses (angles, anchor position, scales). */
 export function mix(a: DemoPose, b: DemoPose, s: number): DemoPose {
   return {
     torso: lerpAngle(a.torso, b.torso, s),
-    head: a.head !== undefined || b.head !== undefined ? lerpAngle(a.head ?? a.torso, b.head ?? b.torso, s) : undefined,
+    bend: a.bend !== undefined || b.bend !== undefined ? lerp(a.bend ?? 0, b.bend ?? 0, s) : undefined,
+    head: a.head !== undefined || b.head !== undefined ? lerpAngle(a.head ?? a.torso + (a.bend ?? 0), b.head ?? b.torso + (b.bend ?? 0), s) : undefined,
     torsoScale: lerp(a.torsoScale ?? 1, b.torsoScale ?? 1, s),
     leg: mixLeg(a.leg, b.leg, s),
     arm: mixArm(a.arm, b.arm, s),

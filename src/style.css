@@ -133,7 +133,7 @@
     --equip: #9da1a6;
     --equip-fill: #2d2f35;
     --equip-line: #6e727a;
-    --pad: #474a52;
+    --pad: #5b5f68;
   }
 }
 :root[data-theme='dark'] {
@@ -194,7 +194,7 @@
   --equip: #9da1a6;
   --equip-fill: #2d2f35;
   --equip-line: #6e727a;
-  --pad: #474a52;
+  --pad: #5b5f68;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); -webkit-text-size-adjust: 100%; }

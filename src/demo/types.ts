@@ -31,7 +31,8 @@ export type Prop =
   | { kind: 'box'; x: number; y: number; w: number; h: number }
   /** A bar seen end-on: pull-up bar, dip bar, low bar. */
   | { kind: 'bar'; at: Vec }
-  | { kind: 'wall'; x: number; top: number }
+  /** A wall seen edge-on: its face at x, facing right (the slab behind it to the left) unless `facing: 'left'`. */
+  | { kind: 'wall'; x: number; top: number; facing?: 'left' | 'right' }
   /** Cable from a pulley at `from`; `rope` draws a rope handle at the hand. */
   | { kind: 'cable'; from: Vec; at: Attach; rope?: boolean }
   | { kind: 'band'; from: Vec; at: Attach }

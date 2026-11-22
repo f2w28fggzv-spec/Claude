@@ -134,7 +134,8 @@ function floorBridge(implement: Implement, singleLeg: boolean): Demo {
       at: shoulder,
     };
   };
-  return { view: 'side', floor, pose, props: loadProps(implement), pauseFar: 0.3 };
+  // Single leg: the near leg works, the free leg's muscles stay near rest.
+  return { view: 'side', floor, pose, props: loadProps(implement), pauseFar: 0.3, ...(singleLeg && { working: 'a' as const }) };
 }
 
 /**
@@ -189,9 +190,10 @@ function sliderLegCurl(): Demo {
 /**
  * Hip thrust: the upper back across the side of a bench (seen end-on, its
  * length running away from the camera), feet flat, the load in the hip crease.
- * The trunk rolls over the bench edge from the hips low (glutes just off the
- * floor) to a straight line from the shoulders to the knees, level with the
- * floor, shins about vertical. Chin tucked, eyes forward.
+ * The trunk rolls over the bench edge from the hips low (a few centimetres off
+ * the floor, hip angle about 90°) to a straight line from the shoulders to the
+ * knees, level with the floor, shins about vertical. Chin tucked, eyes
+ * forward; elbows out to the sides.
  */
 function hipThrust(implement: Implement): Demo {
   const floor = FLOOR;
@@ -286,6 +288,8 @@ export function sideLyingAbduction(): Demo {
         at,
       };
     },
+    // The top leg works; the bottom one rests on the floor.
+    working: 'a',
   };
 }
 
@@ -354,11 +358,13 @@ function standingCalfRaise(implement: Implement, single: boolean): Demo {
       return build(foot, solveFor(-15, 25, (lean) => massX(build(foot, lean)), target));
     },
     props: single
-      ? [{ kind: 'wall', x: palm.x + BODY.hand / 2 + 0.05, top: -STANDING - 0.3 }]
+      ? [{ kind: 'wall', x: palm.x + BODY.hand / 2, top: -STANDING - 0.3, facing: 'left' }]
       : dumbbells
         ? [{ kind: 'dumbbell', at: 'wrists', lengthwise: true }]
         : [],
     pauseFar: 0.5,
+    // Single leg: the near (standing) leg works.
+    ...(single && { working: 'a' as const }),
   };
 }
 
@@ -379,7 +385,7 @@ function seatedCalfRaise(): Demo {
   return {
     view: 'side',
     pose: (s) => {
-      const foot = 90 + (RISE - 2) * s;
+      const foot = 90 + RISE * s;
       const leg = { ...legTo(hip, ankleFrom(ball, foot), UP, foot), toes: 90 };
       // Its lower head sits on the thigh just above the knee; the hand holds the handle.
       const base = along(along(hip, leg.thigh, L.thigh * 0.78), leg.thigh - 90, BODY.thighFront);
@@ -405,7 +411,7 @@ function machineCalfRaise(): Demo {
   const step = 0.06; // platform height
   const ball: Vec = { x: 0, y: FLOOR - step }; // the ball of the foot pivots on the platform's back edge
   const low = 90 - 18; // heels below the platform
-  const high = 90 + RISE - 2; // heels well above it
+  const high = 90 + RISE; // heels well above it
   const shoulderX = ball.x; // pads over the balls of the feet
   const column = ball.x + 0.26;
   // On the carriage, from the shoulder joints: the pads' centre line, and the handles ahead of the shoulders.
@@ -426,9 +432,9 @@ function machineCalfRaise(): Demo {
     props: [
       { kind: 'box', x: ball.x, y: ball.y, w: column + 0.03 - ball.x, h: step },
       { kind: 'line', from: { x: column, y: FLOOR - 0.01 }, to: { x: column, y: top.y - 0.26 }, width: 0.045 },
-      // Shoulder pad on top of the shoulders (behind the neck), and the carriage arm from it to the column.
-      { kind: 'attached', at: 'shoulder', from: { x: -0.075, y: padY }, to: { x: 0.055, y: padY }, width: 0.05, pad: true },
-      { kind: 'attached', at: 'shoulder', from: { x: 0.07, y: padY }, to: { x: column - shoulderX, y: padY }, width: 0.024 },
+      // The near shoulder pad on top of the shoulder (over the side of the neck), and the carriage arm from the handles to the column.
+      { kind: 'pad', at: 'shoulder', frame: 'trunk', offset: { x: 0.05, y: -0.018 }, block: { along: 0.04, across: 0.11 } },
+      { kind: 'attached', at: 'shoulder', from: { x: handle.x - 0.015, y: padY }, to: { x: column - shoulderX, y: padY }, width: 0.024 },
     ],
     pauseFar: 0.5,
   };

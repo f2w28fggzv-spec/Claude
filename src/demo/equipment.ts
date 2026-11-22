@@ -141,7 +141,8 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
         out.mid += circle(p.at, 0.02, `fill="${STEEL}"`) + circle(p.at, 0.009, `fill="${FILL}"`);
         break;
       case 'wall':
-        out.back += `<rect x="${n(p.x - 0.05)}" y="${n(p.top)}" width="0.05" height="${n((floor ?? 0) - p.top)}" fill="${FILL}"/>` + seg({ x: p.x, y: p.top }, { x: p.x, y: floor ?? 0 }, 0.008, LINE);
+        // The slab behind the face the lifter touches; the face is drawn as a line.
+        out.back += `<rect x="${n(p.facing === 'left' ? p.x : p.x - 0.05)}" y="${n(p.top)}" width="0.05" height="${n((floor ?? 0) - p.top)}" fill="${FILL}"/>` + seg({ x: p.x, y: p.top }, { x: p.x, y: floor ?? 0 }, 0.008, LINE);
         break;
       case 'cable':
       case 'band':
