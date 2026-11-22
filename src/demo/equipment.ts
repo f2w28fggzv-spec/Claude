@@ -9,9 +9,11 @@ import type { Prop } from './types';
 
 /**
  * back: behind everything. behind: between the far limbs and the trunk.
- * mid: between the trunk and the near limbs. front: over everything.
+ * mid: between the near leg and the near arm (a held bar under the fist).
+ * hand: just over the near arm (the end-on head of a dumbbell in that hand).
+ * front: over everything. See ./render for the order with the hands between the legs.
  */
-export type Depth = 'back' | 'behind' | 'mid' | 'front';
+export type Depth = 'back' | 'behind' | 'mid' | 'hand' | 'front';
 export type EquipmentLayers = Record<Depth, string>;
 
 const n = (v: number) => (Math.round(v * 10000) / 10000).toString();
@@ -67,7 +69,7 @@ export function propExtent(p: Prop, f: Figure): Vec[] {
 
 /** All of a demo's equipment for one frame, by depth layer. */
 export function drawEquipment(props: readonly Prop[], f: Figure, floor: number | null): EquipmentLayers {
-  const out: EquipmentLayers = { back: '', behind: '', mid: '', front: '' };
+  const out: EquipmentLayers = { back: '', behind: '', mid: '', hand: '', front: '' };
   for (const p of props) {
     switch (p.kind) {
       case 'barbell': {
@@ -90,16 +92,18 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
             const y = c.y + (p.cupped ? 0.02 : 0);
             s = `<rect x="${n(c.x - 0.034)}" y="${n(y - 0.062)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.034)}" y="${n(y + 0.018)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.009)}" y="${n(y - 0.03)}" width="0.018" height="0.06" fill="${LINE}"/>`;
           } else if (p.lengthwise) {
-            // Neutral grip: the handle runs across the fist, a head at each end.
+            // Neutral grip: the handle runs across the fist, a head at each end (about 34 cm long, 27 cm when light).
             const side = far ? f.b : f.a;
             const across = angleOf(sub(side.hand, side.wrist)) + 90;
-            const a = along(c, across, 0.075);
-            const b = along(c, across + 180, 0.075);
-            const head = (q: Vec) => `<g transform="translate(${n(q.x)} ${n(q.y)}) rotate(${n(across)})"><rect x="-0.044" y="-0.024" width="0.088" height="0.048" rx="0.012" fill="${STEEL}"/></g>`;
+            const [reach, len, thick] = p.light ? [0.05, 0.052, 0.038] : [0.062, 0.07, 0.046];
+            const a = along(c, across, reach);
+            const b = along(c, across + 180, reach);
+            const head = (q: Vec) =>
+              `<g transform="translate(${n(q.x)} ${n(q.y)}) rotate(${n(across)})"><rect x="${n(-len / 2)}" y="${n(-thick / 2)}" width="${n(len)}" height="${n(thick)}" rx="0.011" fill="${STEEL}"/></g>`;
             s = seg(a, b, 0.016, STEEL) + head(a) + head(b);
           } else {
             // Seen end-on: the hexagonal head nearest the camera.
-            const r = 0.04;
+            const r = p.light ? 0.033 : 0.04;
             const hex = Array.from({ length: 6 }, (_, k) => {
               const a = (Math.PI / 3) * k + Math.PI / 6;
               return `${n(c.x + r * Math.cos(a))},${n(c.y + r * Math.sin(a))}`;
@@ -107,10 +111,10 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
             s = `<polygon points="${hex}" fill="${STEEL}" stroke="${STEEL}" stroke-width="0.008" stroke-linejoin="round"/>` + circle(c, 0.012, `fill="${FILL}" opacity="0.7"`);
           }
           // The far one behind the lifter. Near: an end-on head is closer to the camera than the fist; a
-          // dumbbell held on end or lengthwise sits under the fingers (and behind the near leg when the hands are between the legs).
+          // dumbbell held on end or lengthwise sits under the fingers.
           if (far) out.back += s;
           else if (p.upright || p.lengthwise) out.mid += s;
-          else out.front += s;
+          else out.hand += s;
         });
         break;
       }
@@ -156,11 +160,14 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
           }
         }
         if (p.kind === 'cable') {
-          // The machine's column, from the floor to just past the pulley, so the cable comes from somewhere.
+          // The machine's column, from the floor to just past the pulley, so the cable comes from somewhere;
+          // with `column` the tower stands there and the pulley hangs on an arm out in front of it.
+          const x = p.column ?? p.from.x;
           if (floor !== null) {
             const top = Math.min(p.from.y - 0.06, floor - 0.2);
-            out.back += `<rect x="${n(p.from.x - 0.022)}" y="${n(top)}" width="0.044" height="${n(floor - top)}" rx="0.01" fill="${FILL}" stroke="${LINE}" stroke-width="0.006"/>`;
+            out.back += `<rect x="${n(x - 0.022)}" y="${n(top)}" width="0.044" height="${n(floor - top)}" rx="0.01" fill="${FILL}" stroke="${LINE}" stroke-width="0.006"/>`;
           }
+          if (p.column !== undefined) out.back += seg({ x, y: p.from.y - 0.03 }, { x: p.from.x, y: p.from.y - 0.03 }, 0.02, STEEL);
           out.back += circle(p.from, 0.028, `fill="${FILL}" stroke="${STEEL}" stroke-width="0.01"`) + circle(p.from, 0.007, `fill="${STEEL}"`);
         }
         break;

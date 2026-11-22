@@ -79,6 +79,6 @@ export function frameMarkup(demo: Demo, s: number, levels: Levels, box: FrameBox
       : `<line x1="${box.x.toFixed(4)}" y1="${floor.toFixed(4)}" x2="${(box.x + box.w).toFixed(4)}" y2="${floor.toFixed(4)}" stroke="var(--floor)" stroke-width="0.008" stroke-linecap="round"/>`;
   // Depth order, back to front: plates and machines, far limbs, benches, trunk, then the near side. A held bar
   // sits over the near leg and under the fist; with the hands between the legs the near leg covers both.
-  const near = demo.armBehindLegs ? eq.mid + body.nearArm + body.nearLeg : body.nearLeg + eq.mid + body.nearArm;
+  const near = demo.armBehindLegs ? eq.mid + body.nearArm + eq.hand + body.nearLeg : body.nearLeg + eq.mid + body.nearArm + eq.hand;
   return ground + eq.back + body.far + eq.behind + body.core + near + eq.front;
 }

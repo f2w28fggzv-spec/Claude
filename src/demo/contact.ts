@@ -124,6 +124,7 @@ export function contactIssues(demo: Demo, frames = 11, tolerance = 0.012): Conta
     for (const sp of skinPoints(demo, s)) {
       if (floor !== null && sp.p.y > floor + tolerance) note({ s, kind: 'floor', part: sp.part, depth: round(sp.p.y - floor) });
       for (const prop of demo.props ?? []) {
+        if (prop.kind === 'bench' && prop.beside?.test(sp.part)) continue;
         const hit = equipmentIssue(sp, prop, tolerance);
         if (hit) note({ s, kind: hit.kind, part: sp.part, depth: round(hit.depth) });
       }

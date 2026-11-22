@@ -23,18 +23,20 @@ export type Prop =
    * the sides, the handle across the hand with a head at each end; `upright`
    * held on end (goblet), `cupped` with the hands under the top head.
    */
-  | { kind: 'dumbbell'; at: Attach; upright?: boolean; cupped?: boolean; lengthwise?: boolean }
+  | { kind: 'dumbbell'; at: Attach; upright?: boolean; cupped?: boolean; lengthwise?: boolean; light?: boolean }
   /** Hangs below the fist, or with `swing` flies in line with the arm (kettlebell swing). */
   | { kind: 'kettlebell'; at: Attach; swing?: boolean }
   /** Bench or pad: a thick line through `points`, with legs to the floor. */
-  | { kind: 'bench'; points: Vec[]; legs?: boolean }
+  /** `beside`: body parts that pass beside the pad rather than over it (arms hanging past a narrow backrest); the contact report skips them. */
+  | { kind: 'bench'; points: Vec[]; legs?: boolean; beside?: RegExp }
   | { kind: 'box'; x: number; y: number; w: number; h: number }
   /** A bar seen end-on: pull-up bar, dip bar, low bar. */
   | { kind: 'bar'; at: Vec }
   /** A wall seen edge-on: its face at x, facing right (the slab behind it to the left) unless `facing: 'left'`. */
   | { kind: 'wall'; x: number; top: number; facing?: 'left' | 'right' }
   /** Cable from a pulley at `from`; `rope` draws a rope handle at the hand. */
-  | { kind: 'cable'; from: Vec; at: Attach; rope?: boolean }
+  /** `column`: x of the machine's tower when the pulley hangs on an arm out in front of it (default: the tower stands under the pulley). */
+  | { kind: 'cable'; from: Vec; at: Attach; rope?: boolean; column?: number }
   | { kind: 'band'; from: Vec; at: Attach }
   /**
    * Machine pad on a joint: a round roller, or with `block` a padded block

@@ -181,7 +181,7 @@ function standingCurl(implement: Implement | 'cable' | 'band', neutral: boolean)
       : implement === 'band'
         ? [{ kind: 'band', from: anchor, at: 'wrist' }]
         : implement === 'dumbbell'
-          ? [{ kind: 'dumbbell', at: 'wrist', ...(neutral && { lengthwise: true }) }]
+          ? [{ kind: 'dumbbell', at: 'wrist', ...(neutral && { lengthwise: true, light: true }) }]
           : // Curling plates are smaller than a deadlift's: 10–15 kg plates on a barbell, 5–10 kg on an EZ bar.
             [{ kind: 'barbell', at: 'wrist', plate: implement === 'ezbar' ? 0.08 : 0.1 }];
   return { view: 'side', pose, props };
@@ -215,8 +215,9 @@ function inclineCurl(): Demo {
     props: [
       { kind: 'line', from: { x: strutTop.x + 0.03, y: floor - 0.01 }, to: strutTop, width: 0.018 },
       { kind: 'line', from: { x: strutTop.x - 0.06, y: floor - 0.008 }, to: { x: s1.x + 0.04, y: floor - 0.008 }, width: 0.016 },
-      { kind: 'bench', points: [b0, corner], legs: false },
-      { kind: 'bench', points: [corner, s1] },
+      // The arms hang beside the narrow backrest and seat, not into them.
+      { kind: 'bench', points: [b0, corner], legs: false, beside: ARMS },
+      { kind: 'bench', points: [corner, s1], beside: ARMS },
       { kind: 'dumbbell', at: 'wrist' },
     ],
   };
@@ -302,15 +303,16 @@ export function pushdown(o: { band?: boolean }): Demo {
     const f = solve('side', build(0, v, 0));
     return offThigh(f, f.a.hand);
   }, BODY.hand);
-  // Pulley (or the band's bar) overhead, just in front of the fists at the top (the column clear of them): the cable hangs nearly straight.
-  const pulley = (lean: number): Vec => ({ x: solve('side', build(lean, fwd, flexTop)).a.hand.x + 0.06, y: o.band ? FLOOR - 1.2 : FLOOR - 1.16 });
+  // Pulley (or the band's bar) overhead, straight above the fists at the top: the cable hangs vertically. The
+  // machine's tower stands a little further forward, the pulley on an arm out in front of it.
+  const pulley = (lean: number): Vec => ({ x: solve('side', build(lean, fwd, flexTop)).a.hand.x + (o.band ? 0.06 : 0.005), y: o.band ? FLOOR - 1.2 : FLOOR - 1.16 });
   const lean = stillLean((v, s) => build(v, fwd, flexTop * (1 - s)), (v) => ({ share: 0.2, from: pulley(v) }));
   const from = pulley(lean);
   const pose = (s: number) => build(lean, fwd, flexTop * (1 - s));
   const props: Prop[] = o.band
     ? [{ kind: 'bar', at: { x: from.x, y: from.y - 0.012 } }, { kind: 'band', from, at: 'wrist' }]
     : // A straight bar on the cable, seen end-on (a bar with no plates).
-      [{ kind: 'cable', from, at: 'wrist' }, { kind: 'barbell', at: 'wrist', plate: 0 }];
+      [{ kind: 'cable', from, at: 'wrist', column: from.x + 0.12 }, { kind: 'barbell', at: 'wrist', plate: 0 }];
   return { view: 'side', pose, props };
 }
 
@@ -346,5 +348,5 @@ export function kickback(): Demo {
   };
   // Hips back until balanced with the dumbbell hanging (the stance then stays put).
   const thighBack = solveFor(0, 80, (t) => -pressureX(solve('side', build(t, 0)), load), -BALANCE);
-  return { view: 'side', pose: (s) => build(thighBack, s), props: [{ kind: 'dumbbell', at: 'wrist', lengthwise: true }], working: 'a' };
+  return { view: 'side', pose: (s) => build(thighBack, s), props: [{ kind: 'dumbbell', at: 'wrist', lengthwise: true, light: true }], working: 'a' };
 }
