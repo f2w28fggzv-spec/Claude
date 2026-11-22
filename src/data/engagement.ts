@@ -213,6 +213,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'quads', role: 'main', peak: 0.9, profile: [1, 0.6, 0.05], note: 'straighten the knees off the floor' },
       { group: 'hamstrings', role: 'main', peak: 0.85, note: 'extend the hip' },
       { group: 'back', role: 'stabilize', peak: 0.5, note: 'keeps the spine neutral' },
+      { group: 'core', role: 'stabilize', peak: 0.45, note: 'braces the trunk' },
     ],
     why: 'As in the conventional pull, the moment about the hips and lower back is largest just off the floor and falls toward lockout (static estimate for the animated path about 1.0, 0.9 and 0.25; the side view draws the thighs at full length, which overstates how far behind the bar the hips sit in a wide stance, so the middle value is kept at the conventional 0.8). The deeper knee bend at the start and the more upright torso put more of the early work on knee extension, so the quads stay involved further up. An EMG comparison (Escamilla et al. 2002) found more vastus medialis and lateralis activity in the sumo than in the conventional deadlift.',
   },
@@ -449,6 +450,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     muscles: [
       { group: 'chest', role: 'main', peak: 1, note: 'lowers the body, then pushes it away from the floor' },
       { group: 'triceps', role: 'assist', peak: 0.6, profile: [0.3, 0.85, 1], note: 'straighten the elbows' },
+      { group: 'shoulders', role: 'assist', peak: 0.5, note: 'front of the shoulder helps push' },
     ],
     why: 'Pivoting on the knees puts about half of body weight on the hands instead of about two thirds (Ebben et al. 2011), but the curve is the full push-up\'s: easiest with straight arms under the shoulders, hardest with the chest near the floor, where the shoulders are furthest ahead of the hands and the elbows most bent.',
   },
@@ -467,6 +469,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     profile: [0.2, 0.7, 1],
     muscles: [
       { group: 'chest', role: 'main', peak: 1, note: 'stretches as the arms open, then hugs them back together' },
+      { group: 'shoulders', role: 'assist', peak: 0.5, note: 'front of the shoulder helps bring the arms up and in' },
     ],
     why: 'With the dumbbells together over the chest the arms hold them with almost no moment arm (they even sit slightly inside the shoulders); as the arms open, the dumbbells move out to the sides and the moment arm about the shoulders grows to its maximum at the bottom, where the chest is also longest. Half way the lever is about 0.63 of its maximum, a little more in effort since the chest is less stretched there. The fly is therefore hardest at the bottom and loses almost all tension at the top.',
   },
@@ -495,6 +498,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'pulls the elbows back and squeezes the shoulder blades; the lower back holds the hinge' },
       { group: 'biceps', role: 'assist', peak: 0.5, profile: [0.1, 0.6, 1], note: 'bend the elbows and hold them bent' },
+      { group: 'hamstrings', role: 'stabilize', peak: 0.4, profile: [1, 0.9, 0.8], note: 'hold the hips in the hinge' },
     ],
     why: 'As in the barbell row the unsupported hinge keeps the lower back working from the start (a little less here, with the more upright torso and lighter load), while the dumbbells hang with no lever about the shoulders; their lever grows as the upper arms swing back (about 0.75 of its maximum at mid-pull) and is longest at the top, where the upper back is also shortest. The forearms hang plumb, so the elbow flexors mostly bend the elbows and hold them bent, most near the top.',
   },
@@ -600,6 +604,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'shoulders', role: 'main', peak: 1, note: 'press the bar the rest of the way overhead' },
       { group: 'triceps', role: 'assist', peak: 0.65, note: 'straighten the elbows to lock out' },
       { group: 'quads', role: 'assist', peak: 0.65, profile: [0.3, 1, 0.5, 0.1, 0.05], note: 'dip and drive the bar off the shoulders' },
+      { group: 'core', role: 'stabilize', peak: 0.4, note: 'braces the trunk through the dip and drive' },
     ],
     why: 'The bar rests racked on the shoulders while the knees dip (the hips drop about 5% of height) and drive (s 0 to 0.4), so the quads carry the start and fade once the legs lock; the shoulders and triceps barely work until the bar leaves the shoulders with the legs\' momentum, are hardest as it passes the head, and ease at lockout over stacked arms. Five points (s = 0, 0.25, 0.5, 0.75, 1) keep the arms cool through the dip.',
   },
@@ -762,6 +767,8 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     profile: [0.3, 0.7, 1],
     muscles: [
       { group: 'triceps', role: 'main', peak: 1, note: 'straighten the elbows to lift the body' },
+      { group: 'shoulders', role: 'assist', peak: 0.6, note: 'front of the shoulder lowers and lifts the body' },
+      { group: 'chest', role: 'assist', peak: 0.45, note: 'lower chest helps push back up' },
     ],
     why: 'The hands carry about 70% of body weight and the heels the rest. With the arms straight the elbows are locked and the load presses them straight, so the triceps hold little; as the hips drop the elbows bend back behind the hands and the elbow\'s lever grows steadily, to about 0.7 of its maximum half way down and most at the bottom, where the elbows reach a right angle. The shoulders stay a constant 0.11 body heights ahead of the hands, so the front of the shoulder carries a large, steady load the whole way.',
   },
@@ -771,6 +778,8 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     muscles: [
       { group: 'triceps', role: 'main', peak: 1, note: 'straighten the elbows; the narrow hands make them lead' },
       { group: 'chest', role: 'assist', peak: 0.65, note: 'helps push the body away from the floor' },
+      { group: 'shoulders', role: 'assist', peak: 0.5, note: 'front of the shoulder helps push' },
+      { group: 'core', role: 'stabilize', peak: 0.45, note: 'keeps the body straight like a plank' },
     ],
     why: 'The hands carry about three quarters of body weight, as in a standard push-up. With them together under the chest the forearms slant in from the elbows to the hands and the shoulders sit further ahead of the hands, so both the elbow and the shoulder levers are longer than in a standard push-up; both build steadily from straight arms to the bottom (about 0.8 of their maximum half way down), so the triceps and chest share one curve.',
   },
