@@ -1,5 +1,6 @@
 // Movement patterns: overhead presses, pike and handstand push-ups, raises. Conventions and helpers: ./shared.ts.
-import { L, add, along, armTo, lerp, lerpV, type DemoPose, type Leg, type Vec } from '../figure';
+import { add, along, armTo, L, lerp, lerpV, PALM, palmTo, type DemoPose, type Leg, type Vec } from '../figure';
+import { BODY } from '../body';
 import type { Demo, Prop } from '../types';
 import { O, FLOOR, ARM_LEN, HANG, BACK, standing, between, handProp, type Implement } from './shared';
 
@@ -25,7 +26,7 @@ export function overheadPress(o: { implement: Implement; seated?: boolean; dip?:
 /** Pike push-up: hips high; the head lowers toward the floor just in front of the hands. */
 export function pikePushUp(): Demo {
   const toe: Vec = { x: -0.04, y: 0 };
-  const wrist: Vec = { x: 0.62, y: FLOOR - 0.01 };
+  const palm: Vec = { x: 0.62 + PALM, y: FLOOR - BODY.hand / 2 };
   return {
     view: 'side',
     pose: (s) => {
@@ -37,7 +38,7 @@ export function pikePushUp(): Demo {
         torso,
         head: torso + 20,
         leg: { thigh: legDir, shin: legDir, foot: legDir - 80 },
-        arm: armTo(shoulder, wrist, BACK),
+        arm: palmTo(shoulder, palm, 90, BACK),
         anchor: 'hip',
         at: hip,
       };

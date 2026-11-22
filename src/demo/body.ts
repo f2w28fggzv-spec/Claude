@@ -8,7 +8,10 @@ import type { Levels } from './engagement';
 
 /** A pose with every optional part filled in. */
 export interface ResolvedPose {
+  /** Lower trunk direction. */
   torso: number;
+  /** Spine flexion at the waist (upper trunk = torso + bend). */
+  bend: number;
   head: number;
   torsoScale: number;
   leg: Leg;
@@ -33,20 +36,27 @@ export interface BodyLayers {
   near: string;
 }
 
-/** Bone line to skin, in body heights, where the body rests on things. */
+/**
+ * Bone line to skin, in body heights (a standing figure is about 1 tall), for
+ * an athletic adult. The figure is drawn to these, and the movement patterns
+ * use them so the body rests on the floor and on benches instead of sinking
+ * into them. Side view: torso and glute from the hip-shoulder line; limbs from
+ * the bone line; footSole from the ankle joint to the sole.
+ */
 export const BODY = {
-  torsoBack: 0.055,
-  torsoFront: 0.055,
-  glute: 0.06,
-  thighBack: 0.045,
-  thighFront: 0.045,
-  calf: 0.035,
-  shinFront: 0.025,
-  upperArm: 0.03,
-  forearm: 0.022,
-  hand: 0.02,
-  head: 0.06,
-  neck: 0.03,
+  torsoBack: 0.076,
+  torsoFront: 0.084,
+  glute: 0.086,
+  thighBack: 0.05,
+  thighFront: 0.059,
+  calf: 0.048,
+  shinFront: 0.03,
+  upperArm: 0.038,
+  forearm: 0.027,
+  /** A fist's half-thickness; a flat hand is about half of this. */
+  hand: 0.025,
+  head: 0.066,
+  neck: 0.04,
   footSole: 0.035,
 };
 

@@ -1,5 +1,6 @@
 // Movement patterns: bench and floor presses, push-ups, dips, flys, skull crushers. Conventions and helpers: ./shared.ts.
-import { L, along, armTo, legTo, lerp, lerpV, type DemoPose, type Vec } from '../figure';
+import { along, armTo, L, legTo, lerp, lerpV, PALM, palmTo, type DemoPose, type Vec } from '../figure';
+import { BODY } from '../body';
 import type { Demo, Prop } from '../types';
 import { FLOOR, LEG_LEN, ARM_LEN, UP, DOWN, BACK, handProp, type Implement } from './shared';
 
@@ -36,7 +37,9 @@ export function pushUp(o: { variant: 'standard' | 'incline' | 'knee' | 'diamond'
   // The body pivots on the toes (or knees); hands stay planted under the
   // shoulders. The shoulder is pinned so the arm geometry is exact.
   const pivot: Vec = { x: 0, y: knee ? FLOOR - 0.05 : FLOOR - 0.06 };
-  const handY = o.variant === 'incline' ? FLOOR - 0.3 : FLOOR - 0.01;
+  // Palms flat, fingers forward: the palm's centre line half a flat hand above the surface.
+  const surface = o.variant === 'incline' ? FLOOR - 0.31 : FLOOR;
+  const handY = surface - BODY.hand / 2;
   const bodyLen = knee ? L.thigh + L.torso : LEG_LEN + L.torso + 0.03;
   const shoulderAt = (aboveHand: number): Vec => {
     const dy = pivot.y - (handY - aboveHand);
@@ -44,6 +47,7 @@ export function pushUp(o: { variant: 'standard' | 'incline' | 'knee' | 'diamond'
   };
   const start = shoulderAt(ARM_LEN * 0.96);
   const wrist: Vec = { x: start.x + (o.variant === 'diamond' ? 0.03 : 0.01), y: handY };
+  const palm: Vec = { x: wrist.x + PALM, y: handY };
   return {
     view: 'side',
     pose: (s) => {
@@ -53,14 +57,14 @@ export function pushUp(o: { variant: 'standard' | 'incline' | 'knee' | 'diamond'
         torso: body,
         head: body,
         leg: knee ? { thigh: body + 180, shin: 270, foot: 180 } : { thigh: body + 180, shin: body + 180, foot: body + 100 },
-        arm: armTo(shoulder, wrist, { x: -1, y: -0.3 }),
+        arm: palmTo(shoulder, palm, 90, { x: -1, y: -0.3 }),
         anchor: 'shoulder',
         at: shoulder,
       };
     },
     props:
       o.variant === 'incline'
-        ? [{ kind: 'bench', points: [{ x: wrist.x - 0.12, y: handY + 0.035 }, { x: wrist.x + 0.2, y: handY + 0.035 }] }]
+        ? [{ kind: 'bench', points: [{ x: wrist.x - 0.12, y: surface + 0.023 }, { x: wrist.x + 0.2, y: surface + 0.023 }] }]
         : [],
   };
 }

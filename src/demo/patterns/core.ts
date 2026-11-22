@@ -1,5 +1,6 @@
 // Movement patterns: planks, holds, crunches and hanging raises. Conventions and helpers: ./shared.ts.
 import { L, legTo, lerp, type DemoPose, type Vec } from '../figure';
+import { BODY } from '../body';
 import type { Demo } from '../types';
 import { O, FLOOR, UP } from './shared';
 
@@ -65,15 +66,19 @@ export function deadBug(): Demo {
   };
 }
 
+/** Lying face up, knees bent: the upper back curls off the floor while the lower back stays down. */
 export function crunch(): Demo {
-  const hip: Vec = { x: 0, y: FLOOR - 0.06 };
+  const hip: Vec = { x: 0, y: FLOOR - BODY.torsoBack };
   const ankle: Vec = { x: 0.36, y: FLOOR - L.ankleHeight };
   return {
     view: 'side',
     floor: FLOOR,
     pose: (s) => {
-      const torso = lerp(270, 302, s);
-      return { torso, head: torso + 8 * s, leg: legTo(hip, ankle, UP), arm: { upper: torso + 150, fore: torso + 40 }, anchor: 'hip', at: hip };
+      const torso = 270 + 3 * s;
+      const bend = 42 * s;
+      const upper = torso + bend;
+      // Arms crossed on the chest: elbow in front of the ribs, hand at the opposite collarbone.
+      return { torso, bend, head: upper + 6 + 10 * s, leg: legTo(hip, ankle, UP), arm: { upper: upper + 146, fore: upper + 356 }, anchor: 'hip', at: hip };
     },
   };
 }
@@ -94,18 +99,22 @@ export function hangingRaise(o: { straight?: boolean }): Demo {
   };
 }
 
+/** Kneeling under a high pulley, rope at the ears: the spine curls down; the hips barely move. */
 export function cableCrunch(): Demo {
   const knee: Vec = { x: 0, y: FLOOR - 0.05 };
   return {
     view: 'side',
     floor: FLOOR,
     pose: (s) => {
-      const torso = lerp(18, 78, s);
+      const torso = lerp(16, 36, s);
+      const bend = 56 * s;
+      const upper = torso + bend;
       return {
         torso,
-        head: torso + 10,
+        bend,
+        head: upper + 10 + 12 * s,
         leg: { thigh: lerp(175, 165, s), shin: 270, foot: 180 },
-        arm: { upper: torso + 150, fore: torso + 330 },
+        arm: { upper: upper + 150, fore: upper + 330 },
         anchor: 'knee',
         at: knee,
       };

@@ -28,6 +28,13 @@ export const L = {
   hipHalf: 0.055,
 };
 
+/** Share of the torso from the hip joint to the waist; the rest runs from the waist to the shoulder. */
+export const WAIST = 0.4;
+/** A gripped bar or handle sits this far past the wrist, in the palm. */
+export const GRIP = 0.035;
+/** An open hand pressing on a surface: palm centre this far past the wrist. */
+export const PALM = 0.04;
+
 export const dir = (deg: number): Vec => {
   const r = (deg * Math.PI) / 180;
   return { x: Math.sin(r), y: -Math.cos(r) };
@@ -51,12 +58,23 @@ export interface Arm {
   fore: number;
   /** Apparent length (1 = full). Below 1 when the arm points toward the camera. */
   scale?: number;
+  /** Direction from the wrist to the fingers. Default: in line with the forearm (a fist around a bar). */
+  hand?: number;
+  /** An open hand pressing on a surface (push-up, plank) instead of a fist. */
+  flat?: boolean;
 }
 
 export type AnchorJoint = 'ankle' | 'toe' | 'knee' | 'hip' | 'shoulder' | 'wrist' | 'elbow';
 
 export interface DemoPose {
+  /** Lower trunk direction (hip joint to waist); without a bend, the whole trunk. */
   torso: number;
+  /**
+   * Spine flexion at the waist, side view only: the upper trunk (waist to
+   * shoulder) turns this many degrees from the lower trunk, toward the front of
+   * the body (a crunch) when positive, backward when negative.
+   */
+  bend?: number;
   head?: number;
   /** Apparent torso length (1 = full), e.g. a hinged torso seen from the front. */
   torsoScale?: number;
@@ -75,6 +93,8 @@ export interface Side {
   shoulder: Vec;
   elbow: Vec;
   wrist: Vec;
+  /** Where the hand holds things: the middle of the fist, or of the palm when the hand is flat. */
+  hand: Vec;
   hip: Vec;
   knee: Vec;
   ankle: Vec;
@@ -92,7 +112,12 @@ export interface Figure {
   nose: Vec;
   ear: Vec;
   ear2: Vec;
+  /** Where the lower and upper trunk meet (on the hip-shoulder line unless the spine bends). */
+  waist: Vec;
+  /** Lower trunk direction. */
   torso: number;
+  /** Upper trunk direction (torso + bend). */
+  upper: number;
 }
 
 function limbs(view: 'side' | 'front', pose: DemoPose, hip: Vec, shoulder: Vec, leg: Leg, arm: Arm, sign: -1 | 1): Side {
@@ -114,13 +139,18 @@ function limbs(view: 'side' | 'front', pose: DemoPose, hip: Vec, shoulder: Vec, 
   const s = arm.scale ?? 1;
   const elbow = along(shoulder, arm.upper, L.upperArm * s);
   const wrist = along(elbow, arm.fore, L.forearm * s);
-  return { shoulder, elbow, wrist, hip, knee, ankle, heel, toe };
+  const hand = along(wrist, arm.hand ?? arm.fore, (arm.flat ? PALM : GRIP) * s);
+  return { shoulder, elbow, wrist, hand, hip, knee, ankle, heel, toe };
 }
 
 /** Joint positions for a pose. */
 export function solve(view: 'side' | 'front', pose: DemoPose): Figure {
   const hipC = { x: 0, y: 0 };
-  const shC = along(hipC, pose.torso, L.torso * (pose.torsoScale ?? 1));
+  const bend = view === 'side' ? (pose.bend ?? 0) : 0;
+  const trunk = L.torso * (pose.torsoScale ?? 1);
+  const waist = along(hipC, pose.torso, trunk * WAIST);
+  const upperDir = pose.torso + bend;
+  const shC = along(waist, upperDir, trunk * (1 - WAIST));
   const across = dir(pose.torso + 90);
   const w = (half: number, sign: -1 | 1) => (view === 'front' ? mul(across, half * sign) : { x: 0, y: 0 });
   const a = limbs(view, pose, add(hipC, w(L.hipHalf, -1)), add(shC, w(L.shoulderHalf, -1)), pose.leg, pose.arm, -1);
@@ -133,13 +163,13 @@ export function solve(view: 'side' | 'front', pose: DemoPose): Figure {
     pose.arm2 ?? pose.arm,
     1,
   );
-  const headDir = pose.head ?? pose.torso;
+  const headDir = pose.head ?? upperDir;
   const head = along(shC, headDir, L.neck);
   const nose = view === 'side' ? along(head, headDir + 90, L.headRadius * 0.95) : along(head, headDir + 180, 0.012);
   const ear = view === 'side' ? along(head, headDir - 90, 0.01) : along(head, headDir - 90, L.headRadius);
   const ear2 = view === 'side' ? ear : along(head, headDir + 90, L.headRadius);
 
-  const fig: Figure = { view, a, b, head, nose, ear, ear2, torso: pose.torso };
+  const fig: Figure = { view, a, b, head, nose, ear, ear2, waist, torso: pose.torso, upper: upperDir };
   const shift = sub(pose.at, a[pose.anchor]);
   return translate(fig, shift);
 }
@@ -147,7 +177,16 @@ export function solve(view: 'side' | 'front', pose: DemoPose): Figure {
 function translate(f: Figure, d: Vec): Figure {
   const moveSide = (s: Side): Side =>
     Object.fromEntries(Object.entries(s).map(([k, v]) => [k, add(v, d)])) as unknown as Side;
-  return { ...f, a: moveSide(f.a), b: moveSide(f.b), head: add(f.head, d), nose: add(f.nose, d), ear: add(f.ear, d), ear2: add(f.ear2, d) };
+  return {
+    ...f,
+    a: moveSide(f.a),
+    b: moveSide(f.b),
+    head: add(f.head, d),
+    nose: add(f.nose, d),
+    ear: add(f.ear, d),
+    ear2: add(f.ear2, d),
+    waist: add(f.waist, d),
+  };
 }
 
 /**
@@ -174,6 +213,24 @@ export function twoLink(base: Vec, target: Vec, l1: number, l2: number, toward: 
 export function armTo(shoulder: Vec, wrist: Vec, toward: Vec, scale = 1): Arm {
   const [upper, fore] = twoLink(shoulder, wrist, L.upperArm * scale, L.forearm * scale, toward);
   return { upper, fore, ...(scale !== 1 && { scale }) };
+}
+
+/**
+ * Arm whose fist closes around `grip` (a bar, a handle), elbow toward
+ * `toward`: the wrist stops short of the bar by GRIP, in line with the forearm.
+ */
+export function gripTo(shoulder: Vec, grip: Vec, toward: Vec, scale = 1): Arm {
+  const [upper, fore] = twoLink(shoulder, grip, L.upperArm * scale, (L.forearm + GRIP) * scale, toward);
+  return { upper, fore, ...(scale !== 1 && { scale }) };
+}
+
+/**
+ * Arm pressing an open hand on a surface: the palm centre lands on `palm`
+ * with the fingers pointing `hand` (degrees), elbow toward `toward`.
+ */
+export function palmTo(shoulder: Vec, palm: Vec, hand: number, toward: Vec): Arm {
+  const wrist = along(palm, hand + 180, PALM);
+  return { ...armTo(shoulder, wrist, toward), hand, flat: true };
 }
 
 /** Leg reaching from `hip` to `ankle`, knee toward `toward`. */

@@ -8,14 +8,15 @@ export function attachPoints(f: Figure, at: Attach): Vec[] {
   const shoulder = mid(f.a.shoulder, f.b.shoulder);
   const hip = mid(f.a.hip, f.b.hip);
   switch (at) {
+    // Held things sit in the hand, just past the wrist.
     case 'wrist':
-      return [f.a.wrist];
+      return [f.a.hand];
     case 'wrists':
-      return [f.a.wrist, f.b.wrist];
+      return [f.a.hand, f.b.hand];
     case 'backRack':
-      return [add(along(shoulder, f.torso - 90, 0.05), mul(dir(f.torso), 0.01))];
+      return [add(along(shoulder, f.upper - 90, 0.05), mul(dir(f.upper), 0.01))];
     case 'frontRack':
-      return [along(shoulder, f.torso + 90, 0.06)];
+      return [along(shoulder, f.upper + 90, 0.06)];
     case 'lap':
       return [along(hip, f.torso + 90, 0.08)];
     case 'knee':

@@ -22,14 +22,17 @@ export const floorOf = (demo: Demo): number | null => (demo.floor === undefined 
 export function resolvePose(pose: DemoPose): ResolvedPose {
   return {
     torso: pose.torso,
-    head: pose.head ?? pose.torso,
+    bend: pose.bend ?? 0,
+    head: pose.head ?? pose.torso + (pose.bend ?? 0),
     torsoScale: pose.torsoScale ?? 1,
     leg: pose.leg,
-    arm: { scale: 1, ...pose.arm },
+    arm: resolveArm(pose.arm),
     leg2: pose.leg2 ?? pose.leg,
-    arm2: { scale: 1, ...(pose.arm2 ?? pose.arm) },
+    arm2: resolveArm(pose.arm2 ?? pose.arm),
   };
 }
+
+const resolveArm = (a: DemoPose['arm']): ResolvedPose['arm'] => ({ scale: 1, hand: a.fore, flat: false, ...a });
 
 /** The solved skeleton with its pose angles at movement progress s. */
 export function figureAt(demo: Demo, s: number): BodyFigure {
