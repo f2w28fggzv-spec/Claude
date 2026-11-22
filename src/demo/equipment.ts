@@ -78,6 +78,8 @@ export function propExtent(p: Prop, f: Figure): Vec[] {
   if (p.kind === 'box') out.push({ x: p.x, y: p.y }, { x: p.x + p.w, y: p.y + p.h });
   if (p.kind === 'bar') around(p.at, 0.03);
   if (p.kind === 'cable' || p.kind === 'band') around(p.from, 0.03);
+  // A tower standing beside its pulley.
+  if (p.kind === 'cable' && p.column !== undefined) around({ x: p.column, y: p.from.y }, 0.03);
   if (p.kind === 'line') out.push(p.from, p.to);
   if (p.kind === 'wall') out.push({ x: p.x - 0.03, y: p.top });
   return out;
