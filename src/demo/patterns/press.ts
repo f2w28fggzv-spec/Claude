@@ -6,7 +6,7 @@
 // points toward or away from the camera.
 import { BODY } from '../body';
 import { PAD_HALF, skinPoints } from '../contact';
-import { GRIP, L, PALM, add, along, angleOf, dir, legTo, lerp, mul, solve, sub, twoLink, type Arm, type DemoPose, type Leg, type Vec } from '../figure';
+import { GRIP, L, PALM, add, along, angleOf, dir, legTo, lerp, lerpV, mul, solve, sub, twoLink, type Arm, type DemoPose, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
 import { FLOOR, HANG, STAND, UP, centreOfMass, handProp, restingPad, solveFor, type Implement } from './shared';
 
@@ -136,12 +136,13 @@ function lying(o: { incline?: number; floor?: boolean }): Lying {
   let support: { at: Vec; deg: number };
   const props: Prop[] = [];
   const free = /arm|forearm|hand|head/; // parts that rest elsewhere or pass beside the pad
+  const arms = /upper arm|forearm|hand/; // the bench is narrower than the shoulders: the arms pass beside it
   if (o.floor) support = { at: { x: 0, y: FLOOR }, deg: 270 };
   else if (!incline) {
     // Flat bench from just past the head to under the top of the thighs.
     const y = seat + PAD_HALF;
     const [a, b] = restingPad(() => body(HANG, upper), { x: shoulder.x - L.neck - BODY.head - 0.035, y }, { x: hip.x + 0.12, y }, free);
-    props.push({ kind: 'bench', points: [a, b] });
+    props.push({ kind: 'bench', points: [a, b], beside: arms });
     support = { at: { x: a.x, y: a.y - PAD_HALF }, deg: 270 };
   } else {
     // Back pad at the incline under the glutes, upper back and head; the seat under the glutes and thighs.
@@ -150,7 +151,17 @@ function lying(o: { incline?: number; floor?: boolean }): Lying {
     const [b0, b1] = restingPad(() => body(HANG, upper), add(hip, behind), add(along(hip, deg, L.torso + L.neck + BODY.head + 0.05), behind), free);
     const y = seat + PAD_HALF;
     const [s0, s1] = restingPad(() => body(HANG, upper), { x: hip.x - 0.14, y }, { x: hip.x + 0.14, y }, free);
-    props.push({ kind: 'bench', points: [b1, crossing(b0, b1, s0, s1), s1] });
+    // An adjustable bench: legs under the seat, the back pad propped on a strut from a floor rail.
+    const corner = crossing(b0, b1, s0, s1);
+    const backLen = Math.hypot(corner.x - b1.x, corner.y - b1.y);
+    const atCorner = backLen / (backLen + Math.hypot(s1.x - corner.x, s1.y - corner.y));
+    const strutTop = add(lerpV(corner, b1, 0.5), mul(dir(deg - 90), PAD_HALF));
+    const strutFoot = { x: lerp(strutTop.x, corner.x, 0.5), y: FLOOR - 0.008 };
+    props.push(
+      { kind: 'line', from: strutFoot, to: strutTop, width: 0.018 },
+      { kind: 'line', from: { x: strutFoot.x - 0.05, y: FLOOR - 0.008 }, to: { x: s1.x + 0.04, y: FLOOR - 0.008 }, width: 0.016 },
+      { kind: 'bench', points: [b1, corner, s1], legs: [atCorner, 1], beside: arms },
+    );
     support = { at: add(b0, mul(dir(deg + 90), PAD_HALF)), deg };
   }
   // The back of the head rests on the surface (neck in line with the trunk).
@@ -260,8 +271,9 @@ export function skullCrusher(): Demo {
 const ballFrom = (foot: number): Vec => add(mul(dir(foot), L.ball), mul(dir(foot + 90), L.ankleHeight));
 /** Kneeling: the knee joint this far above the floor (the kneecap on the floor). */
 const KNEEL = 0.05;
-/** At the bottom the chest (or whatever is lowest) stays this far off the floor or bench. */
+/** At the bottom the chest (or whatever is lowest) stays this far off the floor or bench; kneeling, the belly comes right down. */
 const CLEAR = 0.012;
+const CLEAR_KNEELING = 0.002;
 
 /**
  * Push-up family: the body is one straight line from the heels (or knees) to
@@ -294,13 +306,13 @@ export function pushUp(o: { variant: 'standard' | 'incline' | 'knee' | 'diamond'
   const surface = incline ? FLOOR - BENCH_H : FLOOR;
   const palmY = surface - BODY.hand / 2;
   // Top: arms locked, wrists just behind the shoulders (diamond: under the chest).
-  const behind = diamond ? 0.085 : 0.035;
+  const behind = diamond ? 0.07 : 0.035;
   const reach = sideReach(176, out, elbowTop, L.forearm);
   const degTop = bodyFor(palmY - Math.sqrt(reach ** 2 - behind ** 2));
   const wrist: Vec = { x: shoulderAt(degTop).x - behind, y: palmY };
   const palm = along(wrist, 90, PALM * seen(L.forearm, out - elbowTop));
   const edge = wrist.x - 0.012;
-  const bench: Prop[] = incline ? [{ kind: 'bench', points: [{ x: edge, y: surface + PAD_HALF }, { x: edge + 0.16, y: surface + PAD_HALF }] }] : [];
+  const bench: Prop[] = incline ? [{ kind: 'bench', points: [{ x: edge, y: surface + PAD_HALF }, { x: edge + 0.16, y: surface + PAD_HALF }], endOn: true }] : [];
   // Bottom: lowered until the body nearly touches the floor (or the chest the bench).
   const lowest = kneeling ? /trunk \(front\)|^head$/ : /trunk \(front\)|thigh \(front\)|^head$/;
   const gap = (deg: number) =>
@@ -309,7 +321,7 @@ export function pushUp(o: { variant: 'standard' | 'incline' | 'knee' | 'diamond'
         .filter((sp) => !incline || (sp.p.x >= edge && sp.p.x <= edge + 0.16))
         .map((sp) => surface - sp.p.y),
     );
-  const degBottom = solveFor(degTop, 100, (d) => -gap(d), -CLEAR);
+  const degBottom = solveFor(degTop, 100, (d) => -gap(d), -(kneeling ? CLEAR_KNEELING : CLEAR));
   const yTop = shoulderAt(degTop).y;
   const yBottom = shoulderAt(degBottom).y;
   return {
@@ -362,21 +374,25 @@ function barDip(): Demo {
 }
 
 /**
- * Bench dip: palms on the front edge of a bench behind the hips, fingers
- * forward, legs out in front on the heels. The hips drop straight down close
- * to the bench until the elbows are bent to 90°, pointing back, then press up.
+ * Bench dip: hands on the front edge of a bench behind the hips, fingers
+ * forward and curled over the edge, legs out in front on the heels. The hips
+ * drop straight down close to the bench until the elbows are bent to 90°,
+ * pointing back, then press up.
  */
 function benchDip(): Demo {
   const top = FLOOR - BENCH_H;
   const edge = 0; // the bench's front edge
-  const palm: Vec = { x: edge - 0.03, y: top - BODY.hand / 2 };
-  const wrist = along(palm, 270, PALM);
+  // The palm wraps the edge, fingers pointing forward and down over it.
+  const hand = 130;
+  const palm = add({ x: edge, y: top }, mul(dir(hand - 90), BODY.hand / 2));
+  const wrist = along(palm, hand + 180, PALM);
   const lean = 3; // trunk nearly upright
-  // Shoulders this far in front of the wrists keep the back and glutes just clear of the bench.
-  const ahead = L.upperArm;
-  const yTop = wrist.y - Math.sqrt(sideReach(176, 0, 0, L.forearm) ** 2 - ahead ** 2);
-  const yBottom = wrist.y - L.forearm; // forearms upright, upper arms level
-  const shoulderAt = (s: number): Vec => ({ x: wrist.x + ahead, y: lerp(yTop, yBottom, s) });
+  // Bottom: elbows at 90°, forearms leaning back a little; the shoulders stay
+  // this far in front of the hands, keeping the back and glutes just clear of the bench.
+  const elbowBottom = along(wrist, -15, L.forearm);
+  const bottom = along(elbowBottom, 75, L.upperArm);
+  const yTop = wrist.y - Math.sqrt(sideReach(176, 0, 0, L.forearm) ** 2 - (bottom.x - wrist.x) ** 2);
+  const shoulderAt = (s: number): Vec => ({ x: bottom.x, y: lerp(yTop, bottom.y, s) });
   // On the heels, toes up; the knees bend a little more as the hips drop.
   const foot = 20;
   const heelFrom = add(mul(dir(foot), -L.heel), mul(dir(foot + 90), L.ankleHeight));
@@ -391,12 +407,12 @@ function benchDip(): Demo {
       return {
         torso: lean,
         leg: legTo(hip, ankle, UP, foot),
-        arm: { ...sidePalm(shoulder, palm, 90, { x: -1, y: 0 }, 0, 0) },
+        arm: sidePalm(shoulder, palm, hand, { x: -1, y: 0 }, 0, 0),
         anchor: 'shoulder',
         at: shoulder,
       };
     },
     // The bench seen end-on, its top under the palms.
-    props: [{ kind: 'bench', points: [{ x: edge - 0.16, y: top + PAD_HALF }, { x: edge, y: top + PAD_HALF }] }],
+    props: [{ kind: 'bench', points: [{ x: edge - 0.16, y: top + PAD_HALF }, { x: edge, y: top + PAD_HALF }], endOn: true }],
   };
 }

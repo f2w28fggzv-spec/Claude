@@ -32,6 +32,20 @@ function segmentDeg(s: Side, frame: 'shin' | 'thigh' | 'forearm' | 'trunk'): num
   return angleOf(sub(s.wrist, s.elbow));
 }
 
+/** The point a share t (0..1) of the way along a polyline, by length. */
+function alongPolyline(points: Vec[], t: number): Vec {
+  const lens = points.slice(1).map((q, i) => Math.hypot(q.x - points[i].x, q.y - points[i].y));
+  let left = Math.max(0, Math.min(1, t)) * lens.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < lens.length; i++) {
+    if (left <= lens[i] || i === lens.length - 1) {
+      const k = lens[i] ? Math.min(1, left / lens[i]) : 0;
+      return { x: points[i].x + (points[i + 1].x - points[i].x) * k, y: points[i].y + (points[i + 1].y - points[i].y) * k };
+    }
+    left -= lens[i];
+  }
+  return points[0];
+}
+
 const circle = (c: Vec, r: number, attrs: string) => `<circle cx="${n(c.x)}" cy="${n(c.y)}" r="${n(r)}" ${attrs}/>`;
 const seg = (a: Vec, b: Vec, w: number, colour: string, extra = '') =>
   `<line x1="${n(a.x)}" y1="${n(a.y)}" x2="${n(b.x)}" y2="${n(b.y)}" stroke="${colour}" stroke-width="${n(w)}" stroke-linecap="round" ${extra}/>`;
@@ -130,11 +144,15 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
         }
         break;
       case 'bench': {
-        const first = p.points[0];
-        const last = p.points[p.points.length - 1];
         let s = '';
         if (p.legs !== false && floor !== null) {
-          for (const q of [first, last]) s += seg({ x: q.x, y: q.y + 0.02 }, { x: q.x, y: floor - 0.008 }, 0.018, STEEL) + seg({ x: q.x - 0.035, y: floor - 0.008 }, { x: q.x + 0.035, y: floor - 0.008 }, 0.016, STEEL);
+          // Upright legs on T-feet: under both ends, where the pattern says, or one in the middle of a bench seen end-on.
+          const at = p.endOn ? [0.5] : Array.isArray(p.legs) ? p.legs : [0, 1];
+          const foot = p.endOn ? 0.09 : 0.035;
+          for (const t of at) {
+            const q = alongPolyline(p.points, t);
+            s += seg({ x: q.x, y: q.y + 0.02 }, { x: q.x, y: floor - 0.008 }, 0.018, STEEL) + seg({ x: q.x - foot, y: floor - 0.008 }, { x: q.x + foot, y: floor - 0.008 }, 0.016, STEEL);
+          }
         }
         s += poly(p.points, 0.046, PAD);
         out.behind += s;

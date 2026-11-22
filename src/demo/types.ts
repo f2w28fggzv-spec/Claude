@@ -27,8 +27,14 @@ export type Prop =
   /** Hangs below the fist, or with `swing` flies in line with the arm (kettlebell swing). */
   | { kind: 'kettlebell'; at: Attach; swing?: boolean }
   /** Bench or pad: a thick line through `points`, with legs to the floor. */
-  /** `beside`: body parts that pass beside the pad rather than over it (arms hanging past a narrow backrest); the contact report skips them. */
-  | { kind: 'bench'; points: Vec[]; legs?: boolean; beside?: RegExp }
+  /**
+   * A padded bench along `points`. Legs stand under both ends unless `legs`
+   * is false or lists where they stand (shares of the pad's length, 0 = the
+   * first point); `endOn` = its long axis points at the camera, so one
+   * central upright on a wide foot. `beside`: body parts that pass beside the
+   * pad rather than over it (arms past a narrow backrest); the contact report skips them.
+   */
+  | { kind: 'bench'; points: Vec[]; legs?: boolean | number[]; endOn?: boolean; beside?: RegExp }
   | { kind: 'box'; x: number; y: number; w: number; h: number }
   /** A bar seen end-on: pull-up bar, dip bar, low bar. */
   | { kind: 'bar'; at: Vec }
