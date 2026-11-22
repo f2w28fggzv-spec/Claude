@@ -26,7 +26,10 @@ export function chainUp(ankle: Vec, shin: number, thigh: number, torso: number) 
 }
 
 export function mixLeg(a: Leg, b: Leg, s: number): Leg {
-  return { thigh: lerpAngle(a.thigh, b.thigh, s), shin: lerpAngle(a.shin, b.shin, s), foot: lerpAngle(a.foot, b.foot, s) };
+  const leg: Leg = { thigh: lerpAngle(a.thigh, b.thigh, s), shin: lerpAngle(a.shin, b.shin, s), foot: lerpAngle(a.foot, b.foot, s) };
+  // Toes that bend in either pose blend too (unset = in line with the foot).
+  if (a.toes !== undefined || b.toes !== undefined) leg.toes = lerpAngle(a.toes ?? a.foot, b.toes ?? b.foot, s);
+  return leg;
 }
 export function mixArm(a: Arm, b: Arm, s: number): Arm {
   return {

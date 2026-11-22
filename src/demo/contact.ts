@@ -62,7 +62,7 @@ export function skinPoints(demo: Demo, s: number): SkinPoint[] {
     segmentSkin(side.elbow, side.wrist, arm.fore - 90, BODY.forearm, BODY.forearm, `${label} forearm`, out);
     const handHalf = arm.flat ? BODY.hand / 2 : BODY.hand;
     out.push({ p: add(side.hand, mul(dir(arm.hand - 90), handHalf)), part: `${label} hand` }, { p: add(side.hand, mul(dir(arm.hand + 90), handHalf)), part: `${label} hand` });
-    out.push({ p: side.heel, part: `${label} heel` }, { p: side.toe, part: `${label} toe` });
+    out.push({ p: side.heel, part: `${label} heel` }, { p: side.ball, part: `${label} ball of the foot` }, { p: side.toe, part: `${label} toe` });
   }
   return out;
 }
@@ -128,7 +128,7 @@ export function contactIssues(demo: Demo, frames = 11, tolerance = 0.012): Conta
         if (hit) note({ s, kind: hit.kind, part: sp.part, depth: round(hit.depth) });
       }
       // Feet on the floor: remember where, frame by frame, to catch sliding (a foot that lifts and lands elsewhere is a step).
-      if (floor !== null && /heel|toe/.test(sp.part)) {
+      if (floor !== null && /heel|ball|toe/.test(sp.part)) {
         const runs = planted.get(sp.part) ?? [[]];
         const run = runs[runs.length - 1];
         if (Math.abs(sp.p.y - floor) <= 0.004) run.push(sp.p.x);

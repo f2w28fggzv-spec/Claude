@@ -63,4 +63,10 @@ export interface Demo {
    * ballistic lifts like the kettlebell swing. Tempo checks still set minimums.
    */
   timing?: { start?: number; out?: number; far?: number; back?: number };
+  /**
+   * Side view: the hands work between the legs (sumo deadlift, kettlebell
+   * swing, cable pull-through, elbows inside the knees in a goblet squat), so
+   * the near arm and what it holds pass behind the near leg.
+   */
+  armBehindLegs?: boolean;
 }

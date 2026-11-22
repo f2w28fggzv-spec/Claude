@@ -19,6 +19,8 @@ export const L = {
   forearm: 0.146,
   /** Ankle to toe along the foot, and ankle height above the floor. */
   foot: 0.11,
+  /** Ankle to the ball of the foot, where the toes bend (about 73% of the foot from the heel). */
+  ball: 0.072,
   ankleHeight: 0.035,
   heel: 0.03,
   neck: 0.115,
@@ -51,7 +53,10 @@ export const dist = (a: Vec, b: Vec) => Math.hypot(a.x - b.x, a.y - b.y);
 export interface Leg {
   thigh: number;
   shin: number;
+  /** Heel to the ball of the foot. */
   foot: number;
+  /** Ball of the foot to the toe tip. Default: in line with the foot. Keeps the toes flat while the heel rises (calf raise, the back foot of a lunge). */
+  toes?: number;
 }
 export interface Arm {
   upper: number;
@@ -101,6 +106,8 @@ export interface Side {
   knee: Vec;
   ankle: Vec;
   heel: Vec;
+  /** Ball of the foot, on the sole, where the toes bend. */
+  ball: Vec;
   toe: Vec;
 }
 
@@ -126,23 +133,27 @@ function limbs(view: 'side' | 'front', pose: DemoPose, hip: Vec, shoulder: Vec, 
   const knee = along(hip, leg.thigh, L.thigh);
   const ankle = along(knee, leg.shin, L.shin);
   let heel: Vec;
+  let ball: Vec;
   let toe: Vec;
   if (view === 'side') {
+    // The sole runs ankleHeight below the ankle: heel, ball of the foot, then the toes (which may bend at the ball).
     const f = dir(leg.foot);
     const n = dir(leg.foot + 90);
     heel = add(add(ankle, mul(f, -L.heel)), mul(n, L.ankleHeight));
-    toe = add(add(ankle, mul(f, L.foot)), mul(n, L.ankleHeight));
+    ball = add(add(ankle, mul(f, L.ball)), mul(n, L.ankleHeight));
+    toe = along(ball, leg.toes ?? leg.foot, L.foot - L.ball);
   } else {
     // Feet point at the camera: draw them short, turned slightly out.
     const down = dir(pose.torso + 180);
     heel = add(ankle, mul(down, L.ankleHeight));
     toe = add(heel, mul(dir(pose.torso + 90), sign * 0.03));
+    ball = lerpV(heel, toe, 0.7);
   }
   const s = arm.scale ?? 1;
   const elbow = along(shoulder, arm.upper, L.upperArm * s);
   const wrist = along(elbow, arm.fore, L.forearm * (arm.foreScale ?? s));
   const hand = along(wrist, arm.hand ?? arm.fore, (arm.flat ? PALM : GRIP) * (arm.foreScale ?? s));
-  return { shoulder, elbow, wrist, hand, hip, knee, ankle, heel, toe };
+  return { shoulder, elbow, wrist, hand, hip, knee, ankle, heel, ball, toe };
 }
 
 /** Joint positions for a pose. */

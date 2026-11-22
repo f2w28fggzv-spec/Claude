@@ -6,7 +6,7 @@ import { progressAt, timeline } from '../../src/demo/timeline';
 import type { PoseFrame, PoseSequence, RawLandmark } from '../../src/engine/types';
 
 // Body points that are pose landmarks (the hand's grip point is not one).
-const SIDE_INDEX: Record<Exclude<keyof Side, 'hand'>, [right: number, left: number]> = {
+const SIDE_INDEX: Record<Exclude<keyof Side, 'hand' | 'ball'>, [right: number, left: number]> = {
   shoulder: [12, 11],
   elbow: [14, 13],
   wrist: [16, 15],

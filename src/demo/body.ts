@@ -29,11 +29,18 @@ export interface BodyContext {
   /** Unique per drawn figure: prefix for any ids in <defs>. */
   id: string;
 }
-/** Painted far, then core, then near; equipment goes between and around them. */
+/**
+ * Painted back to front: far limbs, trunk with neck and head, near leg, near
+ * arm; equipment goes between and around them (a held bar between the near
+ * leg and the near arm). With the hands between the legs (Demo.armBehindLegs)
+ * the near arm is painted before the near leg. Front view: everything that
+ * isn't one of the near limbs goes in far and core.
+ */
 export interface BodyLayers {
   far: string;
   core: string;
-  near: string;
+  nearLeg: string;
+  nearArm: string;
 }
 
 /**
@@ -82,7 +89,8 @@ function sideLimbs(s: Side, leg: Leg, arm: Arm, c: BodyContext, body: string) {
     line(s.hip, off(s.hip, thighFront, -0.03), 0.07, heat(level.glutes)) +
     line(s.knee, s.ankle, 0.06, body) +
     line(off(lerpV(s.knee, s.ankle, 0.15), shinFront, -0.015), off(lerpV(s.knee, s.ankle, 0.55), shinFront, -0.015), 0.03, heat(level.calves)) +
-    line(s.heel, s.toe, 0.03, body);
+    line(s.heel, s.ball, 0.03, body) +
+    line(s.ball, s.toe, 0.026, body);
   const arms =
     line(s.shoulder, s.elbow, 0.055, body) +
     line(off(lerpV(s.shoulder, s.elbow, 0.3), armFront, 0.012), off(lerpV(s.shoulder, s.elbow, 0.85), armFront, 0.012), 0.024, heat(level.biceps)) +
@@ -108,7 +116,7 @@ export function drawBody(fig: BodyFigure, c: BodyContext): BodyLayers {
       line(add(lerpV(hip, sh, 0.1), mul(front, 0.035)), add(lerpV(hip, sh, 0.5), mul(front, 0.035)), 0.04, heat(level.core)) +
       line(add(lerpV(hip, sh, 0.15), mul(front, -0.035)), add(lerpV(hip, sh, 0.9), mul(front, -0.035)), 0.04, heat(level.back)) +
       `<circle cx="${n(fig.head.x)}" cy="${n(fig.head.y)}" r="0.058" fill="${body}"/><circle cx="${n(fig.nose.x)}" cy="${n(fig.nose.y)}" r="0.012" fill="${body}"/>`;
-    return { far: far.arms + far.legs, core, near: near.legs + near.arms };
+    return { far: far.arms + far.legs, core, nearLeg: near.legs, nearArm: near.arms };
   }
   let s = `<polygon points="${[fig.a.shoulder, fig.b.shoulder, fig.b.hip, fig.a.hip].map((q) => `${n(q.x)},${n(q.y)}`).join(' ')}" fill="${body}" stroke="${body}" stroke-width="0.06" stroke-linejoin="round"/>`;
   for (const side of [fig.a, fig.b]) {
@@ -117,5 +125,5 @@ export function drawBody(fig: BodyFigure, c: BodyContext): BodyLayers {
     s += `<circle cx="${n(side.shoulder.x)}" cy="${n(side.shoulder.y)}" r="0.035" fill="${heat(level.shoulders)}"/>`;
   }
   s += `<circle cx="${n(fig.head.x)}" cy="${n(fig.head.y)}" r="0.058" fill="${body}"/>`;
-  return { far: '', core: s, near: '' };
+  return { far: '', core: s, nearLeg: '', nearArm: '' };
 }

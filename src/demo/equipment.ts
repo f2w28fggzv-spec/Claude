@@ -98,7 +98,10 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
             }).join(' ');
             s = `<polygon points="${hex}" fill="${STEEL}" stroke="${STEEL}" stroke-width="0.008" stroke-linejoin="round"/>` + circle(c, 0.012, `fill="${FILL}" opacity="0.7"`);
           }
+          // The far one behind the lifter. Near: an end-on head is closer to the camera than the fist; a
+          // dumbbell held on end or lengthwise sits under the fingers (and behind the near leg when the hands are between the legs).
           if (far) out.back += s;
+          else if (p.upright || p.lengthwise) out.mid += s;
           else out.front += s;
         });
         break;

@@ -123,7 +123,7 @@ export function hinge(o: {
         ? // On one leg: a single dumbbell in the hand opposite the standing leg (the far hand from this camera).
           [{ kind: 'dumbbell', at: o.singleLeg ? 'wrist2' : 'wrists' }]
         : [{ kind: 'barbell', at: 'wrist' }];
-  return { view: 'side', pose, props };
+  return { view: 'side', pose, props, armBehindLegs: o.implement === 'cable' };
 }
 
 /** Single-leg hinge: the free leg in line with the trunk, its knee bend and relaxed foot fading out as it rises. */
@@ -168,6 +168,8 @@ export function deadlift(o: {
   ahead: number;
   /** Knee bend (thigh tilt back, shins vertical) as the bar passes the knees. */
   pastKnees: number;
+  /** Sumo stance: the hands grip inside the knees. */
+  sumo?: boolean;
 }): Demo {
   const bar0 = barOnShins(o.shin);
   const knee0 = along(O, o.shin, L.shin);
@@ -186,7 +188,7 @@ export function deadlift(o: {
     const bar = onLegs(shoulder, hip, knee, O, BAR_R);
     return { torso, head: headFor(torso), leg: { thigh, shin, foot: 90 }, arm: gripTo(shoulder, bar, BACK), anchor: 'ankle', at: O };
   };
-  return { view: 'side', pose, props: [{ kind: 'barbell', at: 'wrist' }] };
+  return { view: 'side', pose, props: [{ kind: 'barbell', at: 'wrist' }], armBehindLegs: o.sumo };
 }
 
 /** Hardstyle kettlebell swing: s = 0 hiked back between the legs, s = 1 standing tall with the bell at chest height. */
@@ -194,6 +196,8 @@ export function swing(): Demo {
   const hike = { shin: 4, thigh: 30, torso: 64 };
   return {
     view: 'side',
+    // Both hands on the handle between the legs.
+    armBehindLegs: true,
     pose: (s) => {
       // The hips snap through first (standing by s = 0.6); the arms just follow and the bell floats up.
       const k = 1 - smooth(s / 0.6);

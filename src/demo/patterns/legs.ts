@@ -136,7 +136,8 @@ export function squat(o: {
     const top = f.a.hip.y + BODY.thighBack + 0.003;
     props.push({ kind: 'box', x: f.a.hip.x - 0.16, y: top, w: 0.25, h: FLOOR - top });
   }
-  return { view: 'side', pose, props, pauseFar: o.pauseFar };
+  // Goblet: the elbows finish inside the knees.
+  return { view: 'side', pose, props, pauseFar: o.pauseFar, armBehindLegs: o.hold === 'goblet' };
 }
 
 // ── Feet and hands ───────────────────────────────────────────────────────
