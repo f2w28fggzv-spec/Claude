@@ -1134,7 +1134,7 @@ const DRAFT_EXERCISES: Exercise[] = [
     secondary: ['triceps'],
     equipment: ['bodyweight'],
     role: 'compound',
-    demo: D.pushUp({ variant: 'pike' }),
+    demo: D.pikePushUp(),
     placement: P.sideFloor,
     tracking: down('nose'),
     requiredLandmarks: ['nose'],
