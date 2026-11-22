@@ -284,7 +284,9 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
         return { kind: 'bench', points: [{ x: edge - 0.3, y }, { x: edge, y }] };
       })()
     : undefined;
-  return lungeDemo(o, imp, hipAt, rearAt, frontAt, pad);
+  const demo = lungeDemo(o, imp, hipAt, rearAt, frontAt, pad);
+  // Back foot up on a bench: the front (near) leg does the work. On the floor both legs share it.
+  return bench ? { ...demo, working: 'a' } : demo;
 }
 
 function lungeDemo(
@@ -374,6 +376,8 @@ export function stepUp(o: { implement?: Implement }): Demo {
     view: 'side',
     pose,
     props: [{ kind: 'box', x: edge, y: top, w: 0.34, h: boxH }, ...handProp(o.implement ?? 'none', 'wrists', { lengthwise: true })],
+    // The lead (near) leg does the work; the trailing leg only pushes off.
+    working: 'a',
   };
 }
 
@@ -405,6 +409,8 @@ export function pistol(): Demo {
   const leanB = solveFor(-10, 80, (t) => com(build(shinB, kneeB, t, 1)), target);
   return {
     view: 'side',
+    // The near (standing) leg does the work.
+    working: 'a',
     pose: (s) => {
       const knee = lerp(180, kneeB, s);
       const torso = lerp(3, leanB, 1 - (1 - s) ** 1.6);

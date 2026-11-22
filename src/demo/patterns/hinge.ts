@@ -123,7 +123,8 @@ export function hinge(o: {
         ? // On one leg: a single dumbbell in the hand opposite the standing leg (the far hand from this camera).
           [{ kind: 'dumbbell', at: o.singleLeg ? 'wrist2' : 'wrists' }]
         : [{ kind: 'barbell', at: 'wrist' }];
-  return { view: 'side', pose, props, armBehindLegs: o.implement === 'cable' };
+  // On one leg, the near (standing) leg does the work.
+  return { view: 'side', pose, props, armBehindLegs: o.implement === 'cable', working: o.singleLeg ? 'a' : undefined };
 }
 
 /** Single-leg hinge: the free leg in line with the trunk, its knee bend and relaxed foot fading out as it rises. */
