@@ -1,3 +1,4 @@
+import { BODY } from './body';
 import { add, along, dir, mul, type Figure, type Vec } from './figure';
 import type { Attach } from './types';
 
@@ -15,8 +16,9 @@ export function attachPoints(f: Figure, at: Attach): Vec[] {
       return [f.a.hand, f.b.hand];
     case 'wrist2':
       return [f.b.hand];
+    // High bar: resting on the upper traps, just behind the skin of the back and a little above the shoulder joints.
     case 'backRack':
-      return [add(along(shoulder, f.upper - 90, 0.05), mul(dir(f.upper), 0.01))];
+      return [add(along(shoulder, f.upper - 90, BODY.torsoBack + 0.016), mul(dir(f.upper), 0.02))];
     case 'frontRack':
       return [along(shoulder, f.upper + 90, 0.06)];
     case 'lap':

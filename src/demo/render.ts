@@ -32,7 +32,7 @@ export function resolvePose(pose: DemoPose): ResolvedPose {
   };
 }
 
-const resolveArm = (a: DemoPose['arm']): ResolvedPose['arm'] => ({ scale: 1, hand: a.fore, flat: false, ...a });
+const resolveArm = (a: DemoPose['arm']): ResolvedPose['arm'] => ({ scale: 1, hand: a.fore, flat: false, ...a, foreScale: a.foreScale ?? a.scale ?? 1 });
 
 /** The solved skeleton with its pose angles at movement progress s. */
 export function figureAt(demo: Demo, s: number): BodyFigure {

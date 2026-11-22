@@ -18,7 +18,12 @@ export type Attach =
 export type Prop =
   /** Barbell seen end-on (side view): a plate. */
   | { kind: 'barbell'; at: Attach; plate?: number }
-  | { kind: 'dumbbell'; at: Attach; upright?: boolean }
+  /**
+   * Seen end-on (palms back or forward); `lengthwise` for a neutral grip at
+   * the sides, the handle across the hand with a head at each end; `upright`
+   * held on end (goblet), `cupped` with the hands under the top head.
+   */
+  | { kind: 'dumbbell'; at: Attach; upright?: boolean; cupped?: boolean; lengthwise?: boolean }
   /** Hangs below the fist, or with `swing` flies in line with the arm (kettlebell swing). */
   | { kind: 'kettlebell'; at: Attach; swing?: boolean }
   /** Bench or pad: a thick line through `points`, with legs to the floor. */
@@ -36,8 +41,8 @@ export type Prop =
    * back), so the roller turns with the limb (leg curl, leg extension).
    */
   | { kind: 'pad'; at: Attach; offset?: Vec; frame?: 'shin' | 'thigh' | 'forearm' }
-  /** A line that moves with a joint (machine plates, handles). */
-  | { kind: 'attached'; at: Attach; from: Vec; to: Vec; width?: number }
+  /** A line that moves with a joint (machine plates, handles); `pad` draws it as a padded surface behind the body. */
+  | { kind: 'attached'; at: Attach; from: Vec; to: Vec; width?: number; pad?: boolean }
   | { kind: 'line'; from: Vec; to: Vec; width?: number };
 
 export interface Demo {

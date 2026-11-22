@@ -54,13 +54,14 @@ export const standing = (o: Partial<DemoPose> = {}): DemoPose => ({ torso: 0, le
 export const between = (a: DemoPose, b: DemoPose): ((s: number) => DemoPose) => (s) => mix(a, b, s);
 
 export type Implement = 'barbell' | 'ezbar' | 'dumbbell' | 'kettlebell' | 'none';
-export const handProp = (imp: Implement, at: 'wrist' | 'wrists' = 'wrist'): Prop[] =>
+/** What the hands hold; `lengthwise` dumbbells hang at the sides with a neutral grip. */
+export const handProp = (imp: Implement, at: 'wrist' | 'wrists' = 'wrist', o: { lengthwise?: boolean } = {}): Prop[] =>
   imp === 'barbell'
     ? [{ kind: 'barbell', at }]
     : imp === 'ezbar'
       ? [{ kind: 'barbell', at, plate: 0.09 }]
       : imp === 'dumbbell'
-        ? [{ kind: 'dumbbell', at }]
+        ? [{ kind: 'dumbbell', at, ...(o.lengthwise && { lengthwise: true }) }]
         : imp === 'kettlebell'
           ? [{ kind: 'kettlebell', at }]
           : [];

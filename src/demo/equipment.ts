@@ -78,8 +78,17 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
           const far = i === 1 || p.at === 'wrist2';
           let s: string;
           if (p.upright) {
-            // Held on end (goblet squat): two heads, one above the other.
-            s = `<rect x="${n(c.x - 0.034)}" y="${n(c.y - 0.062)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.034)}" y="${n(c.y + 0.018)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.009)}" y="${n(c.y - 0.03)}" width="0.018" height="0.06" fill="${LINE}"/>`;
+            // Held on end (goblet squat): two heads, one above the other; cupped = hands under the top head.
+            const y = c.y + (p.cupped ? 0.04 : 0);
+            s = `<rect x="${n(c.x - 0.034)}" y="${n(y - 0.062)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.034)}" y="${n(y + 0.018)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.009)}" y="${n(y - 0.03)}" width="0.018" height="0.06" fill="${LINE}"/>`;
+          } else if (p.lengthwise) {
+            // Neutral grip: the handle runs across the fist, a head at each end.
+            const side = far ? f.b : f.a;
+            const across = angleOf(sub(side.hand, side.wrist)) + 90;
+            const a = along(c, across, 0.075);
+            const b = along(c, across + 180, 0.075);
+            const head = (q: Vec) => `<g transform="translate(${n(q.x)} ${n(q.y)}) rotate(${n(across)})"><rect x="-0.044" y="-0.024" width="0.088" height="0.048" rx="0.012" fill="${STEEL}"/></g>`;
+            s = seg(a, b, 0.016, STEEL) + head(a) + head(b);
           } else {
             // Seen end-on: the hexagonal head nearest the camera.
             const r = 0.04;
@@ -152,7 +161,11 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
         }
         break;
       case 'attached':
-        for (const c of attachPoints(f, p.at)) out.mid += seg({ x: c.x + p.from.x, y: c.y + p.from.y }, { x: c.x + p.to.x, y: c.y + p.to.y }, p.width ?? 0.02, STEEL);
+        for (const c of attachPoints(f, p.at)) {
+          const line = seg({ x: c.x + p.from.x, y: c.y + p.from.y }, { x: c.x + p.to.x, y: c.y + p.to.y }, p.width ?? 0.02, p.pad ? PAD : STEEL);
+          if (p.pad) out.behind += line;
+          else out.mid += line;
+        }
         break;
       case 'line':
         out.back += seg(p.from, p.to, p.width ?? 0.02, STEEL);

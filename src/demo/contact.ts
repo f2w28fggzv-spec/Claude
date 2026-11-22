@@ -118,7 +118,7 @@ export function contactIssues(demo: Demo, frames = 11, tolerance = 0.012): Conta
     if (!prev || issue.depth > prev.depth) worst.set(key, issue);
   };
   const round = (v: number) => Math.round(v * 1000) / 1000;
-  const planted = new Map<string, number[]>();
+  const planted = new Map<string, number[][]>();
   for (let k = 0; k < frames; k++) {
     const s = frames === 1 ? 0 : k / (frames - 1);
     for (const sp of skinPoints(demo, s)) {
@@ -127,16 +127,18 @@ export function contactIssues(demo: Demo, frames = 11, tolerance = 0.012): Conta
         const hit = equipmentIssue(sp, prop, tolerance);
         if (hit) note({ s, kind: hit.kind, part: sp.part, depth: round(hit.depth) });
       }
-      // Feet on the floor: remember where, to catch sliding.
-      if (floor !== null && /heel|toe/.test(sp.part) && Math.abs(sp.p.y - floor) <= 0.004) {
-        const xs = planted.get(sp.part) ?? [];
-        xs.push(sp.p.x);
-        planted.set(sp.part, xs);
+      // Feet on the floor: remember where, frame by frame, to catch sliding (a foot that lifts and lands elsewhere is a step).
+      if (floor !== null && /heel|toe/.test(sp.part)) {
+        const runs = planted.get(sp.part) ?? [[]];
+        const run = runs[runs.length - 1];
+        if (Math.abs(sp.p.y - floor) <= 0.004) run.push(sp.p.x);
+        else if (run.length) runs.push([]);
+        planted.set(sp.part, runs);
       }
     }
   }
-  for (const [part, xs] of planted) {
-    const slide = Math.max(...xs) - Math.min(...xs);
+  for (const [part, runs] of planted) {
+    const slide = Math.max(0, ...runs.filter((xs) => xs.length).map((xs) => Math.max(...xs) - Math.min(...xs)));
     if (slide > tolerance) note({ s: 0, kind: 'slide', part, depth: round(slide) });
   }
   return [...worst.values()].sort((a, b) => b.depth - a.depth);

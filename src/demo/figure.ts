@@ -58,6 +58,8 @@ export interface Arm {
   fore: number;
   /** Apparent length (1 = full). Below 1 when the arm points toward the camera. */
   scale?: number;
+  /** Apparent forearm length when it differs from the upper arm's (a wide grip foreshortens mostly the forearm). */
+  foreScale?: number;
   /** Direction from the wrist to the fingers. Default: in line with the forearm (a fist around a bar). */
   hand?: number;
   /** An open hand pressing on a surface (push-up, plank) instead of a fist. */
@@ -138,8 +140,8 @@ function limbs(view: 'side' | 'front', pose: DemoPose, hip: Vec, shoulder: Vec, 
   }
   const s = arm.scale ?? 1;
   const elbow = along(shoulder, arm.upper, L.upperArm * s);
-  const wrist = along(elbow, arm.fore, L.forearm * s);
-  const hand = along(wrist, arm.hand ?? arm.fore, (arm.flat ? PALM : GRIP) * s);
+  const wrist = along(elbow, arm.fore, L.forearm * (arm.foreScale ?? s));
+  const hand = along(wrist, arm.hand ?? arm.fore, (arm.flat ? PALM : GRIP) * (arm.foreScale ?? s));
   return { shoulder, elbow, wrist, hand, hip, knee, ankle, heel, toe };
 }
 

@@ -4,7 +4,7 @@ import { attachPoints } from '../attach';
 import { PAD_HALF, skinPoints } from '../contact';
 import { L, PALM, add, along, armTo, dir, gripTo, legTo, lerp, lerpV, mul, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
-import { O, FLOOR, LEG_LEN, HANG, FWD, DOWN, handProp, type Implement } from './shared';
+import { O, FLOOR, LEG_LEN, HANG, FWD, handProp, type Implement } from './shared';
 
 // ── Balance ──────────────────────────────────────────────────────────────
 // A standing lift is balanced when its load sits over the middle of the foot:
@@ -95,7 +95,7 @@ export function squat(o: {
         return { ...armTo(shoulder, wrist, dir(torso + 120), 0.88), hand, flat: true };
       }
       case 'goblet': {
-        // Dumbbell held upright against the chest, both hands around the handle, elbows down.
+        // Dumbbell held upright against the chest, both hands cupping the top head, elbows down.
         const db = add(along(shoulder, torso + 180, 0.08), mul(dir(torso + 90), BODY.torsoFront + 0.04));
         return gripTo(shoulder, db, dir(torso + 160), 0.95);
       }
@@ -129,7 +129,7 @@ export function squat(o: {
   const props: Prop[] = [];
   if (o.hold === 'back') props.push({ kind: 'barbell', at: 'backRack' });
   if (o.hold === 'front') props.push({ kind: 'barbell', at: 'frontRack' });
-  if (o.hold === 'goblet') props.push({ kind: 'dumbbell', at: 'wrist', upright: true });
+  if (o.hold === 'goblet') props.push({ kind: 'dumbbell', at: 'wrist', upright: true, cupped: true });
   if (o.box) {
     // Box under the glutes at the bottom: its top just under the back of the thighs.
     const f = solve('side', pose(1));
@@ -192,6 +192,12 @@ function stepFoot(from: { ankle: Vec; foot: number }, to: { ankle: Vec; foot: nu
   const low = Math.max(heelFrom(foot).y, toeFrom(foot).y);
   return { ankle: { x: ankle.x, y: Math.min(ankle.y, FLOOR - low) }, foot };
 }
+
+/** A leg from hip to ankle whose knee bends forward, whichever way the leg points. */
+const kneeForward = (hip: Vec, ankle: Vec, foot: number): Leg => {
+  const d = sub(ankle, hip);
+  return legTo(hip, ankle, { x: d.y, y: -d.x }, foot);
+};
 
 /** Hands resting on the hips: palms on the pelvis, fingers forward, elbows out to the sides. */
 function handsOnHips(hip: Vec, torso: number): Arm {
@@ -324,13 +330,13 @@ function lungeDemo(
       torso,
       // Dumbbells hang straight down at the sides; without them, hands on the hips.
       arm: imp === 'none' ? handsOnHips(hip, torso) : HANG,
-      leg: legTo(hip, front.ankle, FWD, front.foot),
-      leg2: legTo(hip, rear.ankle, DOWN, rear.foot),
+      leg: kneeForward(hip, front.ankle, front.foot),
+      leg2: kneeForward(hip, rear.ankle, rear.foot),
       anchor: 'hip',
       at: hip,
     };
   };
-  const props: Prop[] = [...handProp(imp, 'wrists')];
+  const props: Prop[] = [...handProp(imp, 'wrists', { lengthwise: true })];
   if (bench) props.push(bench);
   return { view: 'side', pose, props };
 }
@@ -381,8 +387,8 @@ export function stepUp(o: { implement?: Implement }): Demo {
     const t = trailAt(s);
     return {
       torso: lerp(16, 2, smooth(s)),
-      leg: legTo(hip, lead, FWD, 90),
-      leg2: legTo(hip, t.ankle, FWD, t.foot),
+      leg: kneeForward(hip, lead, 90),
+      leg2: kneeForward(hip, t.ankle, t.foot),
       arm: HANG,
       anchor: 'hip',
       at: hip,
@@ -391,7 +397,7 @@ export function stepUp(o: { implement?: Implement }): Demo {
   return {
     view: 'side',
     pose,
-    props: [{ kind: 'box', x: edge, y: top, w: 0.34, h: boxH }, ...handProp(o.implement ?? 'none', 'wrists')],
+    props: [{ kind: 'box', x: edge, y: top, w: 0.34, h: boxH }, ...handProp(o.implement ?? 'none', 'wrists', { lengthwise: true })],
   };
 }
 
@@ -560,8 +566,8 @@ export function hackSquat(): Demo {
   const pose = (s: number): DemoPose => {
     const hip = lerpV(hipTop, hipB, s);
     const shoulder = along(hip, torso, L.torso);
-    // Handles at the front of the shoulder pads; elbows down.
-    const handle = add(along(shoulder, torso + 90, 0.1), mul(dir(torso), -0.01));
+    // Handles at the front of the shoulder pads, about chest high; elbows down.
+    const handle = add(along(shoulder, torso + 90, 0.09), mul(dir(torso), -0.06));
     return { torso, leg: legTo(hip, O, FWD, foot), arm: gripTo(shoulder, handle, dir(torso + 160), 0.85), anchor: 'hip', at: hip };
   };
   // Platform under the feet, tilted toes up.
@@ -579,6 +585,7 @@ export function hackSquat(): Demo {
     from: add(mul(behind, BODY.torsoBack + 0.022), mul(up, 0.04)),
     to: add(mul(behind, BODY.torsoBack + 0.022), mul(up, L.torso + 0.06)),
     width: 0.04,
+    pad: true,
   };
   const railBase = add(hipB, mul(behind, BODY.torsoBack + 0.07));
   const rails: Prop = { kind: 'line', from: add(railBase, mul(up, -0.12)), to: add(railBase, mul(up, travel + L.torso + 0.2)), width: 0.03 };
@@ -586,7 +593,8 @@ export function hackSquat(): Demo {
     view: 'side',
     floor: Math.max(p0.y, p1.y) + 0.03,
     pose,
-    props: [rails, sledPad, { kind: 'line', from: p0, to: p1, width: 0.028 }, { kind: 'pad', at: 'shoulder', offset: add(mul(up, 0.06), mul(dir(torso + 90), 0.015)) }],
+    // Rails, sled pad, platform and the shoulder pad resting on top of the shoulder.
+    props: [rails, sledPad, { kind: 'line', from: p0, to: p1, width: 0.028 }, { kind: 'pad', at: 'shoulder', offset: add(mul(up, 0.045), mul(dir(torso + 90), 0.01)) }],
   };
 }
 
