@@ -4,14 +4,14 @@
 // up beside the head, along the back), drifting a few degrees at most, and
 // what the hands hold stays clear of the body: a bar starts on the front of
 // the thighs and finishes in front of the shoulders, a dumbbell held
-// overhead passes behind the head. Standing lifters stay balanced: the whole
-// body tips a degree or two at the ankles (knees soft, trunk braced) so the
-// centre of pressure stays under the middle of the foot while the weight
-// moves out in front or behind the head, or a cable pulls on the hands.
-// Seated lifters rest on their bench by the skin (BODY).
+// overhead passes behind the head. Standing lifters keep still (no swinging),
+// knees soft and trunk braced, tipped a degree or two at the ankles so that
+// the pressure under the feet stays around the middle of the foot through
+// the rep: against a weight out in front or behind the head, or a cable
+// pulling the hands. Seated lifters rest on their bench by the skin (BODY).
 import { BODY } from '../body';
 import { PAD_HALF } from '../contact';
-import { L, add, along, angleOf, dir, dist, legTo, lerp, lerpV, mul, palmTo, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
+import { L, PALM, add, along, angleOf, armTo, dir, dist, legTo, lerp, lerpV, mul, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
 import { O, FLOOR, UP, centreOfMass, restingPad, solveFor, type Implement } from './shared';
 
@@ -62,6 +62,20 @@ function sideArm(torso: number, fwd: number, flex: number): Arm {
   return { upper, fore: upper - flex };
 }
 
+/**
+ * The free (far) arm bracing its flat hand on `palm`, fingers pointing `hand`,
+ * the elbow a little bent toward `toward`. Where the hand is nearer than the
+ * arm reaches, the elbow bends out to the side, which from the side looks like
+ * a shorter arm.
+ */
+function bracedArm(shoulder: Vec, palm: Vec, hand: number, toward: Vec): Arm {
+  const bend = (20 * Math.PI) / 180;
+  const span = Math.sqrt(L.upperArm ** 2 + L.forearm ** 2 + 2 * L.upperArm * L.forearm * Math.cos(bend));
+  let scale = 1;
+  for (let k = 0; k < 4; k++) scale = Math.min(1, dist(shoulder, along(palm, hand + 180, PALM * scale)) / span);
+  return { ...armTo(shoulder, along(palm, hand + 180, PALM * scale), toward, scale), hand, flat: true };
+}
+
 // ── Balance ──────────────────────────────────────────────────────────────
 
 /**
@@ -91,25 +105,25 @@ function pressureX(f: Figure, load?: Load): number {
  * `hinge` degrees forward of the legs, the whole body tipped `lean` degrees
  * forward at the ankles.
  */
-function stance(lean: number, hinge = 0, knee = 6) {
-  const leg: Leg = { thigh: 180 + lean - knee / 2, shin: 180 + lean + knee / 2, foot: 90 };
-  const hip = along(along(O, leg.shin + 180, L.shin), leg.thigh + 180, L.thigh);
-  const torso = lean + hinge;
-  return { leg, hip, torso, shoulder: along(hip, torso, L.torso) };
+function stance(lean: number, hinge = 0, knee = 6): { leg: Leg; torso: number } {
+  return { leg: { thigh: 180 + lean - knee / 2, shin: 180 + lean + knee / 2, foot: 90 }, torso: lean + hinge };
 }
 
 /**
  * A standing lift with the body held still: `build(lean, s)` is the pose at
- * progress s with the body tipped `lean` degrees at the ankles. One lean
- * serves the whole rep, chosen so the centre of pressure averages where a
- * relaxed stance puts it; as the weight moves it shifts a little toward the
- * toes or heels while the body stays put (no swinging).
+ * progress s with the body tipped `lean` degrees at the ankles, `load(lean)`
+ * what it balances. One lean serves the whole rep, chosen so the centre of
+ * pressure under the feet stays around where a relaxed stance puts it: as the
+ * weight moves it shifts toward the toes or heels while the body stays put
+ * (no swinging). Returns that lean.
  */
-function balanced(build: (lean: number, s: number) => DemoPose, load?: Load): (s: number) => DemoPose {
+function stillLean(build: (lean: number, s: number) => DemoPose, load: (lean: number) => Load | undefined): number {
   const frames = Array.from({ length: 11 }, (_, k) => k / 10);
-  const mean = (lean: number) => frames.reduce((a, s) => a + pressureX(solve('side', build(lean, s)), load), 0) / frames.length;
-  const lean = solveFor(-20, 20, mean, BALANCE);
-  return (s) => build(lean, s);
+  const middle = (lean: number) => {
+    const xs = frames.map((s) => pressureX(solve('side', build(lean, s)), load(lean)));
+    return (Math.min(...xs) + Math.max(...xs)) / 2;
+  };
+  return solveFor(-20, 20, middle, BALANCE);
 }
 
 // ── Curls ────────────────────────────────────────────────────────────────
@@ -135,16 +149,17 @@ const CURL_TOP = 140;
  * of the thighs; dumbbells and band handles hang beside them. The forearms
  * curl the weight up in an arc to the front of the shoulders, the elbows
  * drifting a few degrees forward only at the very top, and lower it back to
- * straight arms. The body stays still apart from a slight tip back at the
- * ankles as the weight moves out in front (and against a low cable's pull).
+ * straight arms. The body stays still, tipped very slightly back at the
+ * ankles against the weight out in front (a little more against a low
+ * cable's pull).
  */
 function standingCurl(implement: Implement | 'cable' | 'band', neutral: boolean): Demo {
   const bar = implement === 'barbell' || implement === 'ezbar' || implement === 'cable';
-  // Low pulley just off the floor, an easy step in front of the toes; a band stood on under the middle of the feet.
-  const pulley: Vec = { x: 0.3, y: FLOOR - 0.08 };
+  // Low pulley just off the floor, a short step in front of the toes; a band stood on under the middle of the feet.
+  const pulley: Vec = { x: 0.27, y: FLOOR - 0.08 };
   const anchor: Vec = { x: MIDFOOT, y: FLOOR };
   // The weight (or the cable's tension) as a share of body weight; a band pulls the hands toward the feet, so it balances itself.
-  const load: Load | undefined = implement === 'cable' ? { share: 0.25, from: pulley } : implement === 'band' ? undefined : { share: 0.3 };
+  const load: Load | undefined = implement === 'cable' ? { share: 0.2, from: pulley } : implement === 'band' ? undefined : { share: 0.3 };
   const build = (lean: number, fwd: number, flex: number): DemoPose => {
     const st = stance(lean);
     return { torso: st.torso, head: st.torso, leg: st.leg, arm: sideArm(st.torso, fwd, flex), anchor: 'ankle', at: O };
@@ -157,7 +172,8 @@ function standingCurl(implement: Implement | 'cable' | 'band', neutral: boolean)
   // Hammer grip: the dumbbell's inner head reaches the front of the shoulder a little sooner.
   const top = neutral ? CURL_TOP - 12 : CURL_TOP;
   const fwdAt = (s: number) => start + 6 * ramp(s, 0.55, 1);
-  const pose = balanced((lean, s) => build(lean, fwdAt(s), top * s), load);
+  const lean = stillLean((v, s) => build(v, fwdAt(s), top * s), () => load);
+  const pose = (s: number) => build(lean, fwdAt(s), top * s);
   const props: Prop[] =
     implement === 'cable'
       ? // A straight bar on the cable, seen end-on (a bar with no plates).
@@ -190,14 +206,14 @@ function inclineCurl(): Demo {
   const seatY = BODY.thighBack + PAD_HALF;
   const [s0, s1] = restingPad(pose, { x: -0.1, y: seatY }, { x: 0.13, y: seatY }, ARMS);
   const corner = crossing(b0, b1, s0, s1);
-  // The backrest's strut, from the frame's rear foot up to the middle of the pad.
-  const strutTop = add(lerpV(b0, corner, 0.45), mul(dir(torso - 90), 0.03));
+  // The backrest's strut, standing on the frame and propping the middle of the pad from behind.
+  const strutTop = add(lerpV(b0, corner, 0.5), mul(dir(torso - 90), 0.03));
   return {
     view: 'side',
     floor,
     pose,
     props: [
-      { kind: 'line', from: { x: corner.x - 0.03, y: floor - 0.01 }, to: strutTop, width: 0.018 },
+      { kind: 'line', from: { x: strutTop.x + 0.03, y: floor - 0.01 }, to: strutTop, width: 0.018 },
       { kind: 'line', from: { x: strutTop.x - 0.06, y: floor - 0.008 }, to: { x: s1.x + 0.04, y: floor - 0.008 }, width: 0.016 },
       { kind: 'bench', points: [b0, corner], legs: false },
       { kind: 'bench', points: [corner, s1] },
@@ -226,9 +242,9 @@ function concentrationCurl(): Demo {
   const torso = solveFor(20, 70, (t) => -dist(along(hip, t, L.torso), elbow), -L.upperArm);
   const shoulder = along(hip, torso, L.torso);
   const upper = angleOf(sub(elbow, shoulder));
-  // Free hand flat on top of the far knee, fingers over it.
-  const palm = add(lerpV(hip, knee, 0.9), mul(dir(leg.thigh - 90), BODY.thighFront + BODY.hand / 2));
-  const arm2 = palmTo(shoulder, palm, leg.thigh + 20, { x: -0.6, y: -1 });
+  // Free hand flat on top of the far thigh by the knee, fingers over it (the knee is out to the side: feet wide).
+  const palm = add(lerpV(hip, knee, 0.82), mul(dir(leg.thigh - 90), BODY.thighFront + BODY.hand / 2));
+  const arm2 = bracedArm(shoulder, palm, leg.thigh + 15, { x: -1, y: -0.3 });
   const pose = (s: number): DemoPose => ({
     torso,
     // Eyes on the dumbbell.
@@ -241,7 +257,7 @@ function concentrationCurl(): Demo {
   });
   // The bench runs back from under the thighs.
   const [p0, p1] = restingPad(pose, { x: hip.x - 0.55, y: padTop + PAD_HALF }, { x: hip.x + 0.07, y: padTop + PAD_HALF }, ARMS);
-  return { view: 'side', pose, props: [{ kind: 'bench', points: [p0, p1] }, { kind: 'dumbbell', at: 'wrist' }], armBehindLegs: true };
+  return { view: 'side', pose, props: [{ kind: 'bench', points: [p0, p1] }, { kind: 'dumbbell', at: 'wrist' }], armBehindLegs: true, working: 'a' };
 }
 
 // ── Triceps ──────────────────────────────────────────────────────────────
@@ -263,7 +279,8 @@ export function overheadExtension(): Demo {
     // Straight (not locked) at the top; the forearms tip back behind the head.
     return { torso: st.torso, head: st.torso, leg: st.leg, arm: { upper, fore: upper - lerp(3, bottom, s) }, anchor: 'ankle', at: O };
   };
-  return { view: 'side', pose: balanced(build, load), props: [{ kind: 'dumbbell', at: 'wrist', upright: true, cupped: true }] };
+  const lean = stillLean(build, () => load);
+  return { view: 'side', pose: (s) => build(lean, s), props: [{ kind: 'dumbbell', at: 'wrist', upright: true, cupped: true }] };
 }
 
 /**
@@ -285,11 +302,11 @@ export function pushdown(o: { band?: boolean }): Demo {
     const f = solve('side', build(0, v, 0));
     return offThigh(f, f.a.hand);
   }, BODY.hand);
-  // Pulley (or the band's bar) overhead, a little in front of the hands at the top.
-  const handTop = solve('side', build(0, fwd, flexTop)).a.hand;
-  const from: Vec = { x: handTop.x + 0.035, y: o.band ? FLOOR - 1.2 : FLOOR - 1.16 };
-  const load: Load = { share: 0.3, from };
-  const pose = balanced((lean, s) => build(lean, fwd, flexTop * (1 - s)), load);
+  // Pulley (or the band's bar) overhead, just in front of the fists at the top (the column clear of them): the cable hangs nearly straight.
+  const pulley = (lean: number): Vec => ({ x: solve('side', build(lean, fwd, flexTop)).a.hand.x + 0.06, y: o.band ? FLOOR - 1.2 : FLOOR - 1.16 });
+  const lean = stillLean((v, s) => build(v, fwd, flexTop * (1 - s)), (v) => ({ share: 0.2, from: pulley(v) }));
+  const from = pulley(lean);
+  const pose = (s: number) => build(lean, fwd, flexTop * (1 - s));
   const props: Prop[] = o.band
     ? [{ kind: 'bar', at: { x: from.x, y: from.y - 0.012 } }, { kind: 'band', from, at: 'wrist' }]
     : // A straight bar on the cable, seen end-on (a bar with no plates).
@@ -299,15 +316,15 @@ export function pushdown(o: { band?: boolean }): Demo {
 
 /**
  * One-arm dumbbell kickback: hinged forward with a flat back (trunk about
- * 70° from vertical), knees soft, the free hand braced on its thigh just
- * above the knee. The working upper arm stays up along the side, a little
- * above the line of the back, palm facing in (the dumbbell seen lengthwise);
- * the forearm swings from hanging straight down to straight back in line
- * with it. The hips sit back until lifter and dumbbell balance over the feet.
+ * 70° from vertical), knees soft, the free hand braced on its knee. The
+ * working upper arm stays up along the side, a little above the line of the
+ * back, palm facing in (the dumbbell seen lengthwise); the forearm swings
+ * from hanging straight down to straight back in line with it. The hips sit
+ * back until lifter and dumbbell balance over the feet.
  */
 export function kickback(): Demo {
   const torso = 70;
-  const shin = 186; // knees a little ahead of the ankles
+  const shin = 182; // shins about upright, knees soft
   const load: Load = { share: 0.12 };
   const upper = torso + 190; // 10° above the line of the trunk
   const build = (thighBack: number, s: number): DemoPose => {
@@ -315,20 +332,19 @@ export function kickback(): Demo {
     const knee = along(O, shin + 180, L.shin);
     const hip = along(knee, leg.thigh + 180, L.thigh);
     const shoulder = along(hip, torso, L.torso);
-    // Free hand flat on the front of its thigh just above the knee, fingers toward the knee.
-    const palm = add(lerpV(hip, knee, 0.78), mul(dir(leg.thigh - 90), BODY.thighFront + BODY.hand / 2));
+    // Free hand flat on its knee, fingers over the kneecap.
+    const palm = add(lerpV(hip, knee, 0.93), mul(dir(leg.thigh - 90), BODY.thighFront + BODY.hand / 2));
     return {
       torso,
       head: headFor(torso),
       leg,
       arm: { upper, fore: lerp(180, upper, s) },
-      arm2: palmTo(shoulder, palm, leg.thigh, { x: -0.4, y: -1 }),
+      arm2: bracedArm(shoulder, palm, leg.thigh, { x: -0.4, y: -1 }),
       anchor: 'ankle',
       at: O,
     };
   };
   // Hips back until balanced with the dumbbell hanging (the stance then stays put).
   const thighBack = solveFor(0, 80, (t) => -pressureX(solve('side', build(t, 0)), load), -BALANCE);
-  return { view: 'side', pose: (s) => build(thighBack, s), props: [{ kind: 'dumbbell', at: 'wrist', lengthwise: true }] };
+  return { view: 'side', pose: (s) => build(thighBack, s), props: [{ kind: 'dumbbell', at: 'wrist', lengthwise: true }], working: 'a' };
 }
-
