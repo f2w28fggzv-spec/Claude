@@ -103,7 +103,9 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
       case 'dumbbell': {
         const pts = attachPoints(f, p.at);
         pts.forEach((c, i) => {
-          const far = i === 1 || p.at === 'wrist2';
+          // Side view: the second hand is the far one. Front view: both hands face the camera alike.
+          const second = i === 1 || p.at === 'wrist2';
+          const far = f.view === 'side' && second;
           let s: string;
           if (p.upright) {
             // Held on end (goblet squat): two heads, one above the other; cupped = palms under the top head, the rest hanging below.
@@ -111,7 +113,7 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
             s = `<rect x="${n(c.x - 0.009)}" y="${n(y - 0.03)}" width="0.018" height="0.06" fill="${LINE}"/><rect x="${n(c.x - 0.034)}" y="${n(y - 0.062)}" width="0.068" height="0.044" rx="0.012" ${OUTLINED}/><rect x="${n(c.x - 0.034)}" y="${n(y + 0.018)}" width="0.068" height="0.044" rx="0.012" ${OUTLINED}/>`;
           } else if (p.lengthwise) {
             // Neutral grip: the handle runs across the fist, a head at each end (about 34 cm long, 27 cm when light).
-            const side = far ? f.b : f.a;
+            const side = second ? f.b : f.a;
             const across = angleOf(sub(side.hand, side.wrist)) + 90;
             const [reach, len, thick] = p.light ? [0.05, 0.052, 0.038] : [0.062, 0.07, 0.046];
             const a = along(c, across, reach);

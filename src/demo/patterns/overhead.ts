@@ -10,7 +10,7 @@
 // stops just off the floor (or touches it, in a handstand push-up).
 import { BODY } from '../body';
 import { skinPoints } from '../contact';
-import { GRIP, L, PALM, add, along, angleOf, armTo, dir, dist, legTo, lerp, lerpV, mul, solve, sub, twoLink, type Arm, type DemoPose, type Leg, type Vec } from '../figure';
+import { GRIP, L, PALM, add, along, angleOf, armTo, dir, dist, legTo, lerp, lerpV, mul, solve, sub, twoLink, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
 import { O, FLOOR, LEG_LEN, FWD, centreOfMass, restingPad, solveFor, type Implement } from './shared';
 
@@ -192,13 +192,14 @@ function standingAt(hipX: number, lean: number, sink = 0): { leg: Leg; shoulder:
 }
 
 /** x of a standing figure's centre of pressure: its centre of mass with the loads it holds. */
-const pressureX = (pose: DemoPose, loads: (f: ReturnType<typeof solve>) => { at: Vec; share: number }[]) => {
+const pressureX = (pose: DemoPose, loads: (f: Figure) => { at: Vec; share: number }[]) => {
   const f = solve('side', pose);
   return centreOfMass(f, loads(f)).x;
 };
 
 // ── Overhead presses ─────────────────────────────────────────────────────
 
+/** Standing barbell press (`dip`: push press), standing dumbbell press (`arnold`: Arnold press), or `seated` on the shoulder press machine. */
 export function overheadPress(o: { implement: Implement; seated?: boolean; dip?: boolean; machine?: boolean; arnold?: boolean }): Demo {
   if (o.seated) return machinePress();
   if (o.implement === 'barbell' || o.implement === 'ezbar') return barbellPress(!!o.dip);
@@ -352,6 +353,8 @@ function machinePress(): Demo {
 
 /** The head stops this far off the floor at the bottom of a pike push-up. */
 const HEAD_CLEAR = 0.012;
+/** Elbows bending back toward the feet (pike push-up). */
+const BACK_UP: Vec = { x: -1, y: -0.5 };
 
 /** Lowest point of the head's skin (see ../contact) for a pose. */
 const headLow = (pose: DemoPose) =>
@@ -397,8 +400,6 @@ export function pikePushUp(): Demo {
     pose: (s) => build(lerpV(top, bottom, s), (sh) => palmArmToward(sh, palm, 90, BACK_UP, out, lerp(foreTop, 172, ramp(s, 0, 0.7)))),
   };
 }
-/** Elbows bending back toward the feet (pike push-up). */
-const BACK_UP: Vec = { x: -1, y: -0.5 };
 
 /**
  * Wall handstand push-up, back to the wall: hands flat on the floor about a
@@ -502,28 +503,26 @@ export function lateralRaise(o: { oneArm?: boolean; cable?: boolean; bentOver?: 
  */
 export function frontRaise(): Demo {
   const bend = 8; // elbows soft
+  const load = 2 * DUMBBELL * 0.6; // lighter dumbbells than for a press
   const build = (hipX: number, upper: number): DemoPose => {
     const { leg } = standingAt(hipX, 0);
     return { torso: 0, head: 0, leg, arm: { upper, fore: upper - bend }, anchor: 'ankle', at: O };
   };
-  // Start: the fists resting on the front of the thighs.
+  /** How far the fist is in front of the near thigh's skin. */
   const offThigh = (p: DemoPose) => {
     const f = solve('side', p);
     const ab = sub(f.a.knee, f.a.hip);
     const t = clamp01(((f.a.hand.x - f.a.hip.x) * ab.x + (f.a.hand.y - f.a.hip.y) * ab.y) / (ab.x ** 2 + ab.y ** 2));
     return dist(f.a.hand, add(f.a.hip, mul(ab, t))) - BODY.thighFront - BODY.hand;
   };
-  const stance = (upperTop: number) => {
-    const startUpper = solveFor(150, 180, (u) => -offThigh(build(0.01, u)), 0);
-    const hipX = solveFor(-0.1, 0.2, (h) => pressureX(build(h, (startUpper + upperTop) / 2), (f) => [{ at: f.a.hand, share: 2 * DUMBBELL * 0.6 }]), BALANCE);
-    return { startUpper, hipX };
-  };
-  // Top: arms level with the shoulders.
-  const upperTop = 90 + bend / 2;
-  const { startUpper, hipX } = stance(upperTop);
+  // Top: arms level with the shoulders. One stance for the whole rep, balanced half way up: the body stays still.
+  const topUpper = 90 + bend / 2;
+  const hipX = solveFor(-0.1, 0.2, (h) => pressureX(build(h, (167 + topUpper) / 2), (f) => [{ at: f.a.hand, share: load }]), BALANCE);
+  // Start: the fists resting on the front of the thighs.
+  const startUpper = solveFor(150, 180, (u) => -offThigh(build(hipX, u)), 0);
   return {
     view: 'side',
-    pose: (s) => build(hipX, lerp(startUpper, upperTop, s)),
+    pose: (s) => build(hipX, lerp(startUpper, topUpper, s)),
     props: [{ kind: 'dumbbell', at: 'wrists' }],
   };
 }

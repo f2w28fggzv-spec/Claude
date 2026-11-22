@@ -180,7 +180,7 @@ export const ROLE_LABEL: Record<MuscleRole, string> = { main: 'Main', assist: 'A
  */
 const STOPS: readonly (readonly [number, string])[] = [
   [0, 'var(--an-muscle)'],
-  [0.14, 'var(--amber)'],
+  [0.14, 'var(--heat-low)'],
   [0.45, 'var(--orange)'],
   [0.75, 'var(--flame)'],
   [1, 'var(--red)'],
