@@ -1106,7 +1106,7 @@ const DRAFT_EXERCISES: Exercise[] = [
     equipment: ['dumbbell'],
     role: 'compound',
     minLevel: 'intermediate',
-    demo: D.overheadPress({ implement: 'dumbbell' }),
+    demo: D.overheadPress({ implement: 'dumbbell', arnold: true }),
     placement: P.sideStanding,
     tracking: up('wrist'),
     checks: [C.rom('elbow', 70)],
