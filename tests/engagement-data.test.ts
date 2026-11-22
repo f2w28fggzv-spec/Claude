@@ -10,8 +10,7 @@ const inUnit = (v: number) => Number.isFinite(v) && v >= 0 && v <= 1;
 const step = (v: number) => Math.abs(v * 20 - Math.round(v * 20)) < 1e-9;
 
 describe('muscle engagement data', () => {
-  // Skipped only while the researched data is being filled in.
-  it.skipIf(Object.keys(ENGAGEMENT).length === 0)('covers every exercise in the library, and nothing else', () => {
+  it('covers every exercise in the library, and nothing else', () => {
     const ids = new Set(EXERCISES.map((e) => e.id));
     expect(Object.keys(ENGAGEMENT).filter((id) => !ids.has(id))).toEqual([]);
     expect(EXERCISES.filter((e) => !ENGAGEMENT[e.id]).map((e) => e.id)).toEqual([]);
