@@ -24,9 +24,17 @@ export function timeline(exercise: Exercise, pauseFar = 0): Timeline {
     if (c.phase === 'eccentric' && c.minSec) ecc = Math.max(ecc, c.minSec / MEASURED_SHARE + 0.2);
     if (c.phase === 'concentric' && c.minSec) con = Math.max(con, c.minSec / MEASURED_SHARE + 0.2);
   }
-  const first = exercise.tracking.firstPhase === 'eccentric' ? ecc : con;
-  const second = exercise.tracking.firstPhase === 'eccentric' ? con : ecc;
-  const segments: Timeline['segments'] = [0.7, first, 0.35 + pauseFar, second];
+  const eccFirst = exercise.tracking.firstPhase === 'eccentric';
+  // A demo can set its own pace (a ballistic swing), but never faster than a tempo check allows.
+  const t = exercise.demo?.timing ?? {};
+  const minFirst = eccFirst ? ecc : con;
+  const minSecond = eccFirst ? con : ecc;
+  const hasTempo = (phase: 'eccentric' | 'concentric') => exercise.checks.some((c) => c.type === 'tempo' && c.phase === phase && c.minSec);
+  const pace = (own: number | undefined, fallback: number, phase: 'eccentric' | 'concentric') =>
+    own === undefined ? fallback : hasTempo(phase) ? Math.max(own, fallback) : own;
+  const first = pace(t.out, minFirst, eccFirst ? 'eccentric' : 'concentric');
+  const second = pace(t.back, minSecond, eccFirst ? 'concentric' : 'eccentric');
+  const segments: Timeline['segments'] = [t.start ?? 0.7, first, (t.far ?? 0.35) + pauseFar, second];
   return { segments, total: segments.reduce((a, b) => a + b, 0) };
 }
 

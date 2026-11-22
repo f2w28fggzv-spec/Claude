@@ -4,7 +4,7 @@
 //
 // Equipment stays neutral (steel, pads); heat colours belong to the muscles.
 import { attachPoints } from './attach';
-import type { Figure, Vec } from './figure';
+import { add, along, angleOf, sub, type Figure, type Side, type Vec } from './figure';
 import type { Prop } from './types';
 
 /**
@@ -20,6 +20,13 @@ const LINE = 'var(--equip-line)';
 const FILL = 'var(--equip-fill)';
 const PAD = 'var(--pad)';
 
+/** Direction a segment of the near limb points (from the joint above), for pads that turn with it. */
+function segmentDeg(s: Side, frame: 'shin' | 'thigh' | 'forearm'): number {
+  if (frame === 'shin') return angleOf(sub(s.ankle, s.knee));
+  if (frame === 'thigh') return angleOf(sub(s.knee, s.hip));
+  return angleOf(sub(s.wrist, s.elbow));
+}
+
 const circle = (c: Vec, r: number, attrs: string) => `<circle cx="${n(c.x)}" cy="${n(c.y)}" r="${n(r)}" ${attrs}/>`;
 const seg = (a: Vec, b: Vec, w: number, colour: string, extra = '') =>
   `<line x1="${n(a.x)}" y1="${n(a.y)}" x2="${n(b.x)}" y2="${n(b.y)}" stroke="${colour}" stroke-width="${n(w)}" stroke-linecap="round" ${extra}/>`;
@@ -34,7 +41,8 @@ export function propExtent(p: Prop, f: Figure): Vec[] {
   const out: Vec[] = [];
   const around = (c: Vec, r: number) => out.push({ x: c.x - r, y: c.y - r }, { x: c.x + r, y: c.y + r });
   if ('at' in p && typeof p.at === 'string') {
-    const r = p.kind === 'barbell' ? (p.plate ?? PLATE_R) + 0.01 : p.kind === 'kettlebell' ? 0.14 : 0.06;
+    const off = p.kind === 'pad' && p.offset ? Math.hypot(p.offset.x, p.offset.y) : 0;
+    const r = p.kind === 'barbell' ? (p.plate ?? PLATE_R) + 0.01 : p.kind === 'kettlebell' ? 0.15 : 0.06 + off;
     for (const q of attachPoints(f, p.at)) {
       if (p.kind === 'attached') out.push({ x: q.x + p.from.x, y: q.y + p.from.y }, { x: q.x + p.to.x, y: q.y + p.to.y });
       else around(q, r);
@@ -67,7 +75,7 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
       case 'dumbbell': {
         const pts = attachPoints(f, p.at);
         pts.forEach((c, i) => {
-          const far = i === 1;
+          const far = i === 1 || p.at === 'wrist2';
           let s: string;
           if (p.upright) {
             // Held on end (goblet squat): two heads, one above the other.
@@ -88,7 +96,11 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
       }
       case 'kettlebell':
         for (const c of attachPoints(f, p.at)) {
-          out.mid += `<path d="M${n(c.x - 0.03)} ${n(c.y + 0.05)} C${n(c.x - 0.045)} ${n(c.y - 0.02)} ${n(c.x + 0.045)} ${n(c.y - 0.02)} ${n(c.x + 0.03)} ${n(c.y + 0.05)}" fill="none" stroke="${STEEL}" stroke-width="0.014" stroke-linecap="round"/>` + circle({ x: c.x, y: c.y + 0.09 }, 0.052, `fill="${STEEL}"`);
+          // Drawn hanging (handle up, bell below the fist); a swing turns it to fly in line with the arm.
+          const side = p.at === 'wrist2' ? f.b : f.a;
+          const turn = p.swing ? 180 + angleOf(sub(side.hand, side.wrist)) : 0;
+          const bell = `<path d="M-0.03 0.05 C-0.045 -0.02 0.045 -0.02 0.03 0.05" fill="none" stroke="${STEEL}" stroke-width="0.014" stroke-linecap="round"/>` + circle({ x: 0, y: 0.09 }, 0.052, `fill="${STEEL}"`);
+          out.mid += `<g transform="translate(${n(c.x)} ${n(c.y)})${turn ? ` rotate(${n(turn)})` : ''}">${bell}</g>`;
         }
         break;
       case 'bench': {
@@ -113,7 +125,15 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
         break;
       case 'cable':
       case 'band':
-        for (const c of attachPoints(f, p.at)) out.mid += seg(p.from, c, p.kind === 'band' ? 0.012 : 0.007, LINE, p.kind === 'band' ? 'stroke-dasharray="0.02 0.016"' : '');
+        for (const c of attachPoints(f, p.at)) {
+          if (p.kind === 'cable' && p.rope) {
+            // A rope handle: the cable ends a little short of the fist, the rope runs into it with a knob.
+            const ropeStart = along(c, angleOf(sub(p.from, c)), 0.06);
+            out.mid += seg(p.from, ropeStart, 0.007, LINE) + seg(ropeStart, c, 0.014, PAD) + circle(c, 0.014, `fill="${PAD}"`);
+          } else {
+            out.mid += seg(p.from, c, p.kind === 'band' ? 0.012 : 0.007, LINE, p.kind === 'band' ? 'stroke-dasharray="0.02 0.016"' : '');
+          }
+        }
         if (p.kind === 'cable') {
           // The machine's column, from the floor to just past the pulley, so the cable comes from somewhere.
           if (floor !== null) {
@@ -124,7 +144,12 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
         }
         break;
       case 'pad':
-        for (const c of attachPoints(f, p.at)) out.front += circle({ x: c.x + (p.offset?.x ?? 0), y: c.y + (p.offset?.y ?? 0) }, 0.035, `fill="${PAD}"`);
+        for (const c of attachPoints(f, p.at)) {
+          const o = p.offset ?? { x: 0, y: 0 };
+          // In a limb's frame the offset turns with it: x along the limb, y toward its back.
+          const at = p.frame ? add(along(c, segmentDeg(f.a, p.frame), o.x), along({ x: 0, y: 0 }, segmentDeg(f.a, p.frame) + 90, o.y)) : { x: c.x + o.x, y: c.y + o.y };
+          out.front += circle(at, 0.035, `fill="${PAD}"`);
+        }
         break;
       case 'attached':
         for (const c of attachPoints(f, p.at)) out.mid += seg({ x: c.x + p.from.x, y: c.y + p.from.y }, { x: c.x + p.to.x, y: c.y + p.to.y }, p.width ?? 0.02, STEEL);

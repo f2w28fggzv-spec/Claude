@@ -13,6 +13,8 @@ export function attachPoints(f: Figure, at: Attach): Vec[] {
       return [f.a.hand];
     case 'wrists':
       return [f.a.hand, f.b.hand];
+    case 'wrist2':
+      return [f.b.hand];
     case 'backRack':
       return [add(along(shoulder, f.upper - 90, 0.05), mul(dir(f.upper), 0.01))];
     case 'frontRack':

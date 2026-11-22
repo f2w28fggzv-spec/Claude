@@ -4,6 +4,8 @@ import type { DemoPose, Vec } from './figure';
 export type Attach =
   | 'wrist'
   | 'wrists'
+  /** The far hand only (side view), e.g. one dumbbell in the hand opposite the standing leg. */
+  | 'wrist2'
   | 'backRack'
   | 'frontRack'
   | 'lap'
@@ -17,17 +19,23 @@ export type Prop =
   /** Barbell seen end-on (side view): a plate. */
   | { kind: 'barbell'; at: Attach; plate?: number }
   | { kind: 'dumbbell'; at: Attach; upright?: boolean }
-  | { kind: 'kettlebell'; at: Attach }
+  /** Hangs below the fist, or with `swing` flies in line with the arm (kettlebell swing). */
+  | { kind: 'kettlebell'; at: Attach; swing?: boolean }
   /** Bench or pad: a thick line through `points`, with legs to the floor. */
   | { kind: 'bench'; points: Vec[]; legs?: boolean }
   | { kind: 'box'; x: number; y: number; w: number; h: number }
   /** A bar seen end-on: pull-up bar, dip bar, low bar. */
   | { kind: 'bar'; at: Vec }
   | { kind: 'wall'; x: number; top: number }
-  | { kind: 'cable'; from: Vec; at: Attach }
+  /** Cable from a pulley at `from`; `rope` draws a rope handle at the hand. */
+  | { kind: 'cable'; from: Vec; at: Attach; rope?: boolean }
   | { kind: 'band'; from: Vec; at: Attach }
-  /** Machine roller pad on a joint. */
-  | { kind: 'pad'; at: Attach; offset?: Vec }
+  /**
+   * Machine roller pad on a joint. `offset` is on screen, or with `frame` in
+   * that segment's own frame (x along it from the joint above, y toward its
+   * back), so the roller turns with the limb (leg curl, leg extension).
+   */
+  | { kind: 'pad'; at: Attach; offset?: Vec; frame?: 'shin' | 'thigh' | 'forearm' }
   /** A line that moves with a joint (machine plates, handles). */
   | { kind: 'attached'; at: Attach; from: Vec; to: Vec; width?: number }
   | { kind: 'line'; from: Vec; to: Vec; width?: number };
@@ -44,4 +52,10 @@ export interface Demo {
   floor?: number | null;
   /** Extra pause at the turnaround in seconds, e.g. a pause squat. */
   pauseFar?: number;
+  /**
+   * Seconds for each part of the rep instead of the controlled default:
+   * pause at the start, move out, pause at the turnaround, move back. For
+   * ballistic lifts like the kettlebell swing. Tempo checks still set minimums.
+   */
+  timing?: { start?: number; out?: number; far?: number; back?: number };
 }

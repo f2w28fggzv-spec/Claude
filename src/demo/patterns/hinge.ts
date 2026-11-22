@@ -118,9 +118,10 @@ export function hinge(o: {
   const props: Prop[] =
     o.implement === 'cable'
       ? // Low pulley behind the lifter; the rope runs between the legs.
-        [{ kind: 'cable', from: { x: -0.6, y: FLOOR - 0.06 }, at: 'wrist' }]
+        [{ kind: 'cable', from: { x: -0.6, y: FLOOR - 0.06 }, at: 'wrist', rope: true }]
       : o.implement === 'dumbbell'
-        ? [{ kind: 'dumbbell', at: 'wrists' }]
+        ? // On one leg: a single dumbbell in the hand opposite the standing leg (the far hand from this camera).
+          [{ kind: 'dumbbell', at: o.singleLeg ? 'wrist2' : 'wrists' }]
         : [{ kind: 'barbell', at: 'wrist' }];
   return { view: 'side', pose, props };
 }
@@ -211,7 +212,9 @@ export function swing(): Demo {
         at: O,
       };
     },
-    props: [{ kind: 'kettlebell', at: 'wrist' }],
+    props: [{ kind: 'kettlebell', at: 'wrist', swing: true }],
+    // Ballistic: a quick snap up and a free drop back into the hike, no long pauses.
+    timing: { start: 0.15, out: 0.55, far: 0.15, back: 0.6 },
   };
 }
 
@@ -273,8 +276,8 @@ export function lyingLegCurl(): Demo {
       { kind: 'bench', points: [{ x: knee.x + 0.05, y: PAD }, { x: padFront, y: PAD }] },
       { kind: 'line', from: { x: padFront, y: handle.y }, to: handle, width: 0.016 },
       { kind: 'bar', at: handle },
-      // Roller on the backs of the ankles (placed for the start: a pad can't turn with the shin).
-      { kind: 'pad', at: 'ankle', offset: add(along(O, shin0 + 180, 0.04), along(O, shin0 + 90, 0.045 + ROLLER)) },
+      // Roller on the backs of the ankles; it turns with the shin.
+      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: -0.04, y: 0.045 + ROLLER } },
     ],
   };
 }
@@ -301,9 +304,9 @@ export function seatedLegCurl(): Demo {
       { kind: 'line', from: { x: hip.x - 0.02, y: 0.05 }, to: { x: hip.x - 0.02, y: 0.4 }, width: 0.03 },
       { kind: 'line', from: { x: hip.x - 0.14, y: 0.392 }, to: { x: hip.x + 0.1, y: 0.392 }, width: 0.016 },
       { kind: 'bar', at: handle },
-      // Thigh pad over the knees; roller under the backs of the ankles (placed for the start: a pad can't turn with the shin).
+      // Thigh pad over the knees; roller under the backs of the ankles, turning with the shin.
       { kind: 'pad', at: 'knee', offset: { x: -0.07, y: 0.06 - (BODY.thighFront + ROLLER) } },
-      { kind: 'pad', at: 'ankle', offset: add(along(O, shin0 + 180, 0.04), along(O, shin0 + 90, 0.045 + ROLLER)) },
+      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: -0.04, y: 0.045 + ROLLER } },
     ],
   };
 }
