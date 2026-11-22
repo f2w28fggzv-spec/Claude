@@ -41,6 +41,8 @@ export interface BodyContext {
    * the trunk always uses `level`.
    */
   working?: 'a' | 'b';
+  /** Share of its level the other side's limbs show (Demo.otherSide; default at rest). */
+  otherSide?: number;
   /** Colour for an engagement level. */
   heat: (level: number) => string;
   /** Unique per drawn figure: prefix for any ids in <defs>. */
@@ -289,7 +291,7 @@ function palette(c: BodyContext, level: Levels, far: boolean): Palette {
   return { skin: 'var(--fig-skin-far)', line: 'var(--fig-edge-far)', lv, m: (g) => `color-mix(in oklab,${c.heat(lv(g))} 85%,var(--fig-skin-far))` };
 }
 /** The levels one side's limbs are drawn with: the working side (or both) at full, the other near rest. */
-const limbLevels = (c: BodyContext, side: 'a' | 'b'): Levels => (c.working && c.working !== side ? restingSide(c.level) : c.level);
+const limbLevels = (c: BodyContext, side: 'a' | 'b'): Levels => (c.working && c.working !== side ? restingSide(c.level, c.otherSide) : c.level);
 
 const path = (d: string, attrs: string) => (d ? `<path d="${d}" ${attrs}/>` : '');
 /** Skin with its outline (the stroke is painted under the fill, so only its outer half shows). */

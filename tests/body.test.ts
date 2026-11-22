@@ -45,11 +45,15 @@ describe('demo figure', () => {
     const fig = figureAt(EXERCISES.find((e) => e.id === 'one-arm-dumbbell-row')!.demo, 0.5);
     const both = all(drawBody(fig, ctx()));
     const one = all(drawBody(fig, ctx({ working: 'a' })));
+    const part = all(drawBody(fig, ctx({ working: 'a', otherSide: 0.3 })));
     expect(shows(both, 'biceps')).toBe(true);
-    // The near (working) arm keeps its level; the far arm's limb muscles drop to the resting share, the trunk doesn't.
+    // The near (working) arm keeps its level; the far arm's limb muscles drop to their share (at rest by default), the trunk doesn't.
+    expect(RESTING_SIDE).toBe(0);
     expect(shows(one, 'biceps')).toBe(true);
-    expect(shows(one, 'biceps', LEVELS.biceps * RESTING_SIDE)).toBe(true);
-    expect(shows(both, 'biceps', LEVELS.biceps * RESTING_SIDE)).toBe(false);
+    expect(one).not.toBe(both);
+    // A share that matches no other group's test level: 0.3 of the biceps level.
+    expect(shows(part, 'biceps', LEVELS.biceps * 0.3)).toBe(true);
+    expect(shows(both, 'biceps', LEVELS.biceps * 0.3)).toBe(false);
     expect(shows(one, 'back')).toBe(true);
   });
 });

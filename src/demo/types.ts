@@ -84,7 +84,13 @@ export interface Demo {
    * One-sided exercises (one-arm row, single-leg moves, side-lying hip
    * abduction): the side whose arm and leg do the work, `a` = near (side
    * view) or the lifter's right (front view), `b` = the other side. The other
-   * side's limb muscles stay near rest; trunk muscles are shared.
+   * side's limb muscles rest (see `otherSide`); trunk muscles are shared.
    */
   working?: 'a' | 'b';
+  /**
+   * With `working`: the share of its level the other side's arm and leg show
+   * (default 0, at rest). Split squats and lunges use about half, since the
+   * back leg helps the front one.
+   */
+  otherSide?: number;
 }
