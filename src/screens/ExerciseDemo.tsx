@@ -102,10 +102,11 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
     const m = momentAt(exercise, tl, t);
     const levels = levelsAt(spec, m, t);
     const colours = muscles.map((u) => engageColour(levels[u.group]));
-    const key = `${m.s.toFixed(4)}|${colours.join()}`;
+    const back = m.phase === 'back';
+    const key = `${m.s.toFixed(4)}|${back}|${colours.join()}`;
     if (key !== painted.current) {
       painted.current = key;
-      el.innerHTML = frameMarkup(demo, m.s, levels, box, uid);
+      el.innerHTML = frameMarkup(demo, m.s, levels, box, uid, back);
       muscles.forEach((u, i) => {
         const bar = bars.current[i];
         if (!bar) return;

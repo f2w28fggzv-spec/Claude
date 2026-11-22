@@ -2,7 +2,7 @@
 // be run through the analysis engine like a recording.
 import type { Exercise } from '../../src/data/types';
 import { solve, type Figure, type Side, type Vec } from '../../src/demo/figure';
-import { progressAt, timeline } from '../../src/demo/timeline';
+import { progressAt, returningAt, timeline } from '../../src/demo/timeline';
 import type { PoseFrame, PoseSequence, RawLandmark } from '../../src/engine/types';
 
 // Body points that are pose landmarks (the hand's grip point is not one).
@@ -31,8 +31,11 @@ export function demoSequence(e: Exercise, o: { reps?: number; fps?: number } = {
   const figures: Figure[] = [];
   for (let k = 0; k * (1000 / fps) <= seconds * 1000; k++) {
     const t = k / fps;
-    const s = hold || t >= reps * tl.total ? 0 : progressAt(tl, t);
-    figures.push(solve(demo.view, demo.pose(s)));
+    const moving = !hold && t < reps * tl.total;
+    const s = moving ? progressAt(tl, t) : 0;
+    // The way back may take its own path (Demo.back).
+    const back = moving && returningAt(tl, t) && demo.back;
+    figures.push(solve(demo.view, back ? back(s) : demo.pose(s)));
   }
   // Fit the whole movement into 80% of the frame.
   const all: Vec[] = figures.flatMap((f) => [...Object.values(f.a), ...Object.values(f.b), f.head]);

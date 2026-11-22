@@ -40,8 +40,8 @@ function segmentSkin(from: Vec, to: Vec, frontDeg: number, front: number, back: 
 }
 
 /** The skin outline points of a side-view figure at progress s. */
-export function skinPoints(demo: Demo, s: number): SkinPoint[] {
-  const f = figureAt(demo, s);
+export function skinPoints(demo: Demo, s: number, back = false): SkinPoint[] {
+  const f = figureAt(demo, s, back);
   const out: SkinPoint[] = [];
   const pose = f.pose;
   const sides = [
@@ -119,9 +119,12 @@ export function contactIssues(demo: Demo, frames = 11, tolerance = 0.012): Conta
   };
   const round = (v: number) => Math.round(v * 1000) / 1000;
   const planted = new Map<string, number[][]>();
-  for (let k = 0; k < frames; k++) {
-    const s = frames === 1 ? 0 : k / (frames - 1);
-    for (const sp of skinPoints(demo, s)) {
+  // The way out, then the way back when it takes its own path; feet are tracked on the moving ground.
+  const steps = Array.from({ length: frames }, (_, k) => ({ s: frames === 1 ? 0 : k / (frames - 1), back: false }));
+  if (demo.back) steps.push(...steps.slice(0, -1).reverse().map((st) => ({ s: st.s, back: true })));
+  for (const { s, back } of steps) {
+    const moved = demo.ground?.at(s, back) ?? 0;
+    for (const sp of skinPoints(demo, s, back)) {
       if (floor !== null && sp.p.y > floor + tolerance) note({ s, kind: 'floor', part: sp.part, depth: round(sp.p.y - floor) });
       for (const prop of demo.props ?? []) {
         if (prop.kind === 'bench' && prop.beside?.test(sp.part)) continue;
@@ -132,7 +135,7 @@ export function contactIssues(demo: Demo, frames = 11, tolerance = 0.012): Conta
       if (floor !== null && /heel|ball|toe/.test(sp.part)) {
         const runs = planted.get(sp.part) ?? [[]];
         const run = runs[runs.length - 1];
-        if (Math.abs(sp.p.y - floor) <= 0.004) run.push(sp.p.x);
+        if (Math.abs(sp.p.y - floor) <= 0.004) run.push(sp.p.x + moved);
         else if (run.length) runs.push([]);
         planted.set(sp.part, runs);
       }

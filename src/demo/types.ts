@@ -98,4 +98,18 @@ export interface Demo {
    * back leg helps the front one.
    */
   otherSide?: number;
+  /**
+   * The way back from the turnaround when it isn't the way out reversed (a
+   * walking lunge brings the back leg through; a negative pull-up gets back
+   * up with help from the legs). s runs from 1 back to 0; back(1) must match
+   * pose(1) and back(0) must match pose(0), so the loop has no jump.
+   */
+  back?: (s: number) => DemoPose;
+  /**
+   * For a lifter who travels (walking lunge): how far the ground has moved
+   * back under them at s, on the way out or back. The picture follows the
+   * lifter and the floor gets marks `spacing` apart that move with the
+   * ground; a whole rep must move it a whole number of spacings.
+   */
+  ground?: { at: (s: number, back: boolean) => number; spacing: number };
 }

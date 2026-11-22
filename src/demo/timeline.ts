@@ -40,6 +40,13 @@ export function timeline(exercise: Exercise, pauseFar = 0): Timeline {
 
 const ease = (u: number) => (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, u)))) / 2;
 
+/** Whether time t falls on the way back from the turnaround (s running from 1 to 0). */
+export function returningAt(tl: Timeline, t: number): boolean {
+  const [p0, out, p1] = tl.segments;
+  const x = ((t % tl.total) + tl.total) % tl.total;
+  return x >= p0 + out + p1;
+}
+
 /** Movement progress s (0 = start, 1 = turnaround) at time t within one rep. */
 export function progressAt(tl: Timeline, t: number): number {
   const [p0, out, p1, back] = tl.segments;
