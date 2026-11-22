@@ -684,21 +684,21 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'Bent over, the dumbbells hang straight down under the shoulders with almost no moment arm; raising them out to the sides moves them away from the shoulder joints until, level with the shoulders, the moment arm is longest and the rear deltoid shortest, so the top is hardest. The middle trapezius and rhomboids pull the shoulder blades together as the arms open, and the lower back holds the hinged trunk still from the start.',
   },
-  // Standing tall side-on, arms hanging straight, barbell held at arm's length in front of the thighs with an underhand grip. -> Elbows fully bent with the upper arms still at the sides, bar curled up to just in front of the shoulders, forearms still tilted about 30 degrees forward of vertical.
+  // Standing tall side-on, knees soft, arms straight with the upper arms angled about 15 degrees forward so the barbell, held palms up, rests against the front of the upper thighs. -> Elbows bent about 140 degrees and drifted a little further forward (upper arms about 20 degrees ahead of the trunk), bar curled to just in front of the shoulders, forearms only about 20 degrees from vertical.
   'barbell-curl': {
-    profile: [0.2, 1, 0.8],
+    profile: [0.2, 1, 0.5],
     muscles: [
       { group: 'biceps', role: 'main', peak: 1, note: 'bend the elbows' },
     ],
-    why: 'With the arms hanging, the bar sits almost straight below the elbows, so the elbow flexors barely work; the bar\'s lever about the elbows grows to its longest as the forearms pass horizontal, the hardest point. By the top the lever has roughly halved, but with the elbows kept at the sides the fully shortened flexors are much weaker there, so the top stays fairly hard.',
+    why: 'On straight elbows the bar\'s weight goes through the locked joints, so the flexors carry almost nothing; once the elbows unlock the bar is already in front of them, and its lever is longest with the forearms around level, the hardest point. Because the upper arms start angled forward to clear the thighs and drift a little more at the top, the forearms finish within about 20 degrees of vertical, where the lever is down to about a third; even with the flexors short and weaker there, the top is only about half as hard.',
   },
-  // Standing tall side-on, arms hanging straight, EZ bar held at arm's length in front of the thighs on its angled grips. -> Elbows fully bent with the upper arms still at the sides, bar curled up to just in front of the shoulders, forearms still tilted about 30 degrees forward of vertical.
+  // Standing tall side-on, knees soft, arms straight with the upper arms angled about 15 degrees forward so the EZ bar, held on its angled grips, rests against the front of the upper thighs. -> Elbows bent about 140 degrees and drifted a little further forward (upper arms about 20 degrees ahead of the trunk), bar curled to just in front of the shoulders, forearms only about 20 degrees from vertical.
   'ez-bar-curl': {
-    profile: [0.2, 1, 0.8],
+    profile: [0.2, 1, 0.5],
     muscles: [
       { group: 'biceps', role: 'main', peak: 1, note: 'bend the elbows' },
     ],
-    why: 'Same lever as the barbell curl: almost no load on the elbow flexors with the arms hanging, hardest as the forearms pass horizontal, and still fairly hard at the top, where the lever has halved but the shortened flexors are weak. The angled grip turns the forearms slightly toward palms-in, which shares a little more of the work with the brachialis and the forearm\'s brachioradialis without changing the curve.',
+    why: 'Same path as the barbell curl: the flexors carry almost nothing on straight elbows, the bar\'s lever is longest with the forearms around level (the hardest point), and at the top the forearms are within about 20 degrees of vertical, so the lever is down to about a third and the top is only about half as hard even with the flexors shortened. The angled grip turns the forearms partly toward palms-in, giving the brachialis and the forearm\'s brachioradialis a slightly larger share without changing the curve.',
   },
   // Standing tall side-on, arms hanging straight at the sides, a dumbbell in each hand, palms forward. -> Elbows fully bent with the upper arms still at the sides, dumbbells curled up to just in front of the shoulders, forearms still tilted about 30 degrees forward of vertical.
   'dumbbell-curl': {
@@ -708,45 +708,45 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'Hanging at the sides, the dumbbells sit almost straight below the elbows, so the elbow flexors barely work; their lever about the elbows is longest as the forearms pass horizontal, the hardest point. Near the top the lever roughly halves, but with the elbows kept at the sides the shortened flexors are much weaker there, so the top stays fairly hard.',
   },
-  // Standing tall side-on, arms hanging straight at the sides, a dumbbell in each hand, palms facing in. -> Elbows fully bent with the upper arms still at the sides, dumbbells curled up to just in front of the shoulders with the thumbs up, forearms still tilted about 30 degrees forward of vertical.
+  // Standing tall side-on, arms hanging straight at the sides, a dumbbell in each hand, palms facing in. -> Elbows bent about 130 degrees with the upper arms still at the sides, dumbbells curled up until their inner ends reach the front of the shoulders, thumbs up, forearms about 45 degrees from vertical.
   'hammer-curl': {
-    profile: [0.2, 1, 0.8],
+    profile: [0.2, 1, 0.85],
     muscles: [
       { group: 'biceps', role: 'main', peak: 1, note: 'bend the elbows; the forearm\'s brachioradialis helps more with this grip' },
     ],
-    why: 'Same lever as the dumbbell curl, so the same curve: barely any load with the arms hanging, hardest as the forearms pass horizontal, still fairly hard at the top with the elbows kept still. The palms-in grip gives the brachialis and the forearm\'s brachioradialis a bigger share of the work than a palms-up curl, which lowers the biceps\' own share a little but not the timing.',
+    why: 'As in the palms-up curl, the dumbbells hang straight below the elbows at the start and have their longest lever with the forearms around level, the hardest point. The hammer curl stops at about 130 degrees of bend with the forearms still about 45 degrees from vertical, so the dumbbells keep about two thirds of their lever at the top while the flexors are less shortened, making the top harder than in the palms-up curl. The palms-in grip gives the brachialis and the forearm\'s brachioradialis a bigger share of the work, which changes who does it, not when it is hardest.',
   },
-  // Lying back on a bench reclined about 40 degrees from upright, arms hanging straight down from the shoulders behind the line of the torso, a dumbbell in each hand. -> Elbows bent about 145 degrees with the upper arms still hanging, dumbbells curled up to just in front of the shoulders, forearms still about 40 degrees short of vertical.
+  // Reclined on a bench about 40 degrees back from upright, back and head on the pad, feet flat, arms hanging straight down behind the line of the trunk, a dumbbell in each hand, palms forward. -> Upper arms still hanging vertically, elbows bent about 140 degrees, dumbbells curled to just in front of and slightly below the shoulders, forearms about 40 degrees from vertical.
   'incline-dumbbell-curl': {
-    profile: [0.2, 1, 0.95],
+    profile: [0.2, 1, 0.9],
     muscles: [
       { group: 'biceps', role: 'main', peak: 1, note: 'bend the elbows from a full stretch' },
     ],
-    why: 'The upper arms hang straight down behind the torso, so the dumbbells load the elbows as in a standing curl: no lever at the start, where the biceps is at full stretch with the shoulders extended, and the longest lever with the forearms horizontal. The demo stops with the forearms still about 40 degrees short of vertical, so the dumbbells keep most of their lever and the top stays almost as hard as the middle.',
+    why: 'The upper arms hang straight down behind the reclined trunk, so at the start the dumbbells hang below the elbows with no lever while the biceps sit at full stretch (shoulders extended about 40 degrees). The lever is longest with the forearms level; at the top the forearms are still about 40 degrees from vertical, so the dumbbells keep about two thirds of it, and the biceps, lengthened at the shoulder, lose less strength at that bend than in a standing curl, so the top stays nearly as hard as the middle.',
   },
-  // Seated on a bench leaning forward, upper arm braced against the inner thigh and hanging almost straight down, arm straight, dumbbell at arm's length between the knees. -> Elbow fully bent (about 150 degrees), dumbbell curled up to shoulder height just in front of the shoulder, forearm nearly vertical.
+  // Seated on the end of a bench leaning forward about 50 degrees, the working upper arm braced on the inner thigh near the knee and sloping slightly back from the shoulder, arm straight, dumbbell hanging between the legs; the free hand rests on the other knee. -> Elbow bent about 140 degrees with the upper arm still braced, dumbbell curled up in front of and a little below the shoulder, forearm still about 50 degrees from vertical.
   'concentration-curl': {
-    profile: [0.2, 1, 0.6],
+    profile: [0.2, 0.8, 1],
     muscles: [
       { group: 'biceps', role: 'main', peak: 1, note: 'bends the elbow' },
     ],
-    why: 'With the upper arm braced on the thigh and hanging almost straight down, the dumbbell has no lever about the elbow at the start and its longest lever as the forearm passes horizontal, the hardest point. At the top the forearm is nearly vertical, so the lever falls to about a third; the fully shortened flexors are weak there, so the top is easier than the middle but not a rest.',
+    why: 'Braced on the thigh, the upper arm slopes about 10 degrees back from the shoulder, so the hanging dumbbell puts no load on the flexors at the start. The same slope means the forearm stops about 50 degrees from vertical at the top, where the dumbbell still has about three quarters of its longest lever while the flexors are fully shortened, and the forward lean shortens the biceps at the shoulder too. So the top is the hardest point, and the middle, with the longest lever but stronger muscles, is a little easier.',
   },
-  // Standing tall side-on facing a low pulley well out in front, arms hanging straight holding the cable bar, cable slanting forward and down to the pulley. -> Elbows fully bent with the upper arms still at the sides, bar curled up to just in front of the shoulders, cable running down at a slant to the pulley.
+  // Standing tall side-on facing a low pulley a short step in front of the toes, knees soft, arms straight with the upper arms angled about 15 degrees forward, cable bar against the front of the thighs, cable running down and forward to the pulley. -> Elbows bent about 140 degrees and drifted slightly forward, bar curled to just in front of the shoulders, forearms within about 20 degrees of vertical, cable running steeply down and forward to the pulley.
   'cable-curl': {
-    profile: [0.1, 0.6, 1],
+    profile: [0.1, 1, 0.8],
     muscles: [
       { group: 'biceps', role: 'main', peak: 1, note: 'bend the elbows against the cable' },
     ],
-    why: 'The low pulley is drawn well out in front (about 0.45 of body height), so with the arms hanging the cable pulls the hands forward and the elbow flexors carry nothing until the forearms have swung about 40 degrees forward. From there the cable\'s lever keeps growing and stays long at the top instead of fading like a dumbbell\'s, so the top, where the flexors are shortest, is hardest. With the pulley closer to the feet the middle gets harder (about 0.75) and the top stays hardest.',
+    why: 'At the start the cable runs about 10 degrees in front of the straight forearms, so it pulls the bar forward rather than bending the elbows down, and the flexors carry nothing. Once the forearms pass the cable\'s line it loads them, with the longest lever around level, the hardest point. At the top the forearms are near vertical, but the cable, angling forward to the pulley, still has about half its longest lever (a barbell keeps about a third there), so with the flexors short the top stays fairly hard.',
   },
-  // Standing tall side-on on the middle of the band, arms hanging straight at the sides holding the handles, band only slightly stretched. -> Elbows fully bent with the upper arms still at the sides, handles curled up to just in front of the shoulders, band stretched to nearly twice its starting length.
+  // Standing tall side-on on the middle of the band, arms hanging straight at the sides holding the handles, band only slightly stretched. -> Elbows bent about 140 degrees with the upper arms still at the sides, handles curled up to just in front of the shoulders, band stretched to about 1.75 times its starting length.
   'band-curl': {
     profile: [0.1, 0.7, 1],
     muscles: [
       { group: 'biceps', role: 'main', peak: 1, note: 'bend the elbows; the band pulls harder as it stretches' },
     ],
-    why: 'At the start the band runs almost along the forearms and is barely stretched, so there is next to no load. As the hands rise the band stretches to nearly twice its length and pulls harder, while its lever about the elbows is longest around horizontal; with the flexors shortened and weaker near the top, the top third is the hardest part.',
+    why: 'At the start the band runs straight along the forearms and is barely stretched, so there is next to no load. As the hands rise the band stretches to about 1.75 times its starting length and pulls harder, while its lever about the elbows is longest around level; with the pull rising and the flexors shortening, effort peaks in the top third and stays close to that at the top.',
   },
   // Lying on a flat bench, barbell held with a shoulder-width grip at arm's length straight above the shoulders. -> Bar lowered to the lower chest, elbows bent and tucked close to the sides.
   'close-grip-bench-press': {
@@ -775,13 +775,13 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'The hands carry about two thirds of body weight, as in a standard push-up, but with them together under the chest the elbows bend further and sit further behind the hands, so the elbow moment is larger and builds early in the descent: the triceps lead and are hardest pressed at the bottom. The chest helps most at the bottom, where it is stretched.',
   },
-  // Standing tall side-on, both hands holding one dumbbell straight overhead, upper arms vertical beside the head, elbows straight. -> Upper arms still vertical, elbows fully bent, dumbbell lowered behind the neck to about shoulder height.
+  // Standing tall side-on, knees soft, one dumbbell held on end overhead in both cupped hands, arms almost straight and pointing up just forward of vertical beside the head. -> Upper arms still pointing up, elbows bent about 120 degrees (a 60-degree angle at the elbow), forearms tipped back to about 20 degrees below level, dumbbell behind the head at about ear height.
   'overhead-dumbbell-extension': {
-    profile: [0.2, 1, 0.6],
+    profile: [0.2, 0.75, 1],
     muscles: [
       { group: 'triceps', role: 'main', peak: 1, note: 'straighten the elbows; the long head works from a full stretch' },
     ],
-    why: 'Straight overhead, the dumbbell sits on top of the forearms, so the triceps do little; its lever about the elbows is longest as the forearms pass horizontal behind the head, the hardest point, and at the deep bottom it hangs almost straight below the elbows, so the lever falls to under half even though the long head is at full stretch. In the current demo, fore lerp(2, 205) swings the forearm forward over the face; bending it back behind the head needs lerp(2, -155).',
+    why: 'With the arms almost straight the dumbbell sits on top of the forearms, so the triceps do little. As the forearms tip back behind the head its lever about the elbows grows, is longest with the forearms level (about 85% of the way down) and is still about 95% of that at the bottom, where the forearms are only about 20 degrees below level; the long head is also at its longest there, with the arms overhead and the elbows bent, so the bottom is the hardest point.',
   },
   // Lying on a flat bench, EZ bar held at arm's length above the chin, upper arms tilted slightly toward the head. -> Elbows bent to a right angle with the upper arms still, bar lowered to just past the top of the head.
   'skull-crusher': {
@@ -791,13 +791,13 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'With straight arms the bar sits almost over the elbows, so the triceps do little. As the forearms lower toward horizontal the bar\'s moment arm about the elbows grows quickly, to about 80% of its maximum by halfway, and peaks with the elbows bent to a right angle at the bottom, the hardest position.',
   },
-  // Standing close to a high pulley, torso leaning slightly forward, upper arms at the sides, elbows bent about 115 degrees with the bar at lower-chest height. -> Elbows straight, bar pushed down to the front of the thighs, upper arms still at the sides.
+  // Standing close under a high pulley, knees soft, leaning forward about 15 degrees from the hips, elbows pinned at the sides and bent about 100 degrees (forearms just above level), bar at about the bottom of the ribs with the cable hanging straight down onto it. -> Elbows straight, bar pushed down to the front of the upper thighs, upper arms still at the sides; the cable now slants slightly forward up to the pulley.
   'triceps-pushdown': {
-    profile: [0.85, 1, 0.6],
+    profile: [1, 0.9, 0.5],
     muscles: [
       { group: 'triceps', role: 'main', peak: 1, note: 'straighten the elbows' },
     ],
-    why: 'The cable from the high pulley runs nearly vertically, so its lever about the elbows is longest with the forearms around horizontal, just after the start: the triceps work hard from the first moment and hardest through the first half. At lockout the cable runs close to the forearms (still pulling them slightly forward), so the lever drops to about a third, but the fully shortened triceps are weaker there, so the finish stays moderately hard.',
+    why: 'The pulley sits straight above the bar at the start, so the cable pulls square to the near-level forearms and its lever about the elbows is at or near its longest from the first moment: holding the bar there is the hardest part. As the bar goes down the cable lines up more with the forearms, and at lockout its lever is down to under a third; the fully shortened triceps are weaker there, so the finish is about half as hard rather than a third.',
   },
   // Hinged forward with the torso about 20 degrees above level and knees slightly bent, upper arm held back along the side of the torso, forearm hanging straight down holding the dumbbell. -> Elbow straightened, forearm in line with the upper arm, dumbbell extended back to just behind the hip.
   'triceps-kickback': {
@@ -807,13 +807,13 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'With the forearm hanging, the dumbbell is straight below the elbow, so the triceps carry almost nothing (the long head only helps hold the upper arm back). As the forearm swings back its lever about the elbow grows and is longest at lockout, with the arm straight and nearly level, exactly where the triceps are shortest and weakest, so lockout is by far the hardest point.',
   },
-  // Standing under a band anchored overhead and a little in front, torso leaning slightly forward, upper arms at the sides, elbows bent about 115 degrees with the hands at lower-chest height, band barely stretched. -> Elbows straight, hands pushed down to the front of the thighs, band at its longest.
+  // Standing close under a band looped over a bar overhead, a little in front of the hands, knees soft, leaning forward about 15 degrees, elbows pinned at the sides and bent about 100 degrees (forearms just above level), hands at about the bottom of the ribs, band barely stretched. -> Elbows straight, hands pushed down to the front of the upper thighs, band stretched to about 1.5 times its starting length.
   'band-pushdown': {
-    profile: [0.2, 1, 0.9],
+    profile: [0.2, 0.85, 1],
     muscles: [
       { group: 'triceps', role: 'main', peak: 1, note: 'straighten the elbows; the band pulls harder as it stretches' },
     ],
-    why: 'At the start the band is barely stretched, so although its lever about the elbows is long the load is small; it pulls harder as it stretches, so effort builds through the push and is highest in the last third. At lockout the band runs close to the forearms, so its lever shrinks and the final few degrees ease slightly even though the band pulls hardest there.',
+    why: 'The band is barely stretched at the start, so although it pulls nearly square to the near-level forearms the load is small. It pulls harder the more it stretches while its lever about the elbows stays long until the last third, so effort builds through the push and peaks over the last quarter. At lockout the band lines up with the forearms and its lever shrinks to about a third, but the pull is at its strongest and the triceps at their shortest, so the finish stays close to the hardest.',
   },
   // Forearm plank: elbows under the shoulders, body straight from shoulders to ankles, about 12 degrees above horizontal -> Same position (a hold)
   'plank': {
