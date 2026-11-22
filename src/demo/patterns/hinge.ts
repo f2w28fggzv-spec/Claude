@@ -213,10 +213,11 @@ export function swing(): Demo {
   };
 }
 
-/** Kneeling, ankles held down: the straight body lowers forward from the knees, hands ready to catch. */
+/** Kneeling on a pad, ankles held down: the straight body lowers forward from the knees, hands ready to catch. */
 export function nordic(): Demo {
-  // Shins flat on the floor (their front on it), feet pointed back.
-  const knee: Vec = { x: 0, y: FLOOR - BODY.shinFront };
+  // Shins flat on the pad (their front on it), feet pointed back.
+  const padTop = FLOOR - 2 * PAD;
+  const knee: Vec = { x: 0, y: padTop - BODY.shinFront };
   const lowest = 66; // body lean at the turnaround
   return {
     view: 'side',
@@ -238,8 +239,11 @@ export function nordic(): Demo {
         at: knee,
       };
     },
-    // Roller over the lower calves, just above the heels.
-    props: [{ kind: 'pad', at: 'ankle', offset: { x: 0.03, y: -(0.045 + ROLLER) } }],
+    props: [
+      { kind: 'bench', points: [{ x: knee.x - L.shin - 0.13, y: FLOOR - PAD }, { x: knee.x + 0.06, y: FLOOR - PAD }], legs: false },
+      // Roller over the lower calves, just above the heels.
+      { kind: 'pad', at: 'ankle', offset: { x: 0.03, y: -(0.045 + ROLLER) } },
+    ],
   };
 }
 
