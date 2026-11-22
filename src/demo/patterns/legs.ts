@@ -163,6 +163,24 @@ const smooth = (u: number) => {
 };
 
 /**
+ * A smooth, monotone curve through v0 (s = 0), v1 (s = a) and v2 (s = 1): it
+ * never overshoots a keyframe and keeps moving through v1 (Fritsch–Butland).
+ * `easeIn` starts it from rest.
+ */
+function through(v0: number, v1: number, v2: number, a: number, easeIn = false): (s: number) => number {
+  const d0 = (v1 - v0) / a;
+  const d1 = (v2 - v1) / (1 - a);
+  const m1 = d0 * d1 > 0 ? 2 / (1 / d0 + 1 / d1) : 0;
+  const m0 = easeIn ? 0 : d0;
+  const hermite = (p0: number, p1: number, m0: number, mEnd: number, h: number, t: number) => {
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * p0 + (t3 - 2 * t2 + t) * h * m0 + (-2 * t3 + 3 * t2) * p1 + (t3 - t2) * h * mEnd;
+  };
+  return (s) => (s < a ? hermite(v0, v1, m0, m1, a, s / a) : hermite(v1, v2, m1, d1, 1 - a, (s - a) / (1 - a)));
+}
+
+/**
  * A stepping foot: from one planted position to another, lifted in an arc so
  * neither the heel nor the toe touches the floor on the way.
  */
@@ -245,16 +263,34 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
     const a = o.step ? 0.4 : 0; // share of the way out spent stepping
     const lower = (u: number) => (u - a) / (1 - a);
     if (o.step === 'back') {
-      // Standing on both feet, then the back foot reaches back and lands on its toes.
+      // Standing on both feet, the back foot reaches back and lands on its
+      // toes while the front knee bends steadily; then straight down.
       const stand = { x: 0.005, y: -LEG_LEN * 0.998 };
+      const polar = (p: Vec) => ({ deg: Math.atan2(p.x, -p.y) * (180 / Math.PI), r: Math.hypot(p.x, p.y) });
+      const [p0, p1, p2] = [polar(stand), polar(hipTop), polar(hipB)];
+      const deg = through(p0.deg, p1.deg, p2.deg, a);
+      const r = through(p0.r, p1.r, p2.r, a);
       rearAt = (s) => (s >= a ? onToes(lower(s)) : stepFoot({ ankle: O, foot: 90 }, onToes(0), s / a, 0.035));
-      hipAt = (s) => (s >= a ? split(lower(s)) : lerpV(stand, hipTop, smooth(s / a)));
+      hipAt = (s) => along(O, deg(s), r(s));
     } else if (o.step === 'forward') {
-      // Standing with the feet together behind; the front foot steps forward while the back heel rises.
+      // Standing with the feet together behind; the front foot steps forward
+      // while the body moves over the back foot, whose heel peels up only as
+      // far as it must to keep that knee nearly straight.
       const start = sub(toe, toeFrom(90));
       const stand = { x: start.x + 0.005, y: -LEG_LEN * 0.998 };
-      rearAt = (s) => (s >= a ? onToes(lower(s)) : toes(lerp(90, footTop, smooth(s / a))));
-      hipAt = (s) => (s >= a ? split(lower(s)) : lerpV(stand, hipTop, smooth(s / a)));
+      const x = through(stand.x, hipTop.x, hipB.x, a);
+      const y = through(stand.y, hipTop.y, hipB.y, a, true); // hips stay high until the body is over the back foot
+      hipAt = (s) => ({ x: x(s), y: y(s) });
+      const reachTop = Math.hypot(hipTop.x - toes(footTop).ankle.x, hipTop.y - toes(footTop).ankle.y);
+      rearAt = (s) => {
+        if (s >= a) return onToes(lower(s));
+        const hip = hipAt(s);
+        const want = lerp(legSpan(172), reachTop, smooth(s / a));
+        const reach = (foot: number) => Math.hypot(hip.x - toes(foot).ankle.x, hip.y - toes(foot).ankle.y);
+        // Raising the heel brings the ankle closer to the hip.
+        const foot = reach(90) <= want ? 90 : solveFor(90, footTop, (f) => -reach(f), -want);
+        return toes(foot);
+      };
       frontAt = (s) => (s >= a ? { ankle: O, foot: 90 } : stepFoot({ ankle: start, foot: 90 }, { ankle: O, foot: 90 }, s / a, 0.05));
     } else {
       rearAt = onToes;
@@ -534,12 +570,13 @@ export function hackSquat(): Demo {
   const plateN = dir(foot + 90);
   const p0 = add(add(heel, mul(plateDir, -0.06)), mul(plateN, 0.014));
   const p1 = add(p0, mul(plateDir, 0.26));
-  // Sled: pad behind the back (moves with the lifter) and the rails it runs on.
+  // Sled: pad behind the back from the lower back up past the shoulders,
+  // moving with the lifter, and the rails it runs on.
   const behind = dir(torso - 90);
   const sledPad: Prop = {
     kind: 'attached',
     at: 'hip',
-    from: add(mul(behind, BODY.torsoBack + 0.022), mul(up, -0.06)),
+    from: add(mul(behind, BODY.torsoBack + 0.022), mul(up, 0.04)),
     to: add(mul(behind, BODY.torsoBack + 0.022), mul(up, L.torso + 0.06)),
     width: 0.04,
   };
