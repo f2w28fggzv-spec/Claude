@@ -95,8 +95,10 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
         for (const c of attachPoints(f, p.at)) {
           // The plates: drawn behind the lifter so they never cover the body.
           out.back += circle(c, r, `fill="${FILL}" stroke="${LINE}" stroke-width="0.008"`) + circle(c, r * 0.8, `fill="none" stroke="${LINE}" stroke-width="0.004" opacity="0.6"`) + circle(c, r * 0.3, `fill="${LINE}" opacity="0.5"`);
-          // The bar, seen end-on, under the near hand.
-          out.mid += circle(c, 0.02, `fill="${STEEL}"`) + circle(c, 0.009, `fill="${FILL}"`);
+          // The bar, seen end-on: under the near fist beside its plates; a bar with no plates (a cable bar) shows its end over the fist.
+          const end = circle(c, 0.02, `fill="${STEEL}"`) + circle(c, 0.009, `fill="${FILL}"`);
+          if (r > 0) out.mid += end;
+          else out.hand += end;
         }
         break;
       }
@@ -166,7 +168,8 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
         out.behind += `<rect x="${n(p.x)}" y="${n(p.y)}" width="${n(p.w)}" height="${n(p.h)}" rx="0.012" fill="${FILL}" stroke="${LINE}" stroke-width="0.008"/>` + seg({ x: p.x + 0.012, y: p.y + 0.02 }, { x: p.x + p.w - 0.012, y: p.y + 0.02 }, 0.004, LINE, 'opacity="0.6"');
         break;
       case 'bar':
-        out.mid += circle(p.at, 0.02, `fill="${STEEL}"`) + circle(p.at, 0.009, `fill="${FILL}"`);
+        // A fixed bar (pull-up bar, machine handle) seen end-on: its end is nearer the camera than the fist gripping it.
+        out.hand += circle(p.at, 0.022, `fill="${STEEL}"`) + circle(p.at, 0.009, `fill="${FILL}"`);
         break;
       case 'wall':
         // The slab behind the face the lifter touches; the face is drawn as a line.
@@ -175,12 +178,18 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
       case 'cable':
       case 'band':
         for (const c of attachPoints(f, p.at)) {
+          const behind = p.kind === 'cable' && p.behind;
           if (p.kind === 'cable' && p.rope) {
             // A rope handle: the cable ends a little short of the fist, the rope runs into it with a knob.
-            const ropeStart = along(c, angleOf(sub(p.from, c)), 0.06);
-            out.mid += seg(p.from, ropeStart, 0.007, LINE) + seg(ropeStart, c, 0.014, PAD) + circle(c, 0.014, `fill="${PAD}"`);
+            const ropeStart = along(c, angleOf(sub(p.from, c)), 0.07);
+            const cable = seg(p.from, ropeStart, 0.007, LINE);
+            if (behind) out.behind += cable;
+            else out.mid += cable;
+            out.mid += seg(ropeStart, c, 0.02, STEEL) + circle(c, 0.019, `fill="${STEEL}"`);
           } else {
-            out.mid += seg(p.from, c, p.kind === 'band' ? 0.012 : 0.007, LINE, p.kind === 'band' ? 'stroke-dasharray="0.02 0.016"' : '');
+            const line = seg(p.from, c, p.kind === 'band' ? 0.012 : 0.007, LINE, p.kind === 'band' ? 'stroke-dasharray="0.02 0.016"' : '');
+            if (behind) out.behind += line;
+            else out.mid += line;
           }
         }
         if (p.kind === 'cable') {
@@ -188,7 +197,8 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
           // with `column` the tower stands there and the pulley hangs on an arm out in front of it.
           const x = p.column ?? p.from.x;
           if (floor !== null) {
-            const top = Math.min(p.from.y - 0.06, floor - 0.2);
+            // A full-height tower (about 2 m), however low the pulley sits on it.
+            const top = Math.min(p.from.y - 0.06, floor - 1.1);
             out.back += `<rect x="${n(x - 0.022)}" y="${n(top)}" width="0.044" height="${n(floor - top)}" rx="0.01" fill="${FILL}" stroke="${LINE}" stroke-width="0.006"/>`;
           }
           if (p.column !== undefined) out.back += seg({ x, y: p.from.y - 0.03 }, { x: p.from.x, y: p.from.y - 0.03 }, 0.02, STEEL);

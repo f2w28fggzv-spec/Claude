@@ -133,13 +133,14 @@ describe('levels', () => {
 describe('engagement colour', () => {
   it('runs from the resting grey through the heat ramp to red', () => {
     expect(engageColour(0)).toBe('var(--an-muscle)');
-    expect(engageColour(0.14)).toBe('var(--heat-low)'); // amber, copper-amber on dark
+    expect(engageColour(0.14)).toBe('var(--amber)');
+    expect(engageColour(0.07)).toBe('var(--heat-glow)'); // half way to amber; a copper ember on dark
     expect(engageColour(0.45)).toBe('var(--orange)');
     expect(engageColour(0.75)).toBe('var(--flame)');
     expect(engageColour(1)).toBe('var(--red)');
     expect(engageColour(5)).toBe('var(--red)');
     expect(engageColour(0.6)).toBe('color-mix(in oklab, var(--flame) 50%, var(--orange))');
-    expect(engageColour(0.07)).toBe('color-mix(in oklab, var(--heat-low) 50%, var(--an-muscle))');
+    expect(engageColour(0.035)).toBe('color-mix(in oklab, var(--heat-glow) 50%, var(--an-muscle))');
   });
 });
 

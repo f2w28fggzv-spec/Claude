@@ -41,8 +41,13 @@ export type Prop =
   /** A wall seen edge-on: its face at x, facing right (the slab behind it to the left) unless `facing: 'left'`. */
   | { kind: 'wall'; x: number; top: number; facing?: 'left' | 'right' }
   /** Cable from a pulley at `from`; `rope` draws a rope handle at the hand. */
-  /** `column`: x of the machine's tower when the pulley hangs on an arm out in front of it (default: the tower stands under the pulley). */
-  | { kind: 'cable'; from: Vec; at: Attach; rope?: boolean; column?: number }
+  /**
+   * `column`: x of the machine's tower when the pulley hangs on an arm out in
+   * front of it (default: the tower stands under the pulley). `behind`: the
+   * cable runs behind the trunk and head (to a rope behind the head, or past
+   * the legs from a low pulley); default in front of them, under the near arm.
+   */
+  | { kind: 'cable'; from: Vec; at: Attach; rope?: boolean; column?: number; behind?: boolean }
   | { kind: 'band'; from: Vec; at: Attach }
   /**
    * Machine pad on a joint: a round roller, or with `block` a padded block
