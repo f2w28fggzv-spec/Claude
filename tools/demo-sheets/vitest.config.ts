@@ -3,5 +3,5 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  test: { include: ['tools/demo-sheets/export.tool.ts'], watch: false },
+  test: { include: [process.env.DEMO_TOOL ?? 'tools/demo-sheets/export.tool.ts'], watch: false },
 });

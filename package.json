@@ -13,7 +13,8 @@
     "test": "vitest run",
     "fixtures": "node scripts/make-fixtures.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests",
-    "demo:sheets": "node tools/demo-sheets/sheets.cjs"
+    "demo:sheets": "node tools/demo-sheets/sheets.cjs",
+    "demo:contact": "DEMO_TOOL=tools/demo-sheets/contact.tool.ts vitest run --config tools/demo-sheets/vitest.config.ts --silent=false"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
