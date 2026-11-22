@@ -21,6 +21,8 @@ const STEEL = 'var(--equip)';
 const LINE = 'var(--equip-line)';
 const FILL = 'var(--equip-fill)';
 const PAD = 'var(--pad)';
+/** Steel with a thin outline, so a dumbbell still reads in front of a dark pad or the body. */
+const OUTLINED = `fill="${STEEL}" stroke="${LINE}" stroke-width="0.006"`;
 
 /** Direction a segment of the near side points (from the joint above; the trunk from hip to shoulder), for pads that turn with it. */
 function segmentDeg(s: Side, frame: 'shin' | 'thigh' | 'forearm' | 'trunk'): number {
@@ -90,7 +92,7 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
           if (p.upright) {
             // Held on end (goblet squat): two heads, one above the other; cupped = palms under the top head, the rest hanging below.
             const y = c.y + (p.cupped ? 0.02 : 0);
-            s = `<rect x="${n(c.x - 0.034)}" y="${n(y - 0.062)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.034)}" y="${n(y + 0.018)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.009)}" y="${n(y - 0.03)}" width="0.018" height="0.06" fill="${LINE}"/>`;
+            s = `<rect x="${n(c.x - 0.009)}" y="${n(y - 0.03)}" width="0.018" height="0.06" fill="${LINE}"/><rect x="${n(c.x - 0.034)}" y="${n(y - 0.062)}" width="0.068" height="0.044" rx="0.012" ${OUTLINED}/><rect x="${n(c.x - 0.034)}" y="${n(y + 0.018)}" width="0.068" height="0.044" rx="0.012" ${OUTLINED}/>`;
           } else if (p.lengthwise) {
             // Neutral grip: the handle runs across the fist, a head at each end (about 34 cm long, 27 cm when light).
             const side = far ? f.b : f.a;
@@ -99,7 +101,7 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
             const a = along(c, across, reach);
             const b = along(c, across + 180, reach);
             const head = (q: Vec) =>
-              `<g transform="translate(${n(q.x)} ${n(q.y)}) rotate(${n(across)})"><rect x="${n(-len / 2)}" y="${n(-thick / 2)}" width="${n(len)}" height="${n(thick)}" rx="0.011" fill="${STEEL}"/></g>`;
+              `<g transform="translate(${n(q.x)} ${n(q.y)}) rotate(${n(across)})"><rect x="${n(-len / 2)}" y="${n(-thick / 2)}" width="${n(len)}" height="${n(thick)}" rx="0.011" ${OUTLINED}/></g>`;
             s = seg(a, b, 0.016, STEEL) + head(a) + head(b);
           } else {
             // Seen end-on: the hexagonal head nearest the camera.
@@ -108,7 +110,7 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
               const a = (Math.PI / 3) * k + Math.PI / 6;
               return `${n(c.x + r * Math.cos(a))},${n(c.y + r * Math.sin(a))}`;
             }).join(' ');
-            s = `<polygon points="${hex}" fill="${STEEL}" stroke="${STEEL}" stroke-width="0.008" stroke-linejoin="round"/>` + circle(c, 0.012, `fill="${FILL}" opacity="0.7"`);
+            s = `<polygon points="${hex}" ${OUTLINED} stroke-linejoin="round"/>` + circle(c, 0.012, `fill="${FILL}" opacity="0.7"`);
           }
           // The far one behind the lifter. Near: an end-on head is closer to the camera than the fist; a
           // dumbbell held on end or lengthwise sits under the fingers.

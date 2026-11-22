@@ -201,9 +201,9 @@ function bentOverRow(implement: 'barbell' | 'dumbbell', torso: number): Demo {
  */
 function oneArmRow(implement: Implement): Demo {
   const padTop = FLOOR - BENCH_H;
-  // Far shin flat on the pad, far thigh straight up to the hip, the top of the foot on the pad.
+  // Far shin flat on the pad, far thigh straight up to the hip; the foot pointed back, its toes on the pad and the heel up.
   const knee2: Vec = { x: 0, y: padTop - BODY.shinFront };
-  const leg2: Leg = { thigh: 180, shin: 270, foot: 270 };
+  const leg2: Leg = { thigh: 180, shin: 270, foot: 248 };
   const hip = along(knee2, 0, L.thigh);
   // Far hand flat on the pad straight under the shoulder: the trunk tips forward until the soft arm reaches it.
   const palmY = padTop - BODY.hand / 2;
@@ -219,8 +219,13 @@ function oneArmRow(implement: Implement): Demo {
   // The bench runs from just behind the far foot to past the far hand.
   const f = solve('side', pose(0));
   const padY = padTop + PAD_HALF;
-  const props: Prop[] = [{ kind: 'bench', points: [{ x: f.b.toe.x - 0.05, y: padY }, { x: palm.x + 0.08, y: padY }] }, ...handProp(implement, 'wrist', { lengthwise: true })];
-  return { view: 'side', pose, props };
+  // The rowing (near) arm hangs beside the bench, not into it.
+  const props: Prop[] = [
+    { kind: 'bench', points: [{ x: f.b.toe.x - 0.05, y: padY }, { x: palm.x + 0.08, y: padY }], beside: /near (hand|forearm|upper arm)/ },
+    ...handProp(implement, 'wrist', { lengthwise: true }),
+  ];
+  // Only the rowing (near) arm works; the far arm just props the trunk up.
+  return { view: 'side', pose, props, working: 'a' };
 }
 
 /**
@@ -251,7 +256,8 @@ function chestSupportedRow(implement: Implement, torso: number): Demo {
     { kind: 'line', from: under(0), to: postFoot, width: 0.03 },
     { kind: 'line', from: under(0.62), to: strutFoot, width: 0.026 },
     { kind: 'line', from: { x: postFoot.x - 0.08, y: postFoot.y }, to: { x: strutFoot.x + 0.06, y: strutFoot.y }, width: 0.016 },
-    { kind: 'bench', points: [low, high], legs: false },
+    // The arms hang beside the pad, not into it.
+    { kind: 'bench', points: [low, high], legs: false, beside: /hand|forearm|upper arm/ },
     ...handProp(implement, 'wrist', { lengthwise: true }),
   ];
   return { view: 'side', pose, props };
@@ -298,7 +304,7 @@ export function pullUp(o: { startTop?: boolean; scapular?: boolean; chin?: boole
     return {
       torso,
       head: torso * 0.4,
-      leg: { thigh, shin, foot: shin - 32 }, // toes pointed
+      leg: { thigh, shin, foot: shin - 40 }, // toes pointed
       arm,
       anchor: 'shoulder',
       at: shoulder,
@@ -395,19 +401,22 @@ function latPulldown(): Demo {
   const pulley: Vec = { x: topBar.x, y: topBar.y - 0.26 };
   // The bar moves forward early so it passes in front of the face.
   const barAt = (s: number): Vec => ({ x: lerp(topBar.x, chest.x, 1 - (1 - s) ** 2.4), y: lerp(topBar.y, chest.y, s) });
-  // Seat under the backs of the thighs, on the machine's upright (which ../equipment draws under the
-  // pulley); the knee pad a roller on the thighs just behind the knees, on a post from the floor rail.
+  // Seat under the backs of the thighs on its own post; the knee pad a roller on the thighs just behind
+  // the knees, on a post from the floor rail. The weight stack stands in front of the knees, the pulley
+  // on a beam reaching back over the head.
   const seatY = hip.y + BODY.thighBack + PAD_HALF;
   const kneePad = add(along(f.a.knee, leg.thigh + 180, 0.05), mul(dir(leg.thigh - 90), BODY.thighFront + 0.036));
+  const stack = kneePad.x + 0.16;
   return {
     view: 'side',
     floor,
     pose: (s) => ({ ...base, arm: sideArm(shoulder, barAt(s), out, elbows) }),
     props: [
-      { kind: 'line', from: { x: pulley.x - 0.1, y: floor - 0.008 }, to: { x: kneePad.x + 0.1, y: floor - 0.008 }, width: 0.016 },
+      { kind: 'line', from: { x: hip.x - 0.1, y: floor - 0.008 }, to: { x: stack + 0.03, y: floor - 0.008 }, width: 0.016 },
+      { kind: 'line', from: { x: hip.x + 0.02, y: seatY }, to: { x: hip.x + 0.02, y: floor - 0.01 }, width: 0.026 },
       { kind: 'line', from: kneePad, to: { x: kneePad.x + 0.06, y: floor - 0.01 }, width: 0.024 },
       { kind: 'bench', points: [{ x: hip.x - 0.12, y: seatY }, { x: hip.x + 0.17, y: seatY }], legs: false },
-      { kind: 'cable', from: pulley, at: 'wrist' },
+      { kind: 'cable', from: pulley, at: 'wrist', column: stack },
       { kind: 'barbell', at: 'wrist', plate: 0 },
       { kind: 'pad', at: 'knee', offset: sub(kneePad, add(f.a.knee, { x: 0, y: -0.06 })) },
     ],
