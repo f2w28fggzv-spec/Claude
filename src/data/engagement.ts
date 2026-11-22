@@ -373,7 +373,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'The pads load the shoulders and the load passes down the straight body to the balls of the feet the whole time. At the start the heels hang below the platform, so the calves already hold the full load at their longest, helped by the stretch\'s passive tension. The lever from the ankle to the ball is longest there and shrinks toward the top while the calves weaken as they shorten, so the effort rises to the top, which is the hardest position to hold.',
   },
-  // Lying on a flat bench, barbell held at arm's length straight above the shoulders, elbows straight. -> Bar lowered to touch the upper chest, elbows bent and level with the shoulders.
+  // Lying on a flat bench, feet on the floor, barbell held at arm's length straight above the shoulders, elbows locked. -> Bar lowered to touch the lower chest (about the nipple line), elbows a little below shoulder level and about 45 to 60 degrees out from the sides.
   'bench-press': {
     profile: [0.25, 0.6, 1],
     muscles: [
@@ -381,19 +381,19 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'triceps', role: 'assist', peak: 0.65, profile: [0.3, 0.85, 1], note: 'straighten the elbows' },
       { group: 'shoulders', role: 'assist', peak: 0.6, note: 'front of the shoulder helps lift the arms' },
     ],
-    why: 'Locked out, the bar sits over straight arms stacked on the shoulders, so little effort is needed; as it lowers, its moment arm about the shoulders grows and the chest stretches, so the bottom and the first few centimetres off the chest are hardest (the sticking region, Elliott et al. 1989). The elbow moment builds earlier in the descent than the shoulder moment, so the triceps are drawn working hard from the middle down while the chest peaks at the bottom.',
+    why: 'Locked out, the bar sits over straight arms stacked on the shoulders, so little effort is needed; lowered to the lower chest it ends about 0.07 body heights toward the feet from the shoulder joints and the chest is stretched, so the bottom is the hardest position to hold and the press is hardest just off the chest (the sticking region, Elliott et al. 1989). The forearms lean about 12 degrees toward the head from mid-way down, so the elbow\'s lever is already near its maximum half way down while the shoulder\'s is about 40% of its maximum: the triceps work hard from the middle down while the chest peaks at the bottom.',
   },
-  // Lying on a bench inclined about 30 degrees, barbell held at arm's length straight above the shoulders. -> Bar lowered to touch the upper chest below the collarbones, elbows bent to about shoulder level.
+  // Lying on a bench inclined about 32 degrees, barbell held at arm's length straight above the shoulders. -> Bar lowered to the upper chest just under the collarbones, forearms upright under it, elbows a little below shoulder level.
   'incline-bench-press': {
     profile: [0.25, 0.6, 1],
     muscles: [
       { group: 'chest', role: 'main', peak: 1, note: 'upper chest drives the arms up and in' },
       { group: 'shoulders', role: 'main', peak: 0.9, note: 'front of the shoulder lifts the arms forward and up' },
-      { group: 'triceps', role: 'assist', peak: 0.6, profile: [0.3, 0.85, 1], note: 'straighten the elbows' },
+      { group: 'triceps', role: 'assist', peak: 0.6, profile: [0.3, 1, 0.4], note: 'straighten the elbows, most through the middle of the press' },
     ],
-    why: 'Same curve as the flat press: little effort with the bar over straight arms, most at and just off the chest, where the bar\'s moment arm about the shoulders is longest. The incline turns the press toward raising the arms forward and overhead, so the front deltoids work almost as hard as the upper (clavicular) chest.',
+    why: 'For the chest and front deltoids the curve is the flat press\'s: least with the bar over straight arms, most at the chest, where the bar is furthest in front of the shoulder joints (lever 0 / 0.42 / 1 of maximum). The incline turns the press toward raising the arms forward and up, so the front deltoids work almost as hard as the upper (clavicular) chest. The forearms are drawn upright under the bar at the chest (2 degrees) and lean back only mid-way (about 7 degrees), so the elbow\'s lever is longest in the middle of the press and about a third of that at the chest: the triceps are drawn working hardest mid-press.',
   },
-  // Lying on a flat bench, dumbbells held at arm's length straight above the shoulders. -> Dumbbells lowered to the sides of the chest, elbows bent and level with the shoulders.
+  // Lying on a flat bench, dumbbells held at arm's length above the shoulders, elbows nearly straight. -> Dumbbells lowered beside the chest and level with it, forearms upright under them, elbows below shoulder level.
   'dumbbell-bench-press': {
     profile: [0.25, 0.6, 1],
     muscles: [
@@ -401,28 +401,28 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'triceps', role: 'assist', peak: 0.55, profile: [0.3, 0.85, 1], note: 'straighten the elbows' },
       { group: 'shoulders', role: 'assist', peak: 0.6, note: 'front of the shoulder helps lift and steady each arm' },
     ],
-    why: 'As with the barbell, the dumbbells are easiest to hold over straight arms and hardest at the bottom, where they sit furthest out from the shoulder joints and the chest is stretched. Each arm balances its own dumbbell, so the shoulders also steady the load, and the free hand path asks a little less of the triceps than a fixed bar.',
+    why: 'As with the barbell, the dumbbells are easiest to hold over straight arms and hardest at the bottom, where they sit furthest out from the shoulder joints (beside the chest, 0.12 body heights out to the side) and the chest is stretched; half way down the lever is under half its maximum. Each arm balances its own dumbbell, so the shoulders also steady the load. The forearms lean only 6 to 9 degrees toward the head from mid-way down, so the elbows carry a shorter lever than with the bar, roughly level from the middle to the bottom.',
   },
-  // Lying on a bench inclined about 30 degrees, dumbbells held at arm's length straight above the shoulders. -> Dumbbells lowered to the sides of the upper chest, elbows bent to about shoulder level.
+  // Lying on a bench inclined about 32 degrees, dumbbells held at arm's length above the shoulders. -> Dumbbells lowered beside the upper chest and level with it, forearms upright under them, elbows below shoulder level.
   'incline-dumbbell-press': {
     profile: [0.25, 0.6, 1],
     muscles: [
       { group: 'chest', role: 'main', peak: 1, note: 'upper chest drives the arms up and in' },
       { group: 'shoulders', role: 'main', peak: 0.9, note: 'front of the shoulder lifts the arms forward and up' },
-      { group: 'triceps', role: 'assist', peak: 0.55, profile: [0.3, 0.85, 1], note: 'straighten the elbows' },
+      { group: 'triceps', role: 'assist', peak: 0.55, profile: [0.3, 1, 0.4], note: 'straighten the elbows, most through the middle of the press' },
     ],
-    why: 'Same mechanics as the incline barbell press: least effort with the dumbbells over straight arms, most at the bottom, where they are furthest from the shoulder joints and the chest is stretched. The incline turns the press toward raising the arms forward and up, so the front deltoids share the work with the upper chest.',
+    why: 'Same mechanics as the incline barbell press: least effort with the dumbbells over straight arms, most at the bottom, where they are furthest from the shoulder joints and the chest is stretched. The incline turns the press toward raising the arms forward and up, so the front deltoids share the work with the upper chest. The forearms stand upright under the dumbbells at the bottom and lean back only mid-way, so the triceps\' lever is longest in the middle of the press and short at the bottom.',
   },
-  // Lying on the floor with knees bent and feet flat, dumbbells held at arm's length straight above the shoulders. -> Dumbbells lowered over the chest, elbows bent, upper arms angled down toward the floor (as drawn they stop a little short of it).
+  // Lying on the floor with knees bent and feet flat, dumbbells held at arm's length above the shoulders. -> Dumbbells lowered until the backs of the upper arms touch the floor about 45 degrees out from the body, elbows bent to about a right angle, forearms upright under the dumbbells.
   'dumbbell-floor-press': {
     profile: [0.25, 0.6, 1],
     muscles: [
       { group: 'chest', role: 'main', peak: 1, note: 'drives the arms up and in' },
-      { group: 'triceps', role: 'assist', peak: 0.7, profile: [0.3, 0.85, 1], note: 'straighten the elbows; a bigger share than in a bench press' },
+      { group: 'triceps', role: 'assist', peak: 0.7, profile: [0.3, 1, 0.4], note: 'straighten the elbows, most through the middle of the press' },
     ],
-    why: 'The floor stops the upper arms at about the point where a bench press sticks, so the press is hardest from the bottom, with no deeper stretch to help, and easiest locked out over the shoulders. Cutting off the deepest, most chest-dominant part of the range leaves the triceps a larger share of the work.',
+    why: 'The floor stops the upper arms level with the back, cutting off the deepest part of a bench press. The dumbbells are furthest out from the shoulder joints at the bottom, so that is the hardest position as long as the arms only touch the floor and stay loaded; locked out over the shoulders is easiest. At the floor the forearms stand upright under the dumbbells, so the elbows carry little there; the triceps\' lever is longest mid-press, where the forearms lean, and the shortened range leaves them a large share of the work.',
   },
-  // Straight-arm plank on the toes, hands under the shoulders, body straight from head to heels. -> Chest lowered to just above the floor, elbows bent back alongside the body, body still straight.
+  // Straight-arm plank on the toes, hands flat just behind the shoulders, body straight from head to heels at about 25 degrees to the floor. -> Chest lowered to just above the floor, elbows bent and pointing back about 45 degrees out from the body, body still straight.
   'push-up': {
     profile: [0.3, 0.6, 1],
     muscles: [
@@ -431,44 +431,44 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'shoulders', role: 'assist', peak: 0.55, note: 'front of the shoulder helps push' },
       { group: 'core', role: 'stabilize', peak: 0.45, note: 'keeps the body straight like a plank' },
     ],
-    why: 'The hands carry about two thirds of body weight through the whole rep (about 64% in Ebben et al. 2011). With straight arms that load runs through joints stacked under the shoulders, while lowering stretches the chest and lengthens the moment arms at the shoulders and elbows, so the bottom is hardest, as in a bench press; the abdominals hold the body straight against sagging throughout.',
+    why: 'The hands carry roughly two thirds to three quarters of body weight (about 64% measured by Ebben et al. 2011; 71% at the top rising to 76% at the bottom in this drawing). With straight arms that load runs down the arms under the shoulders. Lowering, the shoulders move ahead of the hands and the elbows bend behind them, so both levers grow and the bottom is hardest, as in a bench press; the elbow\'s lever is already near its maximum half way down. The abdominals hold the body straight against sagging throughout.',
   },
-  // Hands on a bench, arms straight, body straight from head to heels at about 45 degrees to the floor. -> Chest lowered to the bench, elbows bent, body still straight at about 25 degrees to the floor.
+  // Hands flat on a bench, arms straight and upright under the shoulders, body straight from head to heels at about 45 degrees to the floor. -> Chest lowered to the bench edge, elbows bent and pointing back with the forearms upright, body still straight at about 30 degrees to the floor.
   'incline-push-up': {
     profile: [0.3, 0.6, 1],
     muscles: [
       { group: 'chest', role: 'main', peak: 1, note: 'lowers the body, then pushes it away from the bench' },
-      { group: 'triceps', role: 'assist', peak: 0.6, profile: [0.3, 0.85, 1], note: 'straighten the elbows' },
+      { group: 'triceps', role: 'assist', peak: 0.6, profile: [0.3, 1, 0.4], note: 'straighten the elbows, most half way down' },
       { group: 'shoulders', role: 'assist', peak: 0.55, note: 'front of the shoulder helps push' },
     ],
-    why: 'Raising the hands puts less of the body weight on them than a floor push-up (Ebben et al. 2011), but the shape of the effort is the same: least with straight arms under the shoulders, most at the bottom with the chest at the bench, where the chest is stretched and the shoulder and elbow moments are longest.',
+    why: 'Raising the hands normally puts less body weight on them than a floor push-up (Ebben et al. 2011), but for the chest and front deltoids the shape is the same: least with straight arms, most at the bottom, where the shoulders have moved furthest ahead of the hands (lever about half its maximum half way down). At the bench the forearms stand upright under the elbows, so the elbow\'s lever is longest mid-way down and short at the bottom: the triceps are drawn hardest in the middle of the rep.',
   },
-  // Kneeling with the lower legs on the floor, arms straight and hands under the shoulders, body straight from knees to head. -> Chest lowered to just above the floor, elbows bent back, body still straight from the knees.
+  // Kneeling on the kneecaps with the shins raised, arms straight and hands flat just behind the shoulders, body straight from knees to head at about 33 degrees to the floor. -> Chest lowered to just above the floor, elbows bent and pointing back, body still straight from the knees.
   'knee-push-up': {
     profile: [0.3, 0.6, 1],
     muscles: [
       { group: 'chest', role: 'main', peak: 1, note: 'lowers the body, then pushes it away from the floor' },
       { group: 'triceps', role: 'assist', peak: 0.6, profile: [0.3, 0.85, 1], note: 'straighten the elbows' },
     ],
-    why: 'Pivoting on the knees puts about half of body weight on the hands instead of about two thirds (Ebben et al. 2011), but the curve is the full push-up\'s: easiest with straight arms stacked under the shoulders, hardest with the chest near the floor.',
+    why: 'Pivoting on the knees puts about half of body weight on the hands instead of about two thirds (Ebben et al. 2011), but the curve is the full push-up\'s: easiest with straight arms under the shoulders, hardest with the chest near the floor, where the shoulders are furthest ahead of the hands and the elbows most bent.',
   },
-  // Supported on parallel bars with arms almost straight, shoulders over the hands, torso leaning slightly forward, knees bent. -> Shoulders lowered to about a forearm's length above the bars, elbows bent sharply, torso leaning about 25 degrees forward (as drawn the shoulders end behind the hands and the elbows dip below the bars).
+  // Supported on parallel bars on straight arms, shoulders right over the hands, trunk upright, knees bent with the feet behind. -> Lowered until the upper arms are about level: elbows bent to about 80 degrees and pointing back, forearms nearly upright, shoulders about a forearm's length above the bars and well ahead of the hands, trunk leaning about 40 degrees forward.
   'dip': {
-    profile: [0.35, 0.65, 1],
+    profile: [0.35, 0.8, 1],
     muscles: [
       { group: 'chest', role: 'main', peak: 1, note: 'lower chest pulls the arms down and forward to lift the body' },
-      { group: 'triceps', role: 'main', peak: 0.95, profile: [0.35, 0.85, 1], note: 'straighten the elbows' },
+      { group: 'triceps', role: 'main', peak: 0.95, profile: [0.3, 0.65, 1], note: 'straighten the elbows' },
       { group: 'shoulders', role: 'assist', peak: 0.6, note: 'front of the shoulder helps drive the arms forward' },
     ],
-    why: 'The arms carry the whole body weight. At the top it runs straight down through locked arms under the shoulders, so little effort is needed; lowering, the shoulders travel forward of the hands and the elbows bend behind them, so the moment arms grow and the bottom, with the chest and front of the shoulders stretched, is hardest. The elbow moment builds earliest, and the forward lean shifts work toward the chest.',
+    why: 'The arms carry the whole body weight and the body balances over the hands. At the top it runs straight down locked arms under the shoulders. Lowering, the trunk tips forward and the shoulders travel ahead of the hands (0.10 body heights half way down, 0.14 at the bottom) while the forearms stay nearly upright (14 degrees at the bottom), so the shoulder\'s lever grows early and the elbow\'s late: half way down the chest and front deltoids are at about three quarters of their bottom demand, the triceps at about two thirds. The bottom, with the chest and front of the shoulders stretched and the elbows past a right angle, is hardest for all of them.',
   },
-  // Lying on a flat bench, dumbbells held at arm's length above the shoulders, elbows slightly bent. -> Arms opened wide out to the sides with the same slight elbow bend, dumbbells lowered to about chest height (from the side the arms look short as they point toward the camera).
+  // Lying on a flat bench, dumbbells held together over the chest on nearly straight arms, elbows softly bent. -> Arms opened wide out to the sides, upper arms just below level with the shoulders, elbows still softly bent, dumbbells about level with the shoulders (from the side the arms look short as they point toward the camera).
   'dumbbell-fly': {
     profile: [0.2, 0.7, 1],
     muscles: [
       { group: 'chest', role: 'main', peak: 1, note: 'stretches as the arms open, then hugs them back together' },
     ],
-    why: 'With the dumbbells over the shoulders the arms hold them with almost no moment arm; as the arms open, the dumbbells move out to the sides and the moment arm about the shoulders grows to its maximum at the bottom, where the chest is also longest. The fly is therefore hardest at the bottom and loses almost all tension at the top.',
+    why: 'With the dumbbells together over the chest the arms hold them with almost no moment arm (they even sit slightly inside the shoulders); as the arms open, the dumbbells move out to the sides and the moment arm about the shoulders grows to its maximum at the bottom, where the chest is also longest. Half way the lever is about 0.63 of its maximum, a little more in effort since the chest is less stretched there. The fly is therefore hardest at the bottom and loses almost all tension at the top.',
   },
   // Hinged about 70 degrees forward with a flat back and bent knees, barbell hanging at straight arms under the shoulders, overhand grip a little wider than the shoulders -> Bar rowed up in front of the knees and thighs until it touches the lower ribs, elbows bent to about 50 degrees, flared out and raised to about the level of the back; torso still hinged at 70 degrees
   'barbell-row': {
@@ -581,7 +581,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'The upper body\'s weight has its longest moment arm about the hips and lower back when the trunk is horizontal, which comes halfway through the animated range. The trunk is about 45 degrees above horizontal at the top and about 43 degrees below it at the bottom, so the lever is about 0.7 of the maximum at both ends (static estimate about 0.74, 1.0, 0.69 at the hips and 0.75, 1.0, 0.68 at the lower back).',
   },
-  // Standing tall, bar resting on the front of the shoulders at collarbone height, elbows down and in front of the bar. -> Bar pressed to straight arms overhead, over the shoulders and mid-foot.
+  // Standing tall, leaning back about 3 degrees, bar resting on the front of the shoulders at collarbone height, elbows down and a little in front of the bar. -> Bar pressed to straight arms overhead, over the shoulders and mid-foot, head through.
   'overhead-press': {
     profile: [1, 0.8, 0.3],
     restAtStart: true,
@@ -590,38 +590,38 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'triceps', role: 'assist', peak: 0.65, profile: [0.5, 1, 0.3], note: 'straighten the elbows, most as the bar passes the head' },
       { group: 'core', role: 'stabilize', peak: 0.4, note: 'braces so the lower back doesn\'t arch under the bar' },
     ],
-    why: 'Between reps the bar rests on the collarbones and front of the shoulders (NSCA: lower it to touch them), so the arms are nearly off until it leaves. Just off the shoulders the bar is furthest in front of the shoulder joints, so the press is hardest from there past the face; locked out overhead the load runs down straight, stacked arms. The elbows straighten mostly in the upper half, where the triceps take over.',
+    why: 'Between reps the bar rests on the front of the shoulders (NSCA: lower it to touch them), so the pressing muscles are nearly off until it leaves. From there to past the forehead the bar stays about 0.08 body heights in front of the shoulder joints (the lifter leans back about 6 degrees to let it pass the face) while the upper arms rise to horizontal, where the shoulder is weaker: that is the hardest stretch. As the bar comes back over the shoulders its lever vanishes and, locked out, the load runs down straight, stacked arms. The triceps work most through the middle, as the elbows flare out under the bar and straighten.',
   },
-  // Standing tall, bar resting on the front of the shoulders at collarbone height. -> Bar locked out overhead on straight arms, legs straight; the short knee dip and drive happen in the first third of the lift.
+  // Standing tall, bar resting on the front of the shoulders at collarbone height. -> Bar locked out overhead on straight arms, legs straight again; the knee dip and drive take the first 40% of the move, with the bar still on the shoulders.
   'push-press': {
-    profile: [0.45, 1, 0.3],
+    profile: [0.2, 0.3, 0.7, 1, 0.3],
     restAtStart: true,
     muscles: [
       { group: 'shoulders', role: 'main', peak: 1, note: 'press the bar the rest of the way overhead' },
-      { group: 'triceps', role: 'assist', peak: 0.65, profile: [0.5, 1, 0.3], note: 'straighten the elbows to lock out' },
-      { group: 'quads', role: 'assist', peak: 0.65, profile: [1, 0.25, 0.2], note: 'dip and drive the bar off the shoulders' },
+      { group: 'triceps', role: 'assist', peak: 0.65, note: 'straighten the elbows to lock out' },
+      { group: 'quads', role: 'assist', peak: 0.65, profile: [0.3, 1, 0.5, 0.1, 0.05], note: 'dip and drive the bar off the shoulders' },
     ],
-    why: 'The bar rests on the shoulders while the knees dip; the quads then drive up and launch it, so the legs work hardest early while the arms carry little. The shoulders and triceps take over as the bar passes the head and must press out the rest, which is where the arms work hardest; locked out overhead the load runs down straight, stacked arms.',
+    why: 'The bar rests racked on the shoulders while the knees dip (the hips drop about 5% of height) and drive (s 0 to 0.4), so the quads carry the start and fade once the legs lock; the shoulders and triceps barely work until the bar leaves the shoulders with the legs\' momentum, are hardest as it passes the head, and ease at lockout over stacked arms. Five points (s = 0, 0.25, 0.5, 0.75, 1) keep the arms cool through the dip.',
   },
-  // Standing tall, dumbbells held at shoulder height, elbows bent below them. -> Dumbbells pressed to straight arms overhead, over the shoulders.
+  // Standing tall, dumbbells at the sides of the head about chin height, palms forward, elbows out to the sides and a little forward, below the shoulders and right under the dumbbells. -> Dumbbells pressed to straight arms right over the shoulders.
   'dumbbell-shoulder-press': {
-    profile: [1, 0.8, 0.3],
+    profile: [0.7, 1, 0.3],
     muscles: [
       { group: 'shoulders', role: 'main', peak: 1, note: 'press the arms up overhead' },
-      { group: 'triceps', role: 'assist', peak: 0.6, profile: [0.5, 1, 0.3], note: 'straighten the elbows, most as the dumbbells pass the head' },
+      { group: 'triceps', role: 'assist', peak: 0.5, profile: [0.5, 1, 0.3], note: 'straighten the elbows, most through the middle of the press' },
     ],
-    why: 'Held at shoulder height with the upper arms out to the sides, the dumbbells sit furthest from the shoulder joints, so the bottom is the hardest position; pressing brings them in over the shoulders until, locked out, the load runs down straight arms. The elbows straighten mostly in the upper half, where the triceps do most of their work.',
+    why: 'The forearms stay upright under the dumbbells, so each dumbbell\'s lever about the shoulder is the upper arm\'s horizontal reach. At the start the elbows are well below the shoulders (upper arms about 53 degrees from hanging), so the dumbbells sit closer in (0.8 of the longest lever) than when the upper arms come level, about 40% of the way up; the shoulder is also weaker the higher the arm, so the hardest stretch runs from there to about two thirds of the way up. Locked out, the load runs down straight arms over the shoulders. With the forearms upright the dumbbells put little turning load on the elbows; the triceps are drawn helping to straighten them through the middle.',
   },
-  // Standing tall, dumbbells held in front of the shoulders at chin height, elbows bent and in front, palms toward the face (the turn of the arms doesn't show from the side). -> Dumbbells pressed to straight arms overhead, palms turned forward.
+  // Standing tall, dumbbells in front of the face about chin height, palms toward the face, elbows together in front of the chest (like the top of a curl); the turn of the arms doesn't show from the side. -> Dumbbells pressed to straight arms over the shoulders, palms forward, the elbows having opened out to the sides on the way.
   'arnold-press': {
-    profile: [1, 0.8, 0.3],
+    profile: [0.6, 1, 0.3],
     muscles: [
       { group: 'shoulders', role: 'main', peak: 1, note: 'turn the arms out to the sides while pressing them overhead' },
-      { group: 'triceps', role: 'assist', peak: 0.55, profile: [0.5, 1, 0.3], note: 'straighten the elbows' },
+      { group: 'triceps', role: 'assist', peak: 0.5, profile: [0.5, 1, 0.3], note: 'straighten the elbows' },
     ],
-    why: 'The press starts with the elbows in front and the palms facing in, then turns the arms out to the sides while pressing, so the front and side of the shoulder share the work through the whole range. The effort curve is the dumbbell press\'s: hardest at the bottom, where the dumbbells are furthest from the shoulder joints, easiest locked out overhead.',
+    why: 'The press starts with the elbows together in front and the palms facing in, then opens the arms out to the sides by about 45% of the way up, so the front and side of the shoulder share the work. The forearms stay upright under the dumbbells, so the lever is the upper arm\'s horizontal reach: at the start, with the elbows low and in front, it is about two thirds of its maximum, which comes as the upper arms pass level (about 40% of the way up); the hardest stretch is from there to about two thirds of the way up, and locked out overhead is easiest.',
   },
-  // Seated against the back pad, handles at shoulder height, elbows bent, weight stack resting. -> Handles pressed to straight arms overhead.
+  // Seated against a back pad reclined about 8 degrees, hands on the handles just above and in front of the shoulders (about chin height), elbows out to the sides below them, weight stack resting. -> Handles pressed straight up to straight arms, a little in front of the head.
   'machine-shoulder-press': {
     profile: [1, 0.8, 0.3],
     restAtStart: true,
@@ -629,28 +629,28 @@ export const ENGAGEMENT: Record<string, Engagement> = {
       { group: 'shoulders', role: 'main', peak: 1, note: 'press the arms up overhead' },
       { group: 'triceps', role: 'assist', peak: 0.6, profile: [0.5, 1, 0.3], note: 'straighten the elbows' },
     ],
-    why: 'The weight stack rests while the handles sit at shoulder height, so the muscles are off until it lifts; from there the press follows the dumbbell press: hardest just off the bottom, where the handles are furthest from the shoulder joints, easing to lockout overhead. The seat and back pad hold the trunk, so it needs little bracing.',
+    why: 'The weight stack rests while the handles sit at the bottom, so the muscles are off until it lifts. The handles then ride straight up a guide a constant distance in front of the shoulder joints, so what changes is how bent the arms are: just off the bottom the elbows are most bent and both joints carry long levers; as the arms straighten the guide can take the slight forward lean, and at lockout the straight arms carry the load with little muscle effort. The seat and back pad hold the trunk, so it needs little bracing.',
   },
-  // Inverted V: hands and toes on the floor, hips high and bent to about a right angle, arms and legs straight. -> Head lowered to touch the floor with the elbows bent, hips still high (as drawn the head lands behind the hands and the forearms end flat on the floor).
+  // Inverted V on the hands and the balls of the feet: hips high and sharply bent (about 65 degrees between trunk and thighs), arms and legs straight, hands ahead of the shoulders. -> Head lowered to just off the floor in front of the hands, elbows bent to about a right angle with the forearms nearly upright, shoulders moved forward past the hands, hips still high.
   'pike-push-up': {
-    profile: [0.5, 0.75, 1],
+    profile: [0.3, 0.4, 1],
     muscles: [
-      { group: 'shoulders', role: 'main', peak: 1, note: 'press the body up, arms overhead relative to the trunk' },
+      { group: 'shoulders', role: 'main', peak: 1, note: 'push the body back up from the floor' },
       { group: 'triceps', role: 'assist', peak: 0.65, profile: [0.3, 0.85, 1], note: 'straighten the elbows' },
     ],
-    why: 'With the hips piked high the hands carry about half the body weight or more, pressing in a direction close to overhead. Even at the top the arms lean forward of the shoulders, so the shoulders are already working; as the head lowers the elbows bend and the moment arms at the shoulders and elbows grow, so the bottom is hardest.',
+    why: 'The hands carry about half of body weight at the top and over 80% at the bottom, as the shoulders travel forward over and past the hands. With straight arms the load runs down the arms. Half way down the shoulders are right over the hands, so the shoulder muscles carry little turning load and the bending elbows (triceps) carry the middle of the rep; in the bottom half the shoulders move ahead of the hands with the elbows at a right angle, so the shoulders work hardest at the bottom.',
   },
-  // Handstand facing the wall with the toes against it, arms straight, body vertical. -> Head lowered to touch the floor, elbows bent past a right angle, body still upright by the wall.
+  // Handstand with the back to the wall and the heels resting on it, hands flat about a hand's length from the wall, arms straight, body nearly vertical (leaning about 6 degrees toward the wall). -> Top of the head touching the floor a little in front of the hands, elbows bent to about a right angle and pointing back toward the wall, heels slid down the wall, body leaning about 14 degrees toward it.
   'handstand-push-up': {
-    profile: [0.35, 0.7, 1],
+    profile: [0.35, 0.5, 1],
     muscles: [
       { group: 'shoulders', role: 'main', peak: 1, note: 'press the whole body up overhead' },
       { group: 'triceps', role: 'assist', peak: 0.7, profile: [0.3, 0.85, 1], note: 'straighten the elbows' },
       { group: 'core', role: 'stabilize', peak: 0.4, note: 'keeps the body straight and the lower back from arching' },
     ],
-    why: 'Upside down the arms carry the whole body weight; locked out it runs straight through stacked joints, but as the head lowers the shoulders move off the line over the hands and the elbows bend, so the moment arms grow and the bottom, head at the floor, is hardest. The elbow moment builds earliest, and the trunk braces to keep the body straight.',
+    why: 'Upside down the arms carry the whole body weight; locked out it runs straight down stacked joints. For the first half the shoulders stay nearly over the hands while the elbows bend, so the triceps carry the middle of the rep; in the second half the shoulders move ahead of the hands (0.07 body heights at the bottom) with the elbows at a right angle, so the bottom, head on the floor, is hardest for the shoulders. The trunk braces to keep the body straight against the wall.',
   },
-  // Standing tall facing the camera, dumbbells hanging at the sides, arms straight. -> Both arms raised out to the sides to shoulder height, elbows almost straight.
+  // Standing tall facing the camera, dumbbells hanging just out from the sides of the thighs, elbows soft. -> Both arms raised out to the sides to shoulder height, elbows slightly bent, hands no higher than the elbows.
   'lateral-raise': {
     profile: [0.2, 0.65, 1],
     muscles: [
@@ -658,30 +658,30 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'Hanging at the sides the dumbbells have almost no moment arm about the shoulders; as the arms rise it grows to its maximum with the arms level at shoulder height, where the shoulder\'s lifting strength is also lower, so the top is hardest.',
   },
-  // Standing tall facing the camera, working arm hanging at the side holding a handle from a low pulley on the other side, cable crossing the body. -> Working arm raised out to the side to shoulder height, cable running down across the body to the pulley.
+  // Standing tall facing the camera; the working (right) arm hangs across the front of the hips holding a handle from a low pulley on the lifter's left, the free hand holding the machine. -> Working arm raised out to the side to shoulder height, the cable running down across the body to the pulley.
   'cable-lateral-raise': {
-    profile: [0.7, 1, 0.9],
+    profile: [0.35, 0.9, 1],
     muscles: [
       { group: 'shoulders', role: 'main', peak: 1, note: 'side of the shoulder lifts the arm out against the cable' },
     ],
-    why: 'The cable pulls from a low pulley on the other side, so its moment arm about the shoulder is already about three quarters of its maximum with the arm down, peaks with the arm about halfway up and stays high to shoulder height. Unlike the dumbbell raise there is clear tension at the bottom and the effort is spread fairly evenly through the range.',
+    why: 'The cable runs from a low pulley on the other side, across the body. With the arm hanging across the front of the hips its lever about the shoulder is already about half its maximum; it is longest about half way up, where the arm is square to the cable, and still about three quarters of that at shoulder height. With the light loads used, the arm\'s own weight adds a lever that is greatest at shoulder height, where the shoulder is also weakest, so the effort keeps rising to the top. Unlike the dumbbell raise there is clear tension at the bottom.',
   },
-  // Standing tall side-on, dumbbells hanging in front of the thighs, arms straight. -> Arms raised straight in front to shoulder height.
+  // Standing tall side-on, dumbbells against the front of the thighs, arms nearly straight (elbows soft). -> Arms raised straight in front to shoulder height, upper arms about level.
   'front-raise': {
     profile: [0.2, 0.65, 1],
     muscles: [
       { group: 'shoulders', role: 'main', peak: 1, note: 'front of the shoulder lifts the arms forward' },
     ],
-    why: 'The same lever as the lateral raise, in front of the body: hanging, the dumbbells have almost no moment arm about the shoulders, and it grows to its maximum with the arms level at shoulder height, where the shoulder\'s lifting strength is also lower, so the top is hardest.',
+    why: 'The same lever as the lateral raise, in front of the body: hanging against the thighs the dumbbells have little moment arm about the shoulders, and it grows to its maximum with the arms level at shoulder height, where the shoulder\'s lifting strength is also lower, so the top is hardest.',
   },
-  // Facing the camera, hinged forward about 65 degrees with a flat back and soft knees, dumbbells hanging straight down under the shoulders. -> Arms raised out to the sides until level with the shoulders, elbows almost straight.
+  // Facing the camera, hinged forward about 65 degrees with a flat back and soft knees, dumbbells hanging straight down under the shoulders. -> Arms raised out to the sides until level with the back, elbows slightly bent.
   'rear-delt-fly': {
     profile: [0.2, 0.65, 1],
     muscles: [
       { group: 'shoulders', role: 'main', peak: 1, note: 'rear of the shoulder sweeps the arms out and back' },
       { group: 'back', role: 'assist', peak: 0.6, profile: [0.45, 0.7, 1], note: 'squeezes the shoulder blades together; the lower back holds the hinge' },
     ],
-    why: 'Bent over, the dumbbells hang straight down under the shoulders with almost no moment arm; raising them out to the sides moves them away from the shoulder joints until, level with the shoulders, the moment arm is longest and the rear deltoid shortest, so the top is hardest. The middle trapezius and rhomboids pull the shoulder blades together as the arms open, and the lower back holds the hinged trunk still from the start.',
+    why: 'Bent over, the dumbbells hang straight down under the shoulders with almost no moment arm; raising them out to the sides moves them away from the shoulder joints until, level with the back, the moment arm is longest and the rear deltoid shortest, so the top is hardest. The middle trapezius and rhomboids pull the shoulder blades together as the arms open, and the lower back holds the hinged trunk still from the start.',
   },
   // Standing tall side-on, knees soft, arms straight with the upper arms angled about 15 degrees forward so the barbell, held palms up, rests against the front of the upper thighs. -> Elbows bent about 140 degrees and drifted a little further forward (upper arms about 20 degrees ahead of the trunk), bar curled to just in front of the shoulders, forearms only about 20 degrees from vertical.
   'barbell-curl': {
@@ -747,32 +747,32 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'At the start the band runs straight along the forearms and is barely stretched, so there is next to no load. As the hands rise the band stretches to about 1.75 times its starting length and pulls harder, while its lever about the elbows is longest around level; with the pull rising and the flexors shortening, effort peaks in the top third and stays close to that at the top.',
   },
-  // Lying on a flat bench, barbell held with a shoulder-width grip at arm's length straight above the shoulders. -> Bar lowered to the lower chest, elbows bent and tucked close to the sides.
+  // Lying on a flat bench, barbell held with a shoulder-width grip at arm's length straight above the shoulders. -> Bar lowered to the bottom of the chest, elbows tucked close to the sides and travelling toward the hips, a little below shoulder level.
   'close-grip-bench-press': {
     profile: [0.25, 0.6, 1],
     muscles: [
-      { group: 'triceps', role: 'main', peak: 1, profile: [0.3, 0.85, 1], note: 'straighten the elbows from a deep bend' },
+      { group: 'triceps', role: 'main', peak: 1, profile: [0.3, 1, 0.7], note: 'straighten the elbows, most through the middle of the press' },
       { group: 'chest', role: 'main', peak: 0.9, note: 'drives the arms up from the chest' },
       { group: 'shoulders', role: 'assist', peak: 0.6, note: 'front of the shoulder lifts the tucked arms' },
     ],
-    why: 'As in any bench press the bar is easiest to hold over straight arms and hardest at and just off the chest. The narrow grip and tucked elbows bend the elbows further and lengthen the elbow moment, so the triceps become a main mover and work hard from the middle of the range down, while the chest peaks at the bottom.',
+    why: 'As in any bench press the bar is easiest to hold over straight arms and hardest at the chest, where it is furthest from the shoulder joints (lever 0 / 0.42 / 1 of maximum). With the hands at shoulder width and the elbows tucked, the elbows travel further toward the hips and the forearms lean back toward the head by about 20 degrees mid-way (12 at the chest), so the elbow\'s lever is longest in the middle of the press and still about 0.7 of that at the chest: the triceps lead through the middle while the chest peaks at the bottom.',
   },
-  // Hands on the edge of a bench behind the hips, arms straight, legs straight out in front with the heels toward the floor (as drawn they hover just above it at the top). -> Hips lowered below the bench top just in front of it, elbows bent past a right angle and pointing back, heels reaching the floor.
+  // Hands on the front edge of a bench behind the hips, arms straight, trunk upright, legs nearly straight out in front with the heels on the floor. -> Hips lowered straight down to below the bench top, close in front of it, elbows bent to a right angle and pointing back, heels still on the floor.
   'bench-dip': {
-    profile: [0.3, 0.85, 1],
+    profile: [0.3, 0.7, 1],
     muscles: [
       { group: 'triceps', role: 'main', peak: 1, note: 'straighten the elbows to lift the body' },
     ],
-    why: 'The hands carry most of the body weight and the heels the rest. With straight arms it passes through stacked joints, but as the hips lower the elbows bend behind the hands and the elbow moment arm grows quickly, so the effort climbs steeply through the first half and is greatest at the bottom.',
+    why: 'The hands carry about 70% of body weight and the heels the rest. With the arms straight the elbows are locked and the load presses them straight, so the triceps hold little; as the hips drop the elbows bend back behind the hands and the elbow\'s lever grows steadily, to about 0.7 of its maximum half way down and most at the bottom, where the elbows reach a right angle. The shoulders stay a constant 0.11 body heights ahead of the hands, so the front of the shoulder carries a large, steady load the whole way.',
   },
-  // Straight-arm plank on the toes with the hands together under the chest, body straight from head to heels. -> Chest lowered to just above the hands, elbows bent back alongside the body, body still straight.
+  // Straight-arm plank on the toes with the hands together under the chest, body straight from head to heels at about 24 degrees to the floor. -> Chest lowered to just above the hands, elbows tucked along the ribs and pointing back, body still straight.
   'diamond-push-up': {
     profile: [0.3, 0.85, 1],
     muscles: [
       { group: 'triceps', role: 'main', peak: 1, note: 'straighten the elbows; the narrow hands make them lead' },
-      { group: 'chest', role: 'assist', peak: 0.65, profile: [0.3, 0.6, 1], note: 'helps push the body away from the floor' },
+      { group: 'chest', role: 'assist', peak: 0.65, note: 'helps push the body away from the floor' },
     ],
-    why: 'The hands carry about two thirds of body weight, as in a standard push-up, but with them together under the chest the elbows bend further and sit further behind the hands, so the elbow moment is larger and builds early in the descent: the triceps lead and are hardest pressed at the bottom. The chest helps most at the bottom, where it is stretched.',
+    why: 'The hands carry about three quarters of body weight, as in a standard push-up. With them together under the chest the forearms slant in from the elbows to the hands and the shoulders sit further ahead of the hands, so both the elbow and the shoulder levers are longer than in a standard push-up; both build steadily from straight arms to the bottom (about 0.8 of their maximum half way down), so the triceps and chest share one curve.',
   },
   // Standing tall side-on, knees soft, one dumbbell held on end overhead in both cupped hands, arms almost straight and pointing up just forward of vertical beside the head. -> Upper arms still pointing up, elbows bent about 120 degrees (a 60-degree angle at the elbow), forearms tipped back to about 20 degrees below level, dumbbell behind the head at about ear height.
   'overhead-dumbbell-extension': {
@@ -782,13 +782,13 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'With the arms almost straight the dumbbell sits on top of the forearms, so the triceps do little. As the forearms tip back behind the head its lever about the elbows grows, is longest with the forearms level (about 85% of the way down) and is still about 95% of that at the bottom, where the forearms are only about 20 degrees below level; the long head is also at its longest there, with the arms overhead and the elbows bent, so the bottom is the hardest point.',
   },
-  // Lying on a flat bench, EZ bar held at arm's length above the chin, upper arms tilted slightly toward the head. -> Elbows bent to a right angle with the upper arms still, bar lowered to just past the top of the head.
+  // Lying on a flat bench, EZ bar held on straight arms above the face, upper arms tilted about 12 degrees toward the head. -> Upper arms unchanged, elbows bent well past a right angle (about 115 degrees of bend), bar lowered beyond the forehead, just clear of the top of the head.
   'skull-crusher': {
-    profile: [0.2, 0.85, 1],
+    profile: [0.35, 1, 0.8],
     muscles: [
       { group: 'triceps', role: 'main', peak: 1, note: 'straighten the elbows; the long head also holds the upper arms still' },
     ],
-    why: 'With straight arms the bar sits almost over the elbows, so the triceps do little. As the forearms lower toward horizontal the bar\'s moment arm about the elbows grows quickly, to about 80% of its maximum by halfway, and peaks with the elbows bent to a right angle at the bottom, the hardest position.',
+    why: 'The upper arms lean about 12 degrees toward the head, so even with straight arms the bar sits a little behind the elbows and the triceps already hold it (about a quarter of the largest lever, near full extension where they are weakest). The lever grows as the forearms lower and is longest as they pass horizontal, about two thirds of the way down; at the bottom the forearms point about 38 degrees below horizontal toward the head, so the lever is back to about 80% of its maximum. The middle of the range is the hardest.',
   },
   // Standing close under a high pulley, knees soft, leaning forward about 15 degrees from the hips, elbows pinned at the sides and bent about 100 degrees (forearms just above level), bar at about the bottom of the ribs with the cable hanging straight down onto it. -> Elbows straight, bar pushed down to the front of the upper thighs, upper arms still at the sides; the cable now slants slightly forward up to the pulley.
   'triceps-pushdown': {

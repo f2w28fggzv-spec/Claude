@@ -19,9 +19,11 @@ export type MuscleRole = 'main' | 'assist' | 'stabilize';
 /**
  * Demand on the moving muscles when holding the load still at movement
  * progress s = 0 (start), 0.5 and 1 (turnaround): 0 = resting, 1 = the
- * hardest position of the range.
+ * hardest position of the range. Five points (s = 0, 0.25, 0.5, 0.75, 1)
+ * when the effort shifts within the rep, as in a push press (the legs drive
+ * before the arms press).
  */
-export type Profile = readonly [number, number, number];
+export type Profile = readonly [number, number, number] | readonly [number, number, number, number, number];
 
 export interface MuscleUse {
   group: MuscleGroup;
@@ -73,10 +75,11 @@ const smooth = (u: number) => {
 };
 const mixN = (a: number, b: number, t: number) => a + (b - a) * t;
 
-/** Demand at progress s: a smooth curve through the three profile points, never overshooting them. */
+/** Demand at progress s: a smooth curve through the evenly spaced profile points, never overshooting them. */
 export function demandAt(profile: Profile, s: number): number {
-  const x = clamp01(s);
-  return x <= 0.5 ? mixN(profile[0], profile[1], smooth(x * 2)) : mixN(profile[1], profile[2], smooth(x * 2 - 1));
+  const pos = clamp01(s) * (profile.length - 1);
+  const i = Math.min(profile.length - 2, Math.floor(pos));
+  return mixN(profile[i], profile[i + 1], smooth(pos - i));
 }
 
 export type RepPhase = 'start' | 'out' | 'far' | 'back' | 'hold';

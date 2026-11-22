@@ -8,6 +8,13 @@ import { progressAt, timeline } from '../src/demo/timeline';
 const byId = (id: string) => EXERCISES.find((e) => e.id === id)!;
 
 describe('demand curve', () => {
+  it('runs through five points when the effort shifts within the rep', () => {
+    const p = [0.3, 1, 0.5, 0.1, 0.05] as const;
+    for (const [s, v] of [[0, 0.3], [0.25, 1], [0.5, 0.5], [0.75, 0.1], [1, 0.05]] as const) expect(demandAt(p, s)).toBeCloseTo(v);
+    expect(demandAt(p, 0.375)).toBeGreaterThan(0.5);
+    expect(demandAt(p, 0.375)).toBeLessThan(1);
+  });
+
   it('passes through the three profile points and never overshoots them', () => {
     const p = [0.3, 1, 0.5] as const;
     expect(demandAt(p, 0)).toBeCloseTo(0.3);
