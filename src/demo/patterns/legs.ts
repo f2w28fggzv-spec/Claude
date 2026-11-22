@@ -11,13 +11,13 @@ import { O, FLOOR, LEG_LEN, HANG, FWD, DOWN, handProp, type Implement } from './
 // the bar for barbell squats, the whole body (plus anything held) otherwise.
 
 /** The middle of a flat foot, ahead of the ankle (heel to toe). */
-export const MIDFOOT = (L.foot - L.heel) / 2;
+const MIDFOOT = (L.foot - L.heel) / 2;
 
 /** Segment masses as a share of body mass (Winter 2009). */
 const MASS = { head: 0.081, trunk: 0.497, upperArm: 0.028, forearm: 0.016, hand: 0.006, thigh: 0.1, shank: 0.0465, foot: 0.0145 };
 
 /** Centre of mass of the body plus held loads (`share` = load mass / body mass). */
-export function centreOfMass(f: Figure, loads: { at: Vec; share: number }[] = []): Vec {
+function centreOfMass(f: Figure, loads: { at: Vec; share: number }[] = []): Vec {
   const parts: [number, Vec][] = [
     [MASS.head, f.head],
     [MASS.trunk, lerpV(lerpV(f.a.hip, f.b.hip, 0.5), lerpV(f.a.shoulder, f.b.shoulder, 0.5), 0.5)],
@@ -216,8 +216,10 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
   const kneeR = { x: hipB.x - Math.sqrt(L.thigh ** 2 - (kneeY - hipB.y) ** 2), y: kneeY };
   // A low flat bench (about 40 cm).
   const benchTop = FLOOR - 0.23;
-  let rearAt: (s: number) => { ankle: Vec; foot: number };
+  type Foot = { ankle: Vec; foot: number };
+  let rearAt: (s: number) => Foot;
   let hipAt: (s: number) => Vec;
+  let frontAt = (_s: number): Foot => ({ ankle: O, foot: 90 });
   if (bench) {
     // Laces on the bench, ankle just past its front edge; the foot stays put.
     const y = benchTop - 0.025;
@@ -236,30 +238,26 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
     const ankleTop = sub(toe, toeFrom(footTop));
     // Top of the split stance: both knees nearly straight.
     const hipTop = circlesMeet(O, LEG_LEN * 0.985, ankleTop, LEG_LEN * 0.985);
-    const onToes = (u: number) => {
-      const foot = lerp(footTop, footB, u);
-      return { ankle: sub(toe, toeFrom(foot)), foot };
-    };
+    // The back foot pivots on its toes from `footTop` (heel low) to `footB` (heel high).
+    const toes = (foot: number): Foot => ({ ankle: sub(toe, toeFrom(foot)), foot });
+    const onToes = (u: number) => toes(lerp(footTop, footB, u));
     const split = (u: number) => lerpV(hipTop, hipB, u);
-    const a = 0.4; // share of the way out spent stepping
+    const a = o.step ? 0.4 : 0; // share of the way out spent stepping
+    const lower = (u: number) => (u - a) / (1 - a);
     if (o.step === 'back') {
       // Standing on both feet, then the back foot reaches back and lands on its toes.
       const stand = { x: 0.005, y: -LEG_LEN * 0.998 };
-      rearAt = (s) => (s >= a ? onToes((s - a) / (1 - a)) : stepFoot({ ankle: O, foot: 90 }, onToes(0), s / a, 0.035));
-      hipAt = (s) => (s >= a ? split((s - a) / (1 - a)) : lerpV(stand, hipTop, smooth(s / a)));
+      rearAt = (s) => (s >= a ? onToes(lower(s)) : stepFoot({ ankle: O, foot: 90 }, onToes(0), s / a, 0.035));
+      hipAt = (s) => (s >= a ? split(lower(s)) : lerpV(stand, hipTop, smooth(s / a)));
     } else if (o.step === 'forward') {
       // Standing with the feet together behind; the front foot steps forward while the back heel rises.
       const start = sub(toe, toeFrom(90));
       const stand = { x: start.x + 0.005, y: -LEG_LEN * 0.998 };
-      rearAt = (s) => (s >= a ? onToes((s - a) / (1 - a)) : (() => {
-        const foot = lerp(90, footTop, smooth(s / a));
-        return { ankle: sub(toe, toeFrom(foot)), foot };
-      })());
-      hipAt = (s) => (s >= a ? split((s - a) / (1 - a)) : lerpV(stand, hipTop, smooth(s / a)));
-      const frontAt = (s: number) => (s >= a ? { ankle: O, foot: 90 } : stepFoot({ ankle: start, foot: 90 }, { ankle: O, foot: 90 }, s / a, 0.05));
-      return lungeDemo(o, imp, hipAt, rearAt, frontAt, undefined);
+      rearAt = (s) => (s >= a ? onToes(lower(s)) : toes(lerp(90, footTop, smooth(s / a))));
+      hipAt = (s) => (s >= a ? split(lower(s)) : lerpV(stand, hipTop, smooth(s / a)));
+      frontAt = (s) => (s >= a ? { ankle: O, foot: 90 } : stepFoot({ ankle: start, foot: 90 }, { ankle: O, foot: 90 }, s / a, 0.05));
     } else {
-      rearAt = (s) => onToes(s);
+      rearAt = onToes;
       hipAt = split;
     }
   }
@@ -270,7 +268,7 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
         return { kind: 'bench', points: [{ x: edge - 0.3, y }, { x: edge, y }] };
       })()
     : undefined;
-  return lungeDemo(o, imp, hipAt, rearAt, () => ({ ankle: O, foot: 90 }), pad);
+  return lungeDemo(o, imp, hipAt, rearAt, frontAt, pad);
 }
 
 function lungeDemo(
@@ -437,6 +435,7 @@ function restingPad(pose: (s: number) => DemoPose, a: Vec, b: Vec, skip?: RegExp
       if (t >= 0 && t <= len && h > -0.04) nearest = Math.min(nearest, h);
     }
   }
+  if (!Number.isFinite(nearest)) return [a, b];
   const shift = mul(n, nearest - PAD_HALF - 0.002);
   return [add(a, shift), add(b, shift)];
 }
@@ -449,7 +448,7 @@ function crossing(a1: Vec, b1: Vec, a2: Vec, b2: Vec): Vec {
   return add(a1, mul(d1, t));
 }
 
-/** Knee-to-hip distance for a hip-to-ankle span with the knee bent to `deg`. */
+/** Hip-to-ankle distance with the knee bent to `deg` (180 = straight). */
 const legSpan = (deg: number) => Math.sqrt(L.thigh ** 2 + L.shin ** 2 - 2 * L.thigh * L.shin * Math.cos((deg * Math.PI) / 180));
 
 /** How far along `u` from p the distance to the origin reaches r. */
@@ -518,11 +517,9 @@ export function hackSquat(): Demo {
   // Bottom: thighs parallel to the platform, shins tilted forward.
   const kneeB = along(O, 14, L.shin);
   const hipB = along(kneeB, foot + 180, L.thigh);
-  // Top: slid up the rails until the knees are nearly straight.
+  // Top: slid up the rails until the knees are nearly straight (about 165°).
   const up = dir(torso);
-  const b = hipB.x * up.x + hipB.y * up.y;
-  const reach = LEG_LEN * 0.985;
-  const travel = -b + Math.sqrt(b * b - (hipB.x ** 2 + hipB.y ** 2 - reach ** 2));
+  const travel = outTo(hipB, up, legSpan(165));
   const hipTop = add(hipB, mul(up, travel));
   const pose = (s: number): DemoPose => {
     const hip = lerpV(hipTop, hipB, s);
