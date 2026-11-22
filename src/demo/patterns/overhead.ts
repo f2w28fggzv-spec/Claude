@@ -141,6 +141,22 @@ function palmArm(shoulder: Vec, palm: Vec, hand: number, toward: Vec, out: numbe
 /** How far to the side the elbow of a straight arm sits when its wrist is `out` to the side of the shoulder. */
 const straightOut = (out: number) => (out * L.upperArm) / (L.upperArm + L.forearm);
 
+/** Shoulder to wrist with the arm straight, as the side view sees it (wrist `out` to the side). */
+const straightReach = (out: number) => L.upperArm * seen(L.upperArm, straightOut(out)) + L.forearm * seen(L.forearm, out - straightOut(out));
+
+/**
+ * How far out to the side the elbow of a palm-on-the-floor arm must flare for
+ * its forearm to point `fore` degrees on screen (elbow to wrist, e.g. 180 =
+ * straight down): the forearms stand upright over the hands at the bottom of
+ * a push-up while the upper arms point back and out.
+ */
+function flareFor(shoulder: Vec, palm: Vec, hand: number, toward: Vec, out: number, fore: number): number {
+  const off = (elbowOut: number) => Math.abs(((palmArm(shoulder, palm, hand, toward, out, elbowOut).fore - fore + 540) % 360) - 180);
+  let best = straightOut(out);
+  for (let e = straightOut(out); e < L.upperArm * 0.9; e += 0.002) if (off(e) < off(best)) best = e;
+  return best;
+}
+
 // ── Standing ─────────────────────────────────────────────────────────────
 
 /**
@@ -325,8 +341,8 @@ const headLow = (pose: DemoPose) =>
 export function pikePushUp(): Demo {
   const ball: Vec = { x: 0, y: FLOOR };
   // Hands to the balls of the feet: feet walked in toward the hands.
-  const palm: Vec = { x: 0.5, y: FLOOR - BODY.hand / 2 };
-  const out = 0.03; // hands a little wider than the shoulders
+  const palm: Vec = { x: Number(process.env.PK_D ?? 0.45), y: FLOOR - BODY.hand / 2 };
+  const out = 0.05; // hands a little wider than the shoulders
   const wrist = along(palm, 270, PALM);
   // The foot keeps this angle to the shin (heels up, about 20° pointed), pivoting on the ball.
   const footFor = (legDeg: number) => legDeg + 110;
@@ -349,14 +365,14 @@ export function pikePushUp(): Demo {
       at: hip,
     };
   };
-  // Top: arms straight, leaning back toward the feet in line with the trunk.
-  const straight = L.upperArm * seen(L.upperArm, straightOut(out)) + L.forearm * seen(L.forearm, out - straightOut(out)) - 0.002;
-  const top = along(wrist, -22, straight);
-  // Bottom: shoulders just ahead of the hands, lowered until the head is just off the floor.
-  const elbowLow = 0.07;
-  const bottomX = wrist.x + 0.035;
-  const bottomY = solveFor(top.y, FLOOR, (y) => headLow(build({ x: bottomX, y }, elbowLow)), FLOOR - HEAD_CLEAR);
+  // Top: arms straight, leaning back toward the feet.
+  const top = along(wrist, -Number(process.env.PK_T ?? 18), straightReach(out) - 0.002);
+  // Bottom: shoulders ahead of the hands, lowered until the head is just off the floor; the elbows
+  // flare back and out just enough for the forearms to stand over the hands.
+  const bottomX = wrist.x + Number(process.env.PK_A ?? 0.1);
+  const bottomY = solveFor(top.y, FLOOR, (y) => headLow(build({ x: bottomX, y }, straightOut(out))), FLOOR - HEAD_CLEAR);
   const bottom = { x: bottomX, y: bottomY };
+  const elbowLow = flareFor(bottom, palm, 90, { x: -1, y: -0.5 }, out, 172);
   return {
     view: 'side',
     pose: (s) => build(lerpV(top, bottom, s), lerp(straightOut(out), elbowLow, s)),
