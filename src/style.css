@@ -545,9 +545,11 @@ progress { width: 100%; height: 10px; accent-color: var(--accent); margin: 8px 0
 .dm-key { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.72rem; }
 .dm-key i { display: block; width: 54px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--an-muscle), var(--amber) 22%, var(--orange) 50%, var(--flame) 76%, var(--red)); }
 .demo-muscles ul { list-style: none; padding: 0; margin: 0; }
-.demo-muscles li { display: grid; grid-template-columns: 6.2em 4.6em 1fr; align-items: center; gap: 8px; min-height: 30px; font-size: 0.92rem; }
-.dm-name { font-weight: 600; }
-.dm-role { color: var(--muted); font-size: 0.8rem; }
+.demo-muscles li { display: grid; grid-template-columns: minmax(8.5em, auto) 1fr; align-items: center; column-gap: 10px; padding: 5px 0; font-size: 0.92rem; }
+.demo-muscles li + li { border-top: 1px solid var(--line); }
+.dm-name { font-weight: 650; white-space: nowrap; }
+.dm-role { color: var(--muted); font-size: 0.78rem; font-weight: 500; margin-left: 4px; }
+.dm-what { grid-column: 1 / -1; color: var(--muted); font-size: 0.82rem; line-height: 1.35; margin-top: 1px; }
 .dm-bar { position: relative; height: 8px; border-radius: 4px; background: var(--raised); overflow: hidden; }
 .dm-bar i { position: absolute; inset: 0; transform-origin: left; border-radius: 4px; }
 .dm-note { margin: 6px 0 0; line-height: 1.4; }

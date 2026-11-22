@@ -46,8 +46,9 @@ function MuscleLegend({ muscles, levels, bars }: { muscles: MuscleUse[]; levels:
       <ul>
         {muscles.map((m, i) => (
           <li>
-            <span class="dm-name">{MUSCLE_LABELS[m.group]}</span>
-            <span class="dm-role">{ROLE_LABEL[m.role]}</span>
+            <span class="dm-name">
+              {MUSCLE_LABELS[m.group]} <span class="dm-role">{ROLE_LABEL[m.role]}</span>
+            </span>
             <span class="dm-bar" aria-hidden="true">
               <i
                 ref={(el) => {
@@ -56,10 +57,11 @@ function MuscleLegend({ muscles, levels, bars }: { muscles: MuscleUse[]; levels:
                 style={{ transform: `scaleX(${levels[m.group].toFixed(3)})`, background: engageColour(levels[m.group]) }}
               />
             </span>
+            {m.note && <span class="dm-what">{m.note}</span>}
           </li>
         ))}
       </ul>
-      <p class="muted small dm-note">Brighter and longer means working harder at that point of the rep. A guide to typical muscle use, not a measurement.</p>
+      <p class="muted small dm-note">Hotter and longer means working harder at that point of the rep. Main muscles move the weight, others assist or hold you steady. A guide to typical muscle use, not a measurement.</p>
     </div>
   );
 }
