@@ -145,16 +145,38 @@ const straightOut = (out: number) => (out * L.upperArm) / (L.upperArm + L.forear
 const straightReach = (out: number) => L.upperArm * seen(L.upperArm, straightOut(out)) + L.forearm * seen(L.forearm, out - straightOut(out));
 
 /**
- * How far out to the side the elbow of a palm-on-the-floor arm must flare for
- * its forearm to point `fore` degrees on screen (elbow to wrist, e.g. 180 =
- * straight down): the forearms stand upright over the hands at the bottom of
- * a push-up while the upper arms point back and out.
+ * The same arm with the elbow flaring out to the side just as far as it takes
+ * for the forearm to point `fore` degrees on screen (elbow to wrist; 180 =
+ * straight down): the forearms stay over the hands while the upper arms point
+ * back and out. Where no flare gives that forearm, the nearest one.
  */
-function flareFor(shoulder: Vec, palm: Vec, hand: number, toward: Vec, out: number, fore: number): number {
-  const off = (elbowOut: number) => Math.abs(((palmArm(shoulder, palm, hand, toward, out, elbowOut).fore - fore + 540) % 360) - 180);
+function palmArmToward(shoulder: Vec, palm: Vec, hand: number, toward: Vec, out: number, fore: number): Arm {
+  const arm = (e: number) => palmArm(shoulder, palm, hand, toward, out, e);
+  const off = (e: number) => ((arm(e).fore - fore + 540) % 360) - 180;
+  // Only flares that still let the hand reach the floor (more flare makes the arm shorter on screen).
+  const reaches = (e: number) => {
+    const fs = seen(L.forearm, out - e);
+    return dist(shoulder, along(palm, hand + 180, PALM * fs)) <= L.upperArm * seen(L.upperArm, e) + L.forearm * fs;
+  };
+  const step = 0.003;
   let best = straightOut(out);
-  for (let e = straightOut(out); e < L.upperArm * 0.9; e += 0.002) if (off(e) < off(best)) best = e;
-  return best;
+  for (let e = best; e + step < L.upperArm * 0.92 && reaches(e + step); e += step) {
+    const a = off(e);
+    const b = off(e + step);
+    // The first flare where the forearm swings past the target: home in on it.
+    if (Math.sign(a) !== Math.sign(b) && Math.abs(a - b) < 90) {
+      let lo = e;
+      let hi = e + step;
+      for (let k = 0; k < 30; k++) {
+        const mid = (lo + hi) / 2;
+        if (Math.sign(off(mid)) === Math.sign(a)) lo = mid;
+        else hi = mid;
+      }
+      return arm((lo + hi) / 2);
+    }
+    if (Math.abs(b) < Math.abs(off(best))) best = e + step;
+  }
+  return arm(best);
 }
 
 // ── Standing ─────────────────────────────────────────────────────────────
@@ -188,7 +210,7 @@ const BAR_LOAD = 0.5;
 /** Fists just outside the shoulders: this far out to the side of the shoulder joints. */
 const BAR_OUT = 0.035;
 /** Bar resting on the front delts by the collarbones: this far in front of and above the shoulder joint. */
-const RACK = { fwd: 0.062, up: 0.016 };
+const RACK = { fwd: 0.08, up: 0.024 };
 /** The bar locked out overhead: shoulder joint to bar with the elbows at 176°, as the side view sees it. */
 const LOCKED = Math.sqrt(L.upperArm ** 2 + REACH ** 2 + 2 * L.upperArm * REACH * Math.cos(rad(4)) - BAR_OUT ** 2);
 
@@ -215,9 +237,9 @@ function barbellPress(dip: boolean): Demo {
   const lean = dip
     ? curve([[0, 0], [0.25, -3], [0.5, -2.5], [0.8, 0], [1, 1]])
     : curve([[0, -3], [0.2, -6], [0.45, -6], [0.75, -1], [1, 1]]);
-  const neck = curve([[0, 0], [0.15, -8], [0.4, -11], [0.6, -3], [0.85, 6], [1, 6]]);
+  const neck = curve([[0, 0], [0.15, -6], [0.4, -8], [0.6, -2], [0.85, 6], [1, 6]]);
   // Forearms: elbows a little in front of the bar on the shoulders, under it once it moves.
-  const tilt = (p: number) => lerp(-12, 0, ramp(p, 0, 0.4));
+  const tilt = (p: number) => lerp(-8, 0, ramp(p, 0, 0.4));
 
   type Place = (shoulder: Vec, torso: number) => Vec;
   const onShoulders: Place = (sh, torso) => local(sh, torso, RACK.fwd, RACK.up);
@@ -267,7 +289,7 @@ function dumbbellPress(arnold: boolean): Demo {
   const up0 = arnold ? 0.045 : 0.07;
   const up1 = L.upperArm + REACH - 0.0005;
   // The upper arms' plane: straight ahead to the scapular plane (Arnold), or in the scapular plane.
-  const plane = arnold ? (s: number) => lerp(100, 30, ramp(s, 0, 0.6)) : () => 30;
+  const plane = arnold ? (s: number) => 30 + 70 * (1 - clamp01(s / 0.45)) ** 2 : () => 30;
   const hand = (s: number) => overElbow(lerp(up0, up1, s), plane(s));
   const build = (hipX: number, s: number): DemoPose => {
     const { leg, shoulder } = standingAt(hipX, 0);
@@ -281,14 +303,14 @@ function dumbbellPress(arnold: boolean): Demo {
 /**
  * Seated shoulder press machine, side view: back against the upright pad,
  * feet flat, hands on the handles just above and in front of the shoulders,
- * elbows out to the sides under them. The handles ride a carriage straight up
- * the machine's guide rail (beside the lifter), pressed to straight arms a
- * little in front of the head.
+ * elbows out to the sides under them. The handles sit on a carriage that
+ * rides straight up a guide column standing in front of the seat, pressed to
+ * straight arms a little in front of the head.
  */
 function machinePress(): Demo {
   const torso = -8; // back pad reclined a little
   const shoulder = along(O, torso, L.torso);
-  // Handles: wider than the shoulders, about chin high at the bottom; the rail runs straight up through them.
+  // Handles wider than the shoulders, about chin high at the bottom, pressed straight up.
   const out = 0.07;
   const bottom = add(shoulder, { x: 0.065, y: -0.05 });
   const reach = Math.sqrt(L.upperArm ** 2 + REACH ** 2 + 2 * L.upperArm * REACH * Math.cos(rad(4)) - out ** 2);
@@ -298,25 +320,30 @@ function machinePress(): Demo {
   const floor = L.shin + L.ankleHeight;
   const pose = (s: number): DemoPose => {
     const grip = lerpV(bottom, top, s);
+    // Forearms upright under the handles, leaning with the straight arm at lockout.
     return { torso, head: torso, leg, arm: barArm(shoulder, grip, out, lerp(0, lockTilt, ramp(s, 0.5, 1))), anchor: 'hip', at: O };
   };
   // Back pad behind the trunk and up behind the head; the seat under the thighs.
   const behind = mul(dir(torso - 90), BODY.torsoBack + 0.023);
   const [b0, b1] = restingPad(pose, add(along(O, torso, 0.5), behind), add(along(O, torso, 0.03), behind), /hand|forearm|upper arm/);
   const [s0, s1] = restingPad(pose, { x: -0.08, y: BODY.thighBack + 0.023 }, { x: 0.17, y: BODY.thighBack + 0.023 }, /hand|forearm|upper arm/);
-  const rail = bottom.x;
+  const seatX = (s0.x + s1.x) / 2;
+  const backPost = lerpV(b0, b1, 0.6);
+  // The guide column stands on the base in front of the toes; the carriage arm reaches back from it to the handles.
+  const column = L.thigh + L.foot + 0.07;
+  const arm = column - bottom.x;
   const props: Prop[] = [
-    // The guide rail beside the lifter, from the base frame to above the lockout, and the base along the floor.
-    { kind: 'line', from: { x: rail, y: floor - 0.01 }, to: { x: rail, y: top.y - 0.1 }, width: 0.026 },
-    { kind: 'line', from: { x: b0.x - 0.06, y: floor - 0.008 }, to: { x: rail + 0.06, y: floor - 0.008 }, width: 0.016 },
+    { kind: 'line', from: { x: b1.x - 0.05, y: floor - 0.008 }, to: { x: column + 0.05, y: floor - 0.008 }, width: 0.016 },
+    { kind: 'line', from: { x: column, y: floor - 0.01 }, to: { x: column, y: top.y - 0.08 }, width: 0.034 },
     // Seat post, and the back pad's post down to the base.
-    { kind: 'line', from: { x: (s0.x + s1.x) / 2, y: s0.y }, to: { x: (s0.x + s1.x) / 2, y: floor - 0.01 }, width: 0.026 },
-    { kind: 'line', from: b0, to: { x: b0.x - 0.06, y: floor - 0.01 }, width: 0.026 },
+    { kind: 'line', from: { x: seatX, y: s0.y }, to: { x: seatX, y: floor - 0.01 }, width: 0.026 },
+    { kind: 'line', from: add(backPost, mul(dir(torso - 90), 0.02)), to: { x: b1.x - 0.05, y: floor - 0.01 }, width: 0.026 },
     { kind: 'bench', points: [b0, b1], legs: false },
     { kind: 'bench', points: [s0, s1], legs: false },
-    // The carriage on the rail, and the handle across it under the fist (neutral grip, seen from the side).
-    { kind: 'attached', at: 'wrist', from: { x: 0, y: -0.045 }, to: { x: 0, y: 0.045 }, width: 0.034 },
-    { kind: 'attached', at: 'wrist', from: { x: -0.045, y: 0 }, to: { x: 0.045, y: 0 }, width: 0.02 },
+    // The carriage: its sleeve on the column, the arm back to the handle (seen end-on under the fist).
+    { kind: 'attached', at: 'wrist', from: { x: arm, y: -0.045 }, to: { x: arm, y: 0.045 }, width: 0.05 },
+    { kind: 'attached', at: 'wrist', from: { x: 0, y: 0 }, to: { x: arm, y: 0 }, width: 0.022 },
+    { kind: 'attached', at: 'wrist', from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, width: 0.036 },
   ];
   return { view: 'side', floor, pose, props };
 }
@@ -341,8 +368,8 @@ const headLow = (pose: DemoPose) =>
 export function pikePushUp(): Demo {
   const ball: Vec = { x: 0, y: FLOOR };
   // Hands to the balls of the feet: feet walked in toward the hands.
-  const palm: Vec = { x: Number(process.env.PK_D ?? 0.45), y: FLOOR - BODY.hand / 2 };
-  const out = 0.05; // hands a little wider than the shoulders
+  const palm: Vec = { x: 0.43, y: FLOOR - BODY.hand / 2 };
+  const out = 0.075; // hands a little wider than the shoulders
   const wrist = along(palm, 270, PALM);
   // The foot keeps this angle to the shin (heels up, about 20° pointed), pivoting on the ball.
   const footFor = (legDeg: number) => legDeg + 110;
@@ -350,34 +377,28 @@ export function pikePushUp(): Demo {
   const hipFor = (legDeg: number) => along(sub(ball, ballFrom(footFor(legDeg))), legDeg, LEG_LEN);
   /** Leg direction that puts the hip a trunk's length from the shoulder (the higher of the two). */
   const legFor = (shoulder: Vec) => solveFor(-30, 80, (d) => -dist(hipFor(d), shoulder), -L.torso);
-  const build = (shoulder: Vec, elbowOut: number): DemoPose => {
+  const build = (shoulder: Vec, arm: (shoulder: Vec) => Arm): DemoPose => {
     const legDeg = legFor(shoulder);
     const hip = hipFor(legDeg);
     const torso = angleOf(sub(shoulder, hip));
-    const foot = footFor(legDeg);
-    return {
-      torso,
-      head: torso,
-      leg: { thigh: legDeg + 180, shin: legDeg + 180, foot, toes: 90 },
-      // Elbows bend back toward the feet and a little out.
-      arm: palmArm(shoulder, palm, 90, { x: -1, y: -0.5 }, out, elbowOut),
-      anchor: 'hip',
-      at: hip,
-    };
+    return { torso, head: torso, leg: { thigh: legDeg + 180, shin: legDeg + 180, foot: footFor(legDeg), toes: 90 }, arm: arm(shoulder), anchor: 'hip', at: hip };
   };
-  // Top: arms straight, leaning back toward the feet.
-  const top = along(wrist, -Number(process.env.PK_T ?? 18), straightReach(out) - 0.002);
-  // Bottom: shoulders ahead of the hands, lowered until the head is just off the floor; the elbows
-  // flare back and out just enough for the forearms to stand over the hands.
-  const bottomX = wrist.x + Number(process.env.PK_A ?? 0.1);
-  const bottomY = solveFor(top.y, FLOOR, (y) => headLow(build({ x: bottomX, y }, straightOut(out))), FLOOR - HEAD_CLEAR);
+  // Top: arms straight, leaning back toward the feet a little more than upright.
+  const top = along(wrist, -10, straightReach(out) - 0.002);
+  // Bottom: shoulders ahead of the hands, lowered until the head is just off the floor.
+  const bottomX = wrist.x + 0.115;
+  const straightArm = (sh: Vec) => palmArm(sh, palm, 90, BACK_UP, out, straightOut(out));
+  const bottomY = solveFor(top.y, FLOOR, (y) => headLow(build({ x: bottomX, y }, straightArm)), FLOOR - HEAD_CLEAR);
   const bottom = { x: bottomX, y: bottomY };
-  const elbowLow = flareFor(bottom, palm, 90, { x: -1, y: -0.5 }, out, 172);
+  // The forearms turn from the straight arm's line to standing over the hands (elbows a little behind the wrists).
+  const foreTop = angleOf(sub(wrist, top));
   return {
     view: 'side',
-    pose: (s) => build(lerpV(top, bottom, s), lerp(straightOut(out), elbowLow, s)),
+    pose: (s) => build(lerpV(top, bottom, s), (sh) => palmArmToward(sh, palm, 90, BACK_UP, out, lerp(foreTop, 172, ramp(s, 0, 0.7)))),
   };
 }
+/** Elbows bending back toward the feet (pike push-up). */
+const BACK_UP: Vec = { x: -1, y: -0.5 };
 
 /**
  * Wall handstand push-up, back to the wall: hands flat on the floor about a
@@ -391,40 +412,37 @@ export function handstandPushUp(): Demo {
   const palm: Vec = { x: 0, y: FLOOR - BODY.hand / 2 };
   const hand = 270; // fingers pointing away from the wall
   const wrist = along(palm, hand + 180, PALM);
-  const out = 0.04;
+  const out = 0.075; // hands a little wider than the shoulders
   const wall = wrist.x + 0.12;
+  const toward: Vec = { x: 1, y: -0.4 }; // elbows bend back, toward the wall
   /** The straight body from the shoulder, leaning `deg` from vertical toward the wall (feet toward it). */
-  const build = (shoulder: Vec, deg: number, elbowOut: number): DemoPose => ({
+  const build = (shoulder: Vec, deg: number, arm: Arm): DemoPose => ({
     torso: deg + 180,
     head: deg + 180,
-    // Legs in line with the trunk; feet pointed a little.
-    leg: { thigh: deg, shin: deg, foot: deg - 60 },
-    arm: palmArm(shoulder, palm, hand, { x: 1, y: -0.4 }, out, elbowOut),
+    // Legs in line with the trunk, toes pointed.
+    leg: { thigh: deg, shin: deg, foot: deg - 25 },
+    arm,
     anchor: 'shoulder',
     at: shoulder,
   });
   /** How far the back of the legs (calves and heels) reaches toward the wall. */
   const legsBack = (p: DemoPose) => Math.max(...skinPoints({ view: 'side', pose: () => p }, 0).filter((sp) => /shin \(back\)|heel/.test(sp.part)).map((sp) => sp.p.x));
-  /** The lean that rests the heels on the wall. */
-  const leanFor = (shoulder: Vec, elbowOut: number) => solveFor(-10, 40, (d) => legsBack(build(shoulder, d, elbowOut)), wall);
+  /** The lean that rests the legs on the wall. */
+  const leanFor = (shoulder: Vec, arm: Arm) => solveFor(-10, 40, (d) => legsBack(build(shoulder, d, arm)), wall);
   // Top: arms straight and upright, shoulders over the wrists.
-  const straight = L.upperArm * seen(L.upperArm, straightOut(out)) + L.forearm * seen(L.forearm, out - straightOut(out)) - 0.002;
-  const top = { x: wrist.x, y: wrist.y - straight };
+  const top = { x: wrist.x, y: wrist.y - (straightReach(out) - 0.002) };
   // Bottom: the top of the head touching the floor in front of the hands.
-  const elbowLow = 0.08;
-  const headX = palm.x - 0.07;
-  const shoulderFor = (deg: number): Vec => {
-    const head = { x: headX, y: FLOOR - BODY.head + 0.004 };
-    return sub(head, mul(dir(deg + 180), L.neck));
-  };
-  const degLow = solveFor(-10, 40, (d) => legsBack(build(shoulderFor(d), d, elbowLow)), wall);
-  const bottom = shoulderFor(degLow);
+  const head = { x: palm.x - 0.1, y: FLOOR - BODY.head + 0.004 };
+  const shoulderFor = (deg: number): Vec => sub(head, mul(dir(deg + 180), L.neck));
+  const straightArm = (sh: Vec) => palmArm(sh, palm, hand, toward, out, straightOut(out));
+  const bottom = shoulderFor(solveFor(-10, 40, (d) => legsBack(build(shoulderFor(d), d, straightArm(shoulderFor(d)))), wall));
   return {
     view: 'side',
     pose: (s) => {
       const shoulder = lerpV(top, bottom, s);
-      const elbowOut = lerp(straightOut(out), elbowLow, s);
-      return build(shoulder, leanFor(shoulder, elbowOut), elbowOut);
+      // Forearms from upright (straight arms) to standing over the hands with the elbows a little toward the wall.
+      const arm = palmArmToward(shoulder, palm, hand, toward, out, lerp(180, 190, ramp(s, 0, 0.7)));
+      return build(shoulder, leanFor(shoulder, arm), arm);
     },
     props: [{ kind: 'wall', x: wall, top: top.y - 0.95, facing: 'left' }],
   };
@@ -462,7 +480,7 @@ export function lateralRaise(o: { oneArm?: boolean; cable?: boolean; bentOver?: 
   // Cable: the machine stands to the lifter's left, the pulley at its foot; the free hand holds the frame.
   const f = solve('front', base);
   const tower = f.b.hip.x + 0.24;
-  const pulley: Vec = { x: tower - 0.03, y: FLOOR - 0.06 };
+  const pulley: Vec = { x: tower - 0.04, y: FLOOR - 0.07 };
   const grab: Vec = { x: tower - 0.025, y: f.b.hip.y - 0.1 };
   const free = armTo(f.b.shoulder, sub(grab, { x: GRIP, y: 0 }), { x: 0.3, y: 1 });
   return {
@@ -470,7 +488,7 @@ export function lateralRaise(o: { oneArm?: boolean; cable?: boolean; bentOver?: 
     pose: (s) => ({ ...base, arm: arm(s), arm2: free }),
     props: [
       { kind: 'line', from: { x: tower, y: FLOOR - 0.01 }, to: { x: tower, y: f.a.shoulder.y - 0.3 }, width: 0.04 },
-      { kind: 'cable', from: pulley, at: 'wrist' },
+      { kind: 'cable', from: pulley, at: 'wrist', column: tower },
     ],
     working: 'a',
   };
