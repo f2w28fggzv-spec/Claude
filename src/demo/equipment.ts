@@ -114,7 +114,14 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
       case 'cable':
       case 'band':
         for (const c of attachPoints(f, p.at)) out.mid += seg(p.from, c, p.kind === 'band' ? 0.012 : 0.007, LINE, p.kind === 'band' ? 'stroke-dasharray="0.02 0.016"' : '');
-        if (p.kind === 'cable') out.back += circle(p.from, 0.028, `fill="${FILL}" stroke="${STEEL}" stroke-width="0.01"`) + circle(p.from, 0.007, `fill="${STEEL}"`);
+        if (p.kind === 'cable') {
+          // The machine's column, from the floor to just past the pulley, so the cable comes from somewhere.
+          if (floor !== null) {
+            const top = Math.min(p.from.y - 0.06, floor - 0.2);
+            out.back += `<rect x="${n(p.from.x - 0.022)}" y="${n(top)}" width="0.044" height="${n(floor - top)}" rx="0.01" fill="${FILL}" stroke="${LINE}" stroke-width="0.006"/>`;
+          }
+          out.back += circle(p.from, 0.028, `fill="${FILL}" stroke="${STEEL}" stroke-width="0.01"`) + circle(p.from, 0.007, `fill="${STEEL}"`);
+        }
         break;
       case 'pad':
         for (const c of attachPoints(f, p.at)) out.front += circle({ x: c.x + (p.offset?.x ?? 0), y: c.y + (p.offset?.y ?? 0) }, 0.035, `fill="${PAD}"`);
