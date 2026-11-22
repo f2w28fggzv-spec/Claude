@@ -544,7 +544,7 @@ export function hackSquat(): Demo {
     floor: Math.max(p0.y, p1.y) + 0.03,
     pose,
     // Rails, sled pad, platform and the shoulder pad resting on top of the shoulder.
-    props: [rails, sledPad, { kind: 'line', from: p0, to: p1, width: 0.028 }, { kind: 'pad', at: 'shoulder', offset: add(mul(up, 0.045), mul(dir(torso + 90), 0.01)) }],
+    props: [rails, sledPad, { kind: 'line', from: p0, to: p1, width: 0.028 }, { kind: 'pad', at: 'shoulder', frame: 'trunk', offset: { x: 0.05, y: 0.005 }, block: { along: 0.05, across: 0.11 } }],
   };
 }
 

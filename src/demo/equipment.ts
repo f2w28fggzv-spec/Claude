@@ -20,8 +20,9 @@ const LINE = 'var(--equip-line)';
 const FILL = 'var(--equip-fill)';
 const PAD = 'var(--pad)';
 
-/** Direction a segment of the near limb points (from the joint above), for pads that turn with it. */
-function segmentDeg(s: Side, frame: 'shin' | 'thigh' | 'forearm'): number {
+/** Direction a segment of the near side points (from the joint above; the trunk from hip to shoulder), for pads that turn with it. */
+function segmentDeg(s: Side, frame: 'shin' | 'thigh' | 'forearm' | 'trunk'): number {
+  if (frame === 'trunk') return angleOf(sub(s.shoulder, s.hip));
   if (frame === 'shin') return angleOf(sub(s.ankle, s.knee));
   if (frame === 'thigh') return angleOf(sub(s.knee, s.hip));
   return angleOf(sub(s.wrist, s.elbow));
@@ -42,7 +43,14 @@ export function propExtent(p: Prop, f: Figure): Vec[] {
   const around = (c: Vec, r: number) => out.push({ x: c.x - r, y: c.y - r }, { x: c.x + r, y: c.y + r });
   if ('at' in p && typeof p.at === 'string') {
     const off = p.kind === 'pad' && p.offset ? Math.hypot(p.offset.x, p.offset.y) : 0;
-    const r = p.kind === 'barbell' ? (p.plate ?? PLATE_R) + 0.01 : p.kind === 'kettlebell' ? 0.15 : 0.06 + off;
+    const r =
+      p.kind === 'barbell'
+        ? (p.plate ?? PLATE_R) + 0.01
+        : p.kind === 'kettlebell'
+          ? 0.15
+          : p.kind === 'dumbbell' && (p.lengthwise || p.cupped)
+            ? 0.13
+            : 0.06 + off;
     for (const q of attachPoints(f, p.at)) {
       if (p.kind === 'attached') out.push({ x: q.x + p.from.x, y: q.y + p.from.y }, { x: q.x + p.to.x, y: q.y + p.to.y });
       else around(q, r);
@@ -78,8 +86,8 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
           const far = i === 1 || p.at === 'wrist2';
           let s: string;
           if (p.upright) {
-            // Held on end (goblet squat): two heads, one above the other; cupped = hands under the top head.
-            const y = c.y + (p.cupped ? 0.04 : 0);
+            // Held on end (goblet squat): two heads, one above the other; cupped = palms under the top head, the rest hanging below.
+            const y = c.y + (p.cupped ? 0.02 : 0);
             s = `<rect x="${n(c.x - 0.034)}" y="${n(y - 0.062)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.034)}" y="${n(y + 0.018)}" width="0.068" height="0.044" rx="0.012" fill="${STEEL}"/><rect x="${n(c.x - 0.009)}" y="${n(y - 0.03)}" width="0.018" height="0.06" fill="${LINE}"/>`;
           } else if (p.lengthwise) {
             // Neutral grip: the handle runs across the fist, a head at each end.
@@ -158,9 +166,13 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
       case 'pad':
         for (const c of attachPoints(f, p.at)) {
           const o = p.offset ?? { x: 0, y: 0 };
-          // In a limb's frame the offset turns with it: x along the limb, y toward its back.
-          const at = p.frame ? add(along(c, segmentDeg(f.a, p.frame), o.x), along({ x: 0, y: 0 }, segmentDeg(f.a, p.frame) + 90, o.y)) : { x: c.x + o.x, y: c.y + o.y };
-          out.front += circle(at, 0.035, `fill="${PAD}"`);
+          // In a segment's frame the offset turns with it: x along the segment, y toward its +90° side.
+          const deg = p.frame ? segmentDeg(f.a, p.frame) : 0;
+          const at = p.frame ? add(along(c, deg, o.x), along({ x: 0, y: 0 }, deg + 90, o.y)) : { x: c.x + o.x, y: c.y + o.y };
+          if (p.block) {
+            const { along: h, across: w } = p.block;
+            out.front += `<g transform="translate(${n(at.x)} ${n(at.y)}) rotate(${n(deg)})"><rect x="${n(-w / 2)}" y="${n(-h / 2)}" width="${n(w)}" height="${n(h)}" rx="${n(Math.min(w, h) * 0.4)}" fill="${PAD}"/></g>`;
+          } else out.front += circle(at, 0.035, `fill="${PAD}"`);
         }
         break;
       case 'attached':
