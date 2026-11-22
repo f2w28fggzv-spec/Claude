@@ -1,10 +1,10 @@
 // Movement patterns: squats, lunges and leg machines. Conventions and helpers: ./shared.ts.
 import { BODY } from '../body';
 import { attachPoints } from '../attach';
-import { PAD_HALF } from '../contact';
-import { L, PALM, add, along, angleOf, armTo, dir, gripTo, legTo, lerp, lerpV, mul, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
+import { PAD_HALF, skinPoints } from '../contact';
+import { L, PALM, add, along, armTo, dir, gripTo, legTo, lerp, lerpV, mul, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
-import { O, FLOOR, LEG_LEN, HANG, FWD, DOWN, chainUp, standing, between, handProp, type Implement } from './shared';
+import { O, FLOOR, LEG_LEN, HANG, FWD, DOWN, handProp, type Implement } from './shared';
 
 // ── Balance ──────────────────────────────────────────────────────────────
 // A standing lift is balanced when its load sits over the middle of the foot:
@@ -100,8 +100,8 @@ export function squat(o: {
         return gripTo(shoulder, db, dir(torso + 160), 0.95);
       }
       case 'arms':
-        // Arms straight out in front at shoulder height, as a counterweight.
-        return { upper: 90, fore: 90 };
+        // Arms straight out in front at shoulder height, palms down, as a counterweight.
+        return { upper: 90, fore: 90, hand: 90, flat: true };
     }
   };
   const build = (shinLean: number, knee: number, torso: number): DemoPose => {
@@ -321,7 +321,7 @@ export function stepUp(o: { implement?: Implement }): Demo {
   const hipStart: Vec = { x: -0.25, y: -LEG_LEN * 0.985 };
   const hipTop: Vec = { x: lead.x + 0.005, y: lead.y - LEG_LEN * 0.998 };
   // Swing over the box's edge: a curve through a point well above it.
-  const over: Vec = { x: edge - 0.13, y: top - 0.29 };
+  const over: Vec = { x: edge - 0.09, y: top - 0.28 };
   const bezier = (u: number): Vec => {
     const e = smooth(u);
     const a = (1 - e) * (1 - e);
@@ -380,7 +380,7 @@ export function pistol(): Demo {
     head: torso * 0.6,
     leg: squatLegs(shinLean, knee),
     leg2: free(s),
-    arm: { upper: 88, fore: 88 },
+    arm: { upper: 88, fore: 88, hand: 88, flat: true },
     anchor: 'ankle',
     at: O,
   });
@@ -403,13 +403,11 @@ export function pistol(): Demo {
 /** Back flat against the wall, thighs level, shins vertical, arms folded across the chest. */
 export function wallSit(): Demo {
   const torso = -2; // just enough to bring the upper back onto the wall too
-  const p: DemoPose = {
-    torso,
-    leg: { thigh: 90, shin: 180, foot: 90 },
-    arm: { upper: torso + 146, fore: torso + 356 },
-    anchor: 'ankle',
-    at: O,
-  };
+  const base: DemoPose = { torso, leg: { thigh: 90, shin: 180, foot: 90 }, arm: HANG, anchor: 'ankle', at: O };
+  // Folded arms: elbows in front of the ribs, fists resting under the opposite collarbone.
+  const shoulder = solve('side', base).a.shoulder;
+  const wrist = add(along(shoulder, torso + 90, BODY.torsoFront + 0.02), mul(dir(torso), -0.05));
+  const p: DemoPose = { ...base, arm: { ...armTo(shoulder, wrist, dir(torso + 150)), hand: torso - 60 } };
   const f = solve('side', p);
   const back = (k: number) => along(lerpV(f.a.hip, f.a.shoulder, k), torso - 90, BODY.torsoBack).x;
   const wallX = Math.min(along(f.a.hip, torso - 90, BODY.glute).x, back(0.85));
@@ -418,56 +416,95 @@ export function wallSit(): Demo {
 
 // ── Machines ─────────────────────────────────────────────────────────────
 
-/** A pad along a line, set back from the body by the skin's thickness (bench props are centred on their points). */
-const padUnder = (from: Vec, to: Vec, away: number, skin: number): Vec[] => {
-  const d = mul(dir(away), skin + PAD_HALF + 0.002);
-  return [add(from, d), add(to, d)];
+/**
+ * A pad (bench-prop points) along the line from a to b, moved along its
+ * normal until the body just rests on it over the whole movement: no skin
+ * point inside the pad, none hovering above it. `skip` names body parts that
+ * pass beside the pad rather than over it (e.g. a hand on a side handle).
+ */
+function restingPad(pose: (s: number) => DemoPose, a: Vec, b: Vec, skip?: RegExp): [Vec, Vec] {
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  const u = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+  // The pad's top side, as in ../contact: the normal pointing up the screen.
+  const n = u.x >= 0 ? { x: u.y, y: -u.x } : { x: -u.y, y: u.x };
+  let nearest = Infinity;
+  for (let k = 0; k <= 10; k++) {
+    for (const sp of skinPoints({ view: 'side', pose }, k / 10)) {
+      if (skip?.test(sp.part)) continue;
+      const d = sub(sp.p, a);
+      const t = d.x * u.x + d.y * u.y;
+      const h = d.x * n.x + d.y * n.y;
+      if (t >= 0 && t <= len && h > -0.04) nearest = Math.min(nearest, h);
+    }
+  }
+  const shift = mul(n, nearest - PAD_HALF - 0.002);
+  return [add(a, shift), add(b, shift)];
+}
+
+/** Where the lines through a1-b1 and a2-b2 cross. */
+function crossing(a1: Vec, b1: Vec, a2: Vec, b2: Vec): Vec {
+  const d1 = sub(b1, a1);
+  const d2 = sub(b2, a2);
+  const t = ((a2.x - a1.x) * d2.y - (a2.y - a1.y) * d2.x) / (d1.x * d2.y - d1.y * d2.x);
+  return add(a1, mul(d1, t));
+}
+
+/** Knee-to-hip distance for a hip-to-ankle span with the knee bent to `deg`. */
+const legSpan = (deg: number) => Math.sqrt(L.thigh ** 2 + L.shin ** 2 - 2 * L.thigh * L.shin * Math.cos((deg * Math.PI) / 180));
+
+/** How far along `u` from p the distance to the origin reaches r. */
+const outTo = (p: Vec, u: Vec, r: number) => {
+  const b = p.x * u.x + p.y * u.y;
+  return -b + Math.sqrt(b * b - (p.x ** 2 + p.y ** 2 - r * r));
 };
 
 /**
- * 45° leg press: reclined against the back pad, hands on the handles by the
- * seat, feet flat on the sled's footplate. The sled runs down its rails until
- * the knees are bent about 90° and comes back up without locking the knees.
+ * 45° leg press: reclined in the seat, hands on the handles beside it, feet
+ * flat on the sled's footplate. The sled runs down its rails until the knees
+ * are bent about 90° (thighs near the chest, lower back still on the pad) and
+ * is pushed back up without locking the knees.
  */
 export function legPress(): Demo {
   const torso = -58;
   const rail = 45; // the sled's direction of travel, up and away
-  const plate = -22; // the footplate's slope: feet pointing up it
-  // Bottom: thighs vertical, knees about 92°.
-  const kneeB = along(O, 0, L.thigh);
-  const ankleB = along(kneeB, 88, L.shin);
-  // Top: the sled pushed up its rails until the knees are nearly straight (about 160°).
-  const reach = Math.sqrt(2 * L.thigh * L.shin * (1 - Math.cos((160 * Math.PI) / 180)) + (L.thigh - L.shin) ** 2);
+  const plate = -15; // footplate slope: feet point up it
+  // Bottom: thighs just past vertical, knees about 90°.
+  const kneeB = along(O, 8, L.thigh);
+  const ankleB = along(kneeB, 98, L.shin);
+  // Top: pushed up the rails until the knees are nearly straight (165°).
   const u = dir(rail);
-  const b = ankleB.x * u.x + ankleB.y * u.y;
-  const travel = -b + Math.sqrt(b * b - (ankleB.x ** 2 + ankleB.y ** 2 - reach ** 2));
+  const travel = outTo(ankleB, u, legSpan(165));
   const ankleTop = add(ankleB, mul(u, travel));
+  const shoulder = along(O, torso, L.torso);
   const pose = (s: number): DemoPose => ({
     torso,
     leg: legTo(O, lerpV(ankleTop, ankleB, s), { x: -0.3, y: -1 }, plate),
-    arm: gripTo(along(O, torso, L.torso), HANDLE, { x: 0.2, y: 1 }),
+    // Arms along the sides to the handles, elbows slightly bent away from the back pad.
+    arm: gripTo(shoulder, PRESS_HANDLE, dir(torso + 90)),
     anchor: 'hip',
     at: O,
   });
-  // Footplate under the soles, moving with the feet.
+  // Footplate under the soles, moving with the feet; its lower end rides on the rails.
   const sole = mul(dir(plate + 90), L.ankleHeight + 0.014);
-  const footplate: Prop = { kind: 'attached', at: 'ankle', from: add(sole, mul(dir(plate), -0.09)), to: add(sole, mul(dir(plate), 0.2)), width: 0.028 };
-  // Rails beneath the sled.
-  const railOff = mul(dir(plate + 90), 0.11);
-  const rails: Prop = { kind: 'line', from: add(add(ankleB, railOff), mul(u, -0.12)), to: add(add(ankleTop, railOff), mul(u, 0.25)), width: 0.03 };
-  // Seat: back pad from the head down past the glutes, then the seat pan forward under them.
-  const back = padUnder(along(O, torso, 0.47), O, torso - 90, BODY.torsoBack);
-  const seatBack = add(O, mul(dir(torso - 90), BODY.glute + PAD_HALF + 0.004));
-  const seatFront = add(seatBack, mul(dir(torso + 75), 0.16));
+  const plateLow = add(sole, mul(dir(plate), -0.11));
+  const footplate: Prop = { kind: 'attached', at: 'ankle', from: plateLow, to: add(sole, mul(dir(plate), 0.2)), width: 0.028 };
+  const rails: Prop = { kind: 'line', from: add(add(ankleB, plateLow), mul(u, -0.12)), to: add(add(ankleTop, plateLow), mul(u, 0.25)), width: 0.03 };
+  // Seat: back pad from behind the head to the hips, seat pan under the glutes.
+  const behind = mul(dir(torso - 90), BODY.torsoBack + PAD_HALF);
+  const [b0, b1] = restingPad(pose, add(along(O, torso, 0.5), behind), add(along(O, torso, 0.02), behind), /hand|forearm/);
+  const panDir = dir(62);
+  const pan0 = add(O, mul(dir(torso - 90), BODY.glute + PAD_HALF));
+  const [p0, p1] = restingPad(pose, add(pan0, mul(panDir, -0.04)), add(pan0, mul(panDir, 0.12)), /hand|forearm/);
+  const corner = crossing(b0, b1, p0, p1);
   return {
     view: 'side',
-    floor: 0.32,
+    floor: 0.3,
     pose,
-    props: [rails, { kind: 'bench', points: [back[0], seatBack, seatFront], legs: true }, { kind: 'bar', at: HANDLE }, footplate],
+    props: [rails, { kind: 'bench', points: [b0, corner, p1], legs: true }, { kind: 'bar', at: PRESS_HANDLE }, footplate],
   };
 }
-/** Leg-press handle beside the seat, just ahead of the hip. */
-const HANDLE: Vec = { x: 0.06, y: 0.03 };
+/** Leg-press handle beside the seat, by the hip. */
+const PRESS_HANDLE: Vec = { x: 0.04, y: -0.03 };
 
 /**
  * Hack squat: back flat on the sled's pad, shoulders under the shoulder pads,
@@ -491,7 +528,7 @@ export function hackSquat(): Demo {
     const hip = lerpV(hipTop, hipB, s);
     const shoulder = along(hip, torso, L.torso);
     // Handles at the front of the shoulder pads; elbows down.
-    const handle = add(along(shoulder, torso + 90, 0.07), mul(dir(torso), 0.02));
+    const handle = add(along(shoulder, torso + 90, 0.1), mul(dir(torso), -0.01));
     return { torso, leg: legTo(hip, O, FWD, foot), arm: gripTo(shoulder, handle, dir(torso + 160), 0.85), anchor: 'hip', at: hip };
   };
   // Platform under the feet, tilted toes up.
@@ -515,7 +552,7 @@ export function hackSquat(): Demo {
     view: 'side',
     floor: Math.max(p0.y, p1.y) + 0.03,
     pose,
-    props: [rails, sledPad, { kind: 'line', from: p0, to: p1, width: 0.028 }, { kind: 'pad', at: 'shoulder', offset: add(mul(up, 0.075), mul(dir(torso + 90), 0.005)) }],
+    props: [rails, sledPad, { kind: 'line', from: p0, to: p1, width: 0.028 }, { kind: 'pad', at: 'shoulder', offset: add(mul(up, 0.06), mul(dir(torso + 90), 0.015)) }],
   };
 }
 
@@ -526,25 +563,27 @@ export function hackSquat(): Demo {
  */
 export function legExtension(): Demo {
   const torso = -12;
+  const shoulder = along(O, torso, L.torso);
   const pose = (s: number): DemoPose => {
     const shin = lerp(190, 95, s);
-    const shoulder = along(O, torso, L.torso);
-    return { torso, leg: { thigh: 90, shin, foot: shin - 90 }, arm: gripTo(shoulder, SEAT_HANDLE, { x: -0.3, y: 1 }), anchor: 'hip', at: O };
+    return { torso, leg: { thigh: 90, shin, foot: shin - 90 }, arm: gripTo(shoulder, SEAT_HANDLE, { x: 0.3, y: 1 }), anchor: 'hip', at: O };
   };
-  // Seat under the thighs (its front edge clears the calves), back pad behind the trunk.
-  const seatY = BODY.thighBack + PAD_HALF + 0.002;
-  const back = padUnder(along(O, torso, 0.44), along(O, torso, 0.06), torso - 90, BODY.torsoBack);
-  const corner = add(O, mul(dir(torso - 135), BODY.glute + PAD_HALF + 0.01));
+  // Back pad behind the trunk; seat under the thighs, its front edge clear of the calves.
+  const behind = mul(dir(torso - 90), BODY.torsoBack + PAD_HALF);
+  const [b0, b1] = restingPad(pose, add(along(O, torso, 0.44), behind), add(along(O, torso, 0.02), behind), /hand|forearm/);
+  const seatY = BODY.thighBack + PAD_HALF;
+  const [s0, s1] = restingPad(pose, { x: -0.06, y: seatY }, { x: 0.165, y: seatY }, /hand|forearm/);
   return {
     view: 'side',
     floor: 0.33,
     pose,
     props: [
-      { kind: 'bench', points: [back[0], back[1], { x: corner.x, y: seatY }, { x: 0.165, y: seatY }], legs: true },
+      { kind: 'bench', points: [b0, crossing(b0, b1, s0, s1), s1], legs: true },
       { kind: 'bar', at: SEAT_HANDLE },
-      { kind: 'pad', at: 'ankle', offset: { x: 0.04, y: -0.045 } },
+      // Roller on the front of the shins just above the ankles, turning with them.
+      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: -0.04, y: -(BODY.shinFront + 0.037) } },
     ],
   };
 }
 /** Leg-extension handle at the side of the seat, by the hip. */
-const SEAT_HANDLE: Vec = { x: 0.05, y: 0.035 };
+const SEAT_HANDLE: Vec = { x: 0.05, y: 0.02 };

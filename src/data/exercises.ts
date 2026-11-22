@@ -115,7 +115,7 @@ const DRAFT_EXERCISES: Exercise[] = [
     secondary: ['hamstrings'],
     equipment: ['barbell', 'rack', 'bench'],
     role: 'compound',
-    demo: D.squat({ hold: 'back', thigh: 88, shin: 12, box: true, pauseFar: 0.5 }),
+    demo: D.squat({ hold: 'back', thigh: 88, shin: 18, box: true, pauseFar: 0.5 }),
     placement: P.sideStanding,
     tracking: down('hip'),
     checks: [C.rom('knee', 70)],
