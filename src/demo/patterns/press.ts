@@ -32,17 +32,10 @@ function sideReach(deg: number, out: number, elbowOut: number, reach = REACH): n
 }
 
 /**
- * Arm whose fist closes on `grip`, the hand `out` to the side of the shoulder
- * and the elbow `elbowOut` (+ = away from the body's midline), elbow toward `toward`.
+ * Arm pressing the palm flat on `palm`, fingers pointing `hand` degrees, the
+ * wrist `out` to the side of the shoulder and the elbow `elbowOut` (+ = away
+ * from the body's midline), elbow toward `toward`.
  */
-function sideGrip(shoulder: Vec, grip: Vec, toward: Vec, out: number, elbowOut: number): Arm {
-  const scale = seen(L.upperArm, elbowOut);
-  const foreScale = seen(REACH, out - elbowOut);
-  const [upper, fore] = twoLink(shoulder, grip, L.upperArm * scale, REACH * foreScale, toward);
-  return { upper, fore, scale, foreScale };
-}
-
-/** The same with the palm pressed flat on `palm`, fingers pointing `hand` degrees; `out` is the wrist's. */
 function sidePalm(shoulder: Vec, palm: Vec, hand: number, toward: Vec, out: number, elbowOut: number): Arm {
   const scale = seen(L.upperArm, elbowOut);
   const foreScale = seen(L.forearm, out - elbowOut);
@@ -59,6 +52,22 @@ function armThrough(shoulder: Vec, elbow: Vec, hand: Vec): Arm {
     fore: angleOf(sub(hand, elbow)),
     foreScale: Math.hypot(hand.x - elbow.x, hand.y - elbow.y) / REACH,
   };
+}
+
+/**
+ * Arm whose fist closes on `grip` with the forearm seen leaning `lean`
+ * degrees from upright (negative = back toward the head when lying), the hand
+ * `out` to the side of the shoulder: the elbow goes out to the side as far as
+ * the arm's length needs (the upper arm looks shorter the further it goes).
+ */
+function leaningGrip(shoulder: Vec, grip: Vec, lean: number, out: number): Arm {
+  const d = dir(lean);
+  const elbowAt = (elbowOut: number) => sub(grip, mul(d, REACH * seen(REACH, out - elbowOut)));
+  const miss = (elbowOut: number) => {
+    const e = elbowAt(elbowOut);
+    return Math.hypot(e.x - shoulder.x, e.y - shoulder.y) - L.upperArm * seen(L.upperArm, elbowOut);
+  };
+  return armThrough(shoulder, elbowAt(solveFor(straightOut(out), L.upperArm * 0.995, miss, 0)), grip);
 }
 
 // ── Contact helpers ──────────────────────────────────────────────────────
@@ -149,7 +158,7 @@ function lying(o: { incline?: number; floor?: boolean }): Lying {
   return { pose: (arm) => body(arm, head), shoulder, upper, head: along(shoulder, head, L.neck), props };
 }
 
-/** How a lying press moves: where the load touches the chest, the grip width and how far the elbows flare. */
+/** How a lying press moves: where the load touches the chest, the grip width and how the forearms lean. */
 interface PressPath {
   /** Load at the bottom: this far down the chest from the shoulder joint... */
   touch: number;
@@ -157,43 +166,47 @@ interface PressPath {
   lift: number;
   /** Hands to the side of the shoulders at the top and at the bottom. */
   out: [number, number];
-  /** Elbows to the side of the shoulders at the bottom. */
-  elbow: number;
+  /** Forearms at the bottom, seen leaning back toward the head by this much (degrees)... */
+  lean: number;
+  /** ...and this much more mid-way, as the elbows travel (tucked elbows travel further toward the hips). */
+  bump: number;
 }
 
-/** Bar to the lower chest, hands a little outside the shoulders, elbows about 45° from the body. */
-const BAR: PressPath = { touch: 0.085, lift: 0.015, out: [0.08, 0.08], elbow: 0.13 };
-/** Close grip: hands about shoulder-width, elbows tucked, bar to the bottom of the chest. */
-const CLOSE: PressPath = { touch: 0.12, lift: 0.015, out: [0.0, 0.0], elbow: 0.06 };
+/** Bar to the lower chest, hands a little outside the shoulders, elbows about 45–60° from the body. */
+const BAR: PressPath = { touch: 0.085, lift: 0.015, out: [0.08, 0.08], lean: 12, bump: 6 };
+/** Close grip: hands about shoulder-width, elbows tucked to the sides, bar to the bottom of the chest. */
+const CLOSE: PressPath = { touch: 0.135, lift: 0.015, out: [0, 0], lean: 12, bump: 14 };
 /** Dumbbells over the shoulders, lowered beside the chest with the forearms upright. */
-const DUMBBELLS: PressPath = { touch: 0.075, lift: 0, out: [-0.03, 0.12], elbow: 0.12 };
+const DUMBBELLS: PressPath = { touch: 0.075, lift: 0, out: [-0.03, 0.12], lean: 6, bump: 6 };
+/** Floor press: the elbows (about 45° from the body) come down onto the floor, forearms upright. */
+const FLOOR_ELBOW = 0.12;
 
 /** Face-up press on a flat or incline bench or the floor: from straight arms over the shoulders down to the chest. */
 export function lyingPress(o: { implement: Implement; incline?: number; floor?: boolean; closeGrip?: boolean }): Demo {
   const body = lying(o);
   const S = body.shoulder;
   const path = o.closeGrip ? CLOSE : o.implement === 'dumbbell' ? DUMBBELLS : BAR;
-  // On an incline the load comes down to the upper chest, just under the collarbones.
+  // On an incline the load comes down to the upper chest, just under the collarbones, forearms upright.
   const touch = o.incline ? 0.035 : path.touch;
+  const lean = o.incline || o.floor ? 2 : path.lean;
   // Top: arms locked straight up over the shoulders.
   const outTop = path.out[0];
-  const elbowTop = straightOut(outTop);
-  const top: Vec = { x: S.x, y: S.y - sideReach(176, outTop, elbowTop) };
-  // Bottom: on the chest; on the floor the backs of the upper arms rest on the floor, forearms upright.
+  const top: Vec = { x: S.x, y: S.y - sideReach(176, outTop, straightOut(outTop)) };
+  // Bottom: on the chest; on the floor the backs of the upper arms rest on the floor.
   let bottom: Vec;
+  let outBottom = path.out[1];
   if (o.floor) {
+    outBottom = FLOOR_ELBOW;
     const elbowY = FLOOR - BODY.upperArm - 0.001;
-    const upperLen = L.upperArm * seen(L.upperArm, path.elbow);
+    const upperLen = L.upperArm * seen(L.upperArm, FLOOR_ELBOW);
     const elbow = { x: S.x + Math.sqrt(upperLen ** 2 - (elbowY - S.y) ** 2), y: elbowY };
-    bottom = along(elbow, 0, REACH * seen(REACH, path.out[1] - path.elbow));
+    bottom = along(elbow, -lean, REACH);
   } else bottom = add(along(S, body.upper + 180, touch), mul(dir(body.upper + 90), BODY.torsoFront + path.lift));
   const pose = (s: number): DemoPose => {
-    // J-curve: straight down from over the shoulders, drifting onto the chest near the bottom.
-    const grip = { x: lerp(top.x, bottom.x, s ** 1.6), y: lerp(top.y, bottom.y, s) };
-    const out = lerp(outTop, path.out[1], s);
-    // The elbows swing out early as the upper arms lower to the sides.
-    const elbow = lerp(elbowTop, path.elbow, 1 - (1 - s) ** 2);
-    return body.pose(sideGrip(S, grip, { x: 0.5, y: 1 }, out, elbow));
+    // A slight J-curve: down from over the shoulders, drifting onto the chest on the way.
+    const grip = { x: lerp(top.x, bottom.x, s ** 1.25), y: lerp(top.y, bottom.y, s) };
+    // Forearms nearly upright all the way, leaning back a little more mid-way as the elbows travel.
+    return body.pose(leaningGrip(S, grip, -(lean * s + path.bump * Math.sin(Math.PI * s)), lerp(outTop, outBottom, s)));
   };
   return { view: 'side', pose, props: [...body.props, ...handProp(o.implement)] };
 }
