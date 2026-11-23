@@ -1053,52 +1053,85 @@ const hipBump = (t: number) => smooth((t + 0.05) / 0.05) * (1 - smooth((t - 0.03
 
 /** How soft flesh gives where two legs press together: the contact eases in over this much. */
 const PRESS_EASE = 0.004;
+/** The press holds a point from this far down the leg's bone (it lets go toward the hip). */
+const PRESS_FROM = 0.07;
+/** The front view's thigh and shin, hip to knee and knee to ankle, and how far the leg's bone line runs on past the ankle through the foot. */
+const THIGH_LEN = 0.245;
+const SHIN_LEN = 0.246;
+const TOE_LEN = 0.045;
+/** From a point to the segment from (ax, ay) along (dx, dy). */
+function toSegment(px: number, py: number, ax: number, ay: number, dx: number, dy: number): number {
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / Math.max(dx * dx + dy * dy, 1e-9), 0, 1);
+  const x = px - ax - dx * t;
+  const y = py - ay - dy * t;
+  return Math.sqrt(x * x + y * y);
+}
+/** The gap between two segments, each a start and a direction: none where they cross, else from the nearest end of one to the other. */
+function segmentGap(ax: number, ay: number, adx: number, ady: number, bx: number, by: number, bdx: number, bdy: number): number {
+  const crosses = (adx * (by - ay) - ady * (bx - ax)) * (adx * (by + bdy - ay) - ady * (bx + bdx - ax)) < 0 && (bdx * (ay - by) - bdy * (ax - bx)) * (bdx * (ay + ady - by) - bdy * (ax + adx - bx)) < 0;
+  if (crosses) return 0;
+  return Math.min(toSegment(ax, ay, bx, by, bdx, bdy), toSegment(ax + adx, ay + ady, bx, by, bdx, bdy), toSegment(bx, by, ax, ay, adx, ady), toSegment(bx + bdx, by + bdy, ax, ay, adx, ady));
+}
 /**
  * Legs that rest on each other (lying on the side, the top leg on the bottom one) press flat where they meet instead
  * of passing through each other: a point of this leg that would reach past the line half way to the other leg's bone
  * (less the outline, and `inset` for what lies inside the outline) is held at that line, easing in so the contact
  * flattens smoothly. The inner thighs meet at the crotch as drawn, so it lets go toward the hip.
+ *
+ * `reach` is how far the point can lie from this leg's bone, from the shape tables: a point that cannot come within the
+ * ease of the line where the legs come closest is left as it is without finding the bones (exactly as the press would
+ * leave it), so legs that cannot touch, standing, cost next to nothing and only legs at rest on each other pay.
  */
-function pressing(own: Side, other: Side): (p: Vec, inset?: number) => Vec {
-  // Each leg's bone line as segments (hip to knee, knee to ankle, on past the ankle through the foot): start, direction,
-  // squared length, length and the length from the hip to the start. Plain numbers: this runs for every point of a leg.
-  const bones = (s: Side): number[][] => {
-    const toe = add(s.ankle, mul(unit(sub(s.ankle, s.knee), V(0, 1)), 0.045));
+function pressing(own: Side, other: Side): (p: Vec, reach: number, inset?: number) => Vec {
+  // Each leg's bone line as three segments (hip to knee, knee to ankle, on past the ankle through the foot), seven
+  // numbers each: start, direction, squared length, length and the length from the hip to the start. Plain numbers in
+  // one list: this runs for every point of a leg that can reach the line.
+  const bones = (s: Side): number[] => {
+    const toe = add(s.ankle, mul(unit(sub(s.ankle, s.knee), V(0, 1)), TOE_LEN));
+    const ends = [s.hip, s.knee, s.ankle, toe];
+    const out: number[] = [];
     let run = 0;
-    return [[s.hip, s.knee], [s.knee, s.ankle], [s.ankle, toe]].map(([a, b]) => {
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
+    for (let i = 0; i < 3; i++) {
+      const dx = ends[i + 1].x - ends[i].x;
+      const dy = ends[i + 1].y - ends[i].y;
       const l = Math.hypot(dx, dy);
-      const seg = [a.x, a.y, dx, dy, Math.max(l * l, 1e-9), l, run];
+      out.push(ends[i].x, ends[i].y, dx, dy, Math.max(l * l, 1e-9), l, run);
       run += l;
-      return seg;
-    });
+    }
+    return out;
   };
   const mine = bones(own);
   const theirs = bones(other);
-  // Legs well apart (beyond the hip) never press: no point of a leg's inner side reaches this far from its bone there.
-  const REACH = 0.055;
+  // Where the legs come closest: the other leg's bone line from this one's, below where this one's hold starts. Every
+  // point the press holds lies across from a point of its bone at least this far from the other bone, so a point no
+  // further than `free` from its bone stays short of the half-way line by the whole ease, where the press leaves it.
   let apart = Infinity;
-  for (let k = 0; k <= 16; k++) {
-    const u = 0.07 + ((mine[2][6] + mine[2][5] - 0.07) * k) / 16;
-    const [ax, ay, dx, dy, , l, run] = mine[u < mine[1][6] ? 0 : u < mine[2][6] ? 1 : 2];
-    const px = ax + (dx * (u - run)) / l;
-    const py = ay + (dy * (u - run)) / l;
-    for (const [bx, by, ex, ey, l2] of theirs) {
-      const t = clamp(((px - bx) * ex + (py - by) * ey) / l2, 0, 1);
-      apart = Math.min(apart, Math.hypot(px - bx - ex * t, py - by - ey * t));
+  for (let i = 0; i < 21; i += 7) {
+    const l = mine[i + 5];
+    const run = mine[i + 6];
+    if (run + l <= PRESS_FROM) continue;
+    // The part of the segment past the hold start.
+    const f = Math.max(0, (PRESS_FROM - run) / l);
+    const dx = mine[i + 2];
+    const dy = mine[i + 3];
+    for (let j = 0; j < 21; j += 7) {
+      apart = Math.min(apart, segmentGap(mine[i] + dx * f, mine[i + 1] + dy * f, dx * (1 - f), dy * (1 - f), theirs[j], theirs[j + 1], theirs[j + 2], theirs[j + 3]));
     }
   }
-  if (apart / 2 - W - PRESS_EASE > REACH + 0.01) return (p) => p;
-  return (p, inset = 0) => {
+  const free = apart / 2 - W - 0.0008 - PRESS_EASE;
+  return (p, reach, inset = 0) => {
+    if (reach + inset <= free) return p;
     // The nearest point q of this leg's bone, and how far it is from the hip.
     let qx = p.x;
     let qy = p.y;
     let at = 0;
     let best = Infinity;
-    for (let i = 0; i < 3; i++) {
-      const [ax, ay, dx, dy, l2, l, run] = mine[i];
-      const t = clamp(((p.x - ax) * dx + (p.y - ay) * dy) / l2, 0, 1);
+    for (let i = 0; i < 21; i += 7) {
+      const ax = mine[i];
+      const ay = mine[i + 1];
+      const dx = mine[i + 2];
+      const dy = mine[i + 3];
+      const t = clamp(((p.x - ax) * dx + (p.y - ay) * dy) / mine[i + 4], 0, 1);
       const x = ax + dx * t;
       const y = ay + dy * t;
       const d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
@@ -1106,18 +1139,21 @@ function pressing(own: Side, other: Side): (p: Vec, inset?: number) => Vec {
         best = d;
         qx = x;
         qy = y;
-        at = run + t * l;
+        at = mine[i + 6] + t * mine[i + 5];
       }
     }
-    const hold = smooth((at - 0.07) / 0.05);
+    const hold = smooth((at - PRESS_FROM) / 0.05);
     if (hold <= 0) return p;
     // The other leg's bone nearest q, and the way across to it.
     let rx = qx;
     let ry = qy;
     best = Infinity;
-    for (let i = 0; i < 3; i++) {
-      const [ax, ay, dx, dy, l2] = theirs[i];
-      const t = clamp(((qx - ax) * dx + (qy - ay) * dy) / l2, 0, 1);
+    for (let i = 0; i < 21; i += 7) {
+      const ax = theirs[i];
+      const ay = theirs[i + 1];
+      const dx = theirs[i + 2];
+      const dy = theirs[i + 3];
+      const t = clamp(((qx - ax) * dx + (qy - ay) * dy) / theirs[i + 4], 0, 1);
       const x = ax + dx * t;
       const y = ay + dy * t;
       const d = (qx - x) * (qx - x) + (qy - y) * (qy - y);
@@ -1144,33 +1180,41 @@ function pressing(own: Side, other: Side): (p: Vec, inset?: number) => Vec {
 
 /** One leg: the thigh skinned at the hip, the shin, the foot pointing at the camera with its toes turned out by `out`; it presses flat where it rests on the other leg. */
 function frontLeg(s: Side, leg: Leg, outer: number, rest: Vec, TF: FrontTrunk, pal: Palette, F: FrontShape, other: Side): FrontLimb {
-  const Th = skinFrame(s.hip, s.knee, 0.245, leg.thigh, outer, rest, TF.k, hipWeight);
-  const Sh = frontFrame(s.knee, s.ankle, 0.246, leg.shin, outer);
+  const Th = skinFrame(s.hip, s.knee, THIGH_LEN, leg.thigh, outer, rest, TF.k, hipWeight);
+  const Sh = frontFrame(s.knee, s.ankle, SHIN_LEN, leg.shin, outer);
   // Her fuller hip and upper outer thigh (hipFlare) settle flat where the hip faces the floor: lying on it she rests
   // where he does.
   const press = smooth((mul(rot90(rest), outer).y - 0.5) / 0.4);
   const flare = (F.hipFlare ?? 0) * (1 - press);
   const wide = (list: readonly P2[], from = 0.015): P2[] => list.map(([t, d]) => [t, d > from ? d + flare * hipBump(t) : d]);
   // Everything drawn on the leg presses flat where it rests on the other leg; what lies inside the outline stays a gap's
-  // width inside it.
+  // width inside it. Each point goes with its reach from the leg's bone line, which runs from 0 to `end` along t in its
+  // frame: its distance across, or from the joint where it lies past either end (below the knee on the thigh, above it
+  // on the shin). Near the hip, where the thigh turns only part of the way with the bone, the press lets go anyway.
   const on = pressing(s, other);
-  const at = (Fr: { p(t: number, d: number): Vec }, list: readonly P2[], inset = GAP / 2) => mapped(Fr, list).map((p, i) => (list[i][1] < 0 ? on(p, inset) : p));
-  const thigh = at(Th, wide(F.thigh), 0);
-  const shin = at(Sh, F.shin, 0);
+  const at = (Fr: { p(t: number, d: number): Vec }, list: readonly P2[], end: number, inset = GAP / 2) =>
+    list.map(([t, d]) => {
+      const p = Fr.p(t, d);
+      if (d >= 0) return p;
+      const past = t < 0 ? -t : t > end ? t - end : 0;
+      return on(p, past > 0 ? Math.hypot(past, d) : -d, inset);
+    });
+  const thigh = at(Th, wide(F.thigh), THIGH_LEN, 0);
+  const shin = at(Sh, F.shin, SHIN_LEN + TOE_LEN, 0);
   // Toes turned out (standing): the big toe's side comes round toward the little toe's; the outer edge stays (lying on
   // the side, the foot rests on it).
   const out = clamp(dot(sub(s.toe, s.heel), Sh.f) / 0.03, -1, 1);
   const Ft = flatFrame(s.ankle, Sh.u, Sh.f, 1);
-  const foot = at(Ft, F.foot.map(([t, d]): P2 => [t, d < 0 ? d * (1 - 0.12 * out * smooth(t / 0.03)) + 0.004 * out * smooth(t / 0.03) : d]), 0);
+  const foot = at(Ft, F.foot.map(([t, d]): P2 => [t, d < 0 ? d * (1 - 0.12 * out * smooth(t / 0.03)) + 0.004 * out * smooth(t / 0.03) : d]), TOE_LEN, 0);
   const [j0, j1] = F.hipArc;
   const n = thigh.length;
-  const quads = F.quads.map((m, i) => closed(at(Th, i ? m : wide(m, 0.02)))).join('');
+  const quads = F.quads.map((m, i) => closed(at(Th, i ? m : wide(m, 0.02), THIGH_LEN))).join('');
   // The abductors swell forward as they work.
   const gl = pal.lv('glutes');
-  let detail = muscle(closed(at(Th, wide(F.glute).map(([t, d], i): P2 => [t, i > 7 ? d - 0.005 * gl * smooth((0.07 - Math.abs(t - 0.02)) / 0.05) : d]))), pal.m('glutes'), pal);
+  let detail = muscle(closed(at(Th, wide(F.glute).map(([t, d], i): P2 => [t, i > 7 ? d - 0.005 * gl * smooth((0.07 - Math.abs(t - 0.02)) / 0.05) : d]), THIGH_LEN)), pal.m('glutes'), pal);
   detail += muscle(quads, pal.m('quads'), pal);
-  detail += muscle(F.calves.map((m) => closed(at(Sh, m))).join(''), pal.m('calves'), pal);
-  detail += crease(open(at(Th, F.patella)) + open(at(Th, F.groin)) + F.toeLines.map((l) => open(at(Ft, l))).join(''), 0.0024);
+  detail += muscle(F.calves.map((m) => closed(at(Sh, m, SHIN_LEN + TOE_LEN))).join(''), pal.m('calves'), pal);
+  detail += crease(open(at(Th, F.patella, THIGH_LEN)) + open(at(Th, F.groin, THIGH_LEN)) + F.toeLines.map((l) => open(at(Ft, l, TOE_LEN))).join(''), 0.0024);
   return {
     root: arcOf(thigh, j1, j0 + n),
     edge: arcOf(thigh, j0, j1) + closed(shin) + closed(foot),
@@ -1238,6 +1282,22 @@ function frontChest(fig: BodyFigure, TF: FrontTrunk, hand: number, c: BodyContex
 
 /** Light on hair: half way from the skin to the outline, so it is lighter than the hair in either theme (warm brown on brown, grey on near-black). */
 const SHINE = 'color-mix(in oklab,var(--fig-skin),var(--fig-edge))';
+/** A tapered streak along a line of control points: `w` wide at its middle, narrowing to points at both ends. */
+function streak(line: readonly P2[], w: number): P2[] {
+  const n = line.length;
+  const left: P2[] = [];
+  const right: P2[] = [];
+  for (let i = 1; i < n - 1; i++) {
+    const [x0, y0] = line[i - 1];
+    const [x1, y1] = line[i + 1];
+    const l = Math.hypot(x1 - x0, y1 - y0) || 1;
+    const k = (w / 2) * Math.sin((Math.PI * i) / (n - 1));
+    const [x, y] = line[i];
+    left.push([x - ((y1 - y0) / l) * k, y + ((x1 - x0) / l) * k]);
+    right.push([x + ((y1 - y0) / l) * k, y - ((x1 - x0) / l) * k]);
+  }
+  return [line[0], ...left, line[n - 1], ...right.reverse()];
+}
 
 /**
  * The head bowed toward a camera above: the crown and the hair, the hairline and the forehead below it with the brows
@@ -1256,9 +1316,10 @@ function bowedHead(fig: BodyFigure, pal: Palette, S: Shape, fade: number): strin
   o += solid(closed(mapped(Hf, B.head)), pal) + (F.earUnder ? ears : '');
   o += path(closed(mapped(Hf, B.hair)), `fill="${S.hairFill}"`);
   if (B.part) o += path(open(mapped(Hf, B.part)), `fill="none" stroke="${pal.skin}" stroke-width=".0022" stroke-linecap="round"${fade < 1 ? ` opacity="${num(fade)}"` : ''}`);
-  // Light catches the crown along its far edge, and his hair turns round the whorl, so dark hair reads as hair on a skull.
-  o += path(closed(mapped(Hf, B.sheen)), `fill="${SHINE}" fill-opacity=".5"`);
-  if (B.strands) o += path(B.strands.map((l) => open(mapped(Hf, l))).join(''), `fill="none" stroke="${SHINE}" stroke-opacity=".4" stroke-width=".0016" stroke-linecap="round"`);
+  // Light catches the hair over the far part of the crown, clear of its edge, and his hair turns out from the whorl, so
+  // dark hair reads as hair on a skull rather than a ball.
+  for (const b of B.sheen) o += path(closed(mapped(Hf, b)), `fill="${SHINE}" fill-opacity=".4"`);
+  if (B.strands) o += path(B.strands.map((l) => closed(mapped(Hf, streak(l, 0.0036)))).join(''), `fill="${SHINE}" fill-opacity=".42"`);
   o += F.earUnder ? '' : ears;
   return o + path(B.face.map((f) => closed(mapped(Hf, f)) + closed(mapped(Hf, mirrorFace(f)))).join(''), 'fill="var(--fig-face)"');
 }
@@ -1446,8 +1507,12 @@ interface FrontShape {
     hair: P2[];
     part?: P2[];
     knot?: P2[];
-    /** Light on the hair along the crown's far edge, and faint lines in it: his crown's whorl. */
-    sheen: P2[];
+    /**
+     * Light on the hair over the far part of the crown, a band of dark hair clear of its edge: bands painted over each
+     * other, so it is brightest in the middle and soft at its edges.
+     */
+    sheen: P2[][];
+    /** His whorl: the middle lines of a few tapered strands (see streak) turning out from it toward the hairline and the temples. */
     strands?: P2[][];
     ear: P2[];
     face: P2[][];
@@ -1624,19 +1689,19 @@ const BACK_VIEW_M: FrontShape['back'] = {
   head: both([[0.0, 0.056], [0.0245, 0.0525], [0.0395, 0.0425], [0.0465, 0.0265], [0.0475, 0.0075], [0.0445, -0.0125], [0.0385, -0.0305], [0.0285, -0.0445], [0.0155, -0.0535], [0.0, -0.0565]]),
   hair: both([[0.0, 0.0595], [0.026, 0.056], [0.0428, 0.0455], [0.0505, 0.0285], [0.0515, 0.008], [0.0482, -0.0075], [0.0446, -0.0088], [0.0412, -0.0128], [0.0338, -0.0212], [0.022, -0.0265], [0.01, -0.0288], [0.0, -0.0292]]),
   ear: [[0.0442, -0.0085], [0.0512, -0.0065], [0.0545, -0.0158], [0.0526, -0.0285], [0.0468, -0.0352], [0.0418, -0.0302]],
-  // Light along the crown's far edge, widest in the middle and fading out toward the temples.
-  sheen: band([[0.0, 0.0578], [0.0252, 0.0545], [0.0412, 0.0448], [0.0488, 0.0292], [0.0502, 0.0118]], [[0.0478, 0.0122], [0.0452, 0.0242], [0.0368, 0.0348], [0.0222, 0.0428], [0.0, 0.0462]]),
-  // The hair turns out from the whorl at the crown and runs over the skull to the hairline, the temples and the nape.
+  // Light over the far part of the crown round the whorl (0.0058, 0.0205), a band of dark hair clear of its edge: a broad
+  // band reaching in toward the whorl, and over it the light the locks catch, their tips pointing in at it.
+  sheen: [
+    [[0.0455, 0.0219], [0.0412, 0.0363], [0.0312, 0.0468], [0.0184, 0.0516], [0.0058, 0.0532], [-0.0075, 0.0533], [-0.0233, 0.0507], [-0.0387, 0.0403], [-0.0454, 0.0223], [-0.0331, 0.0347], [-0.0065, 0.0352], [0.0058, 0.0252], [0.0152, 0.0317], [0.0348, 0.0311]],
+    [[0.0438, 0.0258], [0.0388, 0.0384], [0.0288, 0.047], [0.0171, 0.0508], [0.0058, 0.0522], [-0.0061, 0.0525], [-0.0203, 0.0506], [-0.0352, 0.0428], [-0.0435, 0.0274], [-0.0338, 0.039], [-0.0174, 0.0414], [-0.0092, 0.0454], [0.0018, 0.0364], [0.0074, 0.0436], [0.0121, 0.0362], [0.0232, 0.0428], [0.0278, 0.0365], [0.038, 0.0335]],
+  ],
+  // The hair turns out from the whorl, each strand bending a little round it, on over the skull to the hairline and the
+  // temples.
   strands: [
-    [[0.0068, 0.0168], [0.0108, 0.0015], [0.0075, -0.0185]],
-    [[0.0015, 0.0162], [-0.0068, 0.0012], [-0.0115, -0.0172]],
-    [[0.0098, 0.0185], [0.0225, 0.0068], [0.0272, -0.0105]],
-    [[-0.0028, 0.0192], [-0.0205, 0.0128], [-0.0318, -0.0035]],
-    [[0.0112, 0.0222], [0.0282, 0.0215], [0.0405, 0.0085]],
-    [[-0.0032, 0.0242], [-0.0225, 0.0305], [-0.0385, 0.0235]],
-    [[0.0078, 0.0262], [0.0198, 0.0372], [0.0318, 0.0418]],
-    [[0.0022, 0.0272], [-0.0035, 0.0395], [-0.0158, 0.0478]],
-    [[0.0066, 0.0228], [0.0042, 0.0248], [0.0022, 0.0222], [0.0046, 0.0198]],
+    [[0.002, 0.0134], [-0.001, 0.0042], [-0.0022, -0.0056], [-0.0016, -0.0158], [0.0009, -0.0259]],
+    [[0.0069, 0.0126], [0.0097, 0.0044], [0.014, -0.0032], [0.0198, -0.0101], [0.0269, -0.0161]],
+    [[0.0112, 0.0146], [0.0179, 0.0094], [0.0257, 0.0055], [0.0343, 0.003], [0.0435, 0.0021]],
+    [[-0.0017, 0.0178], [-0.0114, 0.0123], [-0.02, 0.005], [-0.0273, -0.004], [-0.033, -0.0144]],
   ],
   face: [
     [[0.0058, -0.0408], [0.016, -0.038], [0.0272, -0.0398], [0.0268, -0.0421], [0.016, -0.0404], [0.0068, -0.0428]],
@@ -1806,7 +1871,10 @@ const BACK_VIEW_W: FrontShape['back'] = {
   hair: both([[0.0, 0.0625], [0.0278, 0.059], [0.0452, 0.0478], [0.0535, 0.0295], [0.0552, 0.008], [0.0532, -0.0115], [0.0492, -0.0232], [0.0452, -0.0252], [0.0428, -0.0178], [0.0358, -0.0222], [0.0238, -0.0275], [0.011, -0.0302], [0.0, -0.0308]]),
   part: [[0.0, -0.0296], [0.0004, 0.006], [0.0008, 0.042]],
   knot: both([[0.0, 0.0845], [0.0128, 0.0815], [0.0198, 0.073], [0.0215, 0.0618], [0.0175, 0.0518], [0.0075, 0.0465], [0.0, 0.0455]]),
-  sheen: band([[0.0, 0.0602], [0.0265, 0.0568], [0.0428, 0.0465], [0.0512, 0.0295], [0.0528, 0.0128]], [[0.0452, 0.0135], [0.0432, 0.0268], [0.0358, 0.0392], [0.0222, 0.0472], [0.0, 0.0505]]),
+  sheen: [
+    band([[0.0, 0.0572], [0.0238, 0.0542], [0.0395, 0.0458], [0.0482, 0.0335], [0.0512, 0.0188]], [[0.0468, 0.019], [0.0425, 0.0285], [0.0335, 0.0352], [0.0195, 0.039], [0.0, 0.04]]),
+    band([[0.0, 0.0536], [0.0205, 0.0512], [0.0338, 0.0448], [0.0412, 0.036], [0.044, 0.026]], [[0.0408, 0.026], [0.0362, 0.0322], [0.0275, 0.0378], [0.0152, 0.0414], [0.0, 0.0425]]),
+  ],
   ear: [[0.0432, -0.0095], [0.0502, -0.0078], [0.0532, -0.0165], [0.0514, -0.0285], [0.0458, -0.0348], [0.041, -0.0298]],
   face: [
     [[0.0062, -0.0412], [0.016, -0.0388], [0.0268, -0.0402], [0.0265, -0.0418], [0.016, -0.0404], [0.007, -0.0428]],
