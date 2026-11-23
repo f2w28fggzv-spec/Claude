@@ -68,9 +68,10 @@ export function plank(): Demo {
  * rests on the hip, elbow up.
  */
 export function sidePlank(): Demo {
-  // Front view, bone to skin on the outer side (see FRONT_SKIN): the edge of the foot, the point of the elbow.
+  // Front view, bone to skin on the outer side (see FRONT_SKIN): the edge of the foot, the point of the elbow; the fist
+  // rests by BODY.hand.
   const FOOT_SIDE = FRONT_SKIN.foot;
-  const ELBOW_SIDE = 0.03;
+  const ELBOW_SIDE = FRONT_SKIN.elbow;
   /** A point in the body's frame, from the middle of the hips: u toward the head along the body at `t`, v across toward the floor (the left side). */
   const frame = (t: number, u: number, v: number): Vec => add(mul(dir(t), u), mul(dir(t + 90), v));
   // Legs stacked, the top one resting on the bottom one: the knees together and the ankles together (their inner sides

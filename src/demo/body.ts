@@ -912,7 +912,6 @@ function drawSide(fig: BodyFigure, c: BodyContext, S: Shape): BodyLayers {
 /** The front-view trunk frame: t up from the hip line (foreshortened by k up to the shoulders), x toward side b. */
 interface FrontTrunk {
   u: Vec;
-  side: Vec;
   k: number;
   p(t: number, x: number): Vec;
 }
@@ -923,6 +922,8 @@ const frontFrame = (o: Vec, tip: Vec, nominal: number, deg: number, outer: numbe
 /** The direction `rad` radians on from unit u toward unit f. */
 const turn = (u: Vec, f: Vec, rad: number) => add(mul(u, Math.cos(rad)), mul(f, Math.sin(rad)));
 
+/** How far round from rest (radians) a limb's turn still counts as raised out to the side and overhead (see skinFrame). */
+const WRAP = 200 * RAD;
 /**
  * A limb skinned to the trunk at its root (see above). `rest` is the way the limb hangs in its tables (down along the
  * trunk), `kRest` the trunk's foreshortening, `weight` how far each table point follows the bone. With `slideInner`
@@ -930,14 +931,21 @@ const turn = (u: Vec, f: Vec, rad: number) => add(mul(u, Math.cos(rad)), mul(f, 
  * trunk to the bone as explicitly weighted points do, instead of turning part of the way round the joint, so a limb
  * raised overhead never swings them out under the joint.
  */
-function skinFrame(o: Vec, tip: Vec, nominal: number, deg: number, outer: number, rest: Vec, kRest: number, weight: (t: number, d: number) => number, slideInner = false): Frame & { phi: number } {
+function skinFrame(o: Vec, tip: Vec, nominal: number, deg: number, outer: number, rest: Vec, kRest: number, weight: (t: number, d: number) => number, slideInner = false, roundCap = false): Frame & { phi: number } {
   const bone = frontFrame(o, tip, nominal, deg, outer);
   const fRest = mul(rot90(rest), outer);
-  // How far the bone has turned out to the side from rest; past straight across the body it counts as raised overhead.
+  // How far the bone has turned out to the side from rest (negative: in across the body). A limb can reach a little past
+  // straight overhead (raised out to the side, then on over the head) or well across the body and up, but not both
+  // ways round at once: the turn reads as raised overhead up to WRAP and as across the body beyond it, where no real
+  // limb goes either way (an arm 20 degrees past vertical on the far side), so a limb swept across the body or up
+  // overhead turns smoothly.
   let phi = Math.atan2(dot(bone.u, fRest), dot(bone.u, rest));
-  if (phi < -Math.PI / 2) phi += 2 * Math.PI;
+  if (phi < WRAP - 2 * Math.PI) phi += 2 * Math.PI;
   const k = bone.k;
   const along = (t: number) => (t <= 0 ? t : t >= nominal ? nominal * k + (t - nominal) : t * k);
+  // Where the trunk holds a point: foreshortened with it, except (roundCap) the cap round the joint, a rounded mass
+  // whose outline the trunk's foreshortening doesn't flatten (capRound).
+  const held = (t: number, d: number) => (roundCap && t < 0 ? t * (kRest + (1 - kRest) * capRound(t, d)) : t * kRest);
   return {
     u: bone.u,
     f: bone.f,
@@ -948,17 +956,24 @@ function skinFrame(o: Vec, tip: Vec, nominal: number, deg: number, outer: number
       if (w !== undefined) {
         // An explicit weight: the point slides on a straight line from where the trunk holds it to where the bone
         // does (a muscle stretched from its origin to its insertion, the skin of the armpit).
-        const r = add(add(o, mul(rest, t * kRest)), mul(fRest, d));
+        const r = add(add(o, mul(rest, held(t, d))), mul(fRest, d));
         return lerpV(r, add(add(o, mul(bone.u, along(t))), mul(bone.f, d)), w);
       }
       const a = weight(t, d);
       const u = turn(rest, fRest, a * phi);
       const f = turn(fRest, mul(rest, -1), a * phi);
-      const s = t * kRest + (along(t) - t * kRest) * a;
+      const s0 = held(t, d);
+      const s = s0 + (along(t) - s0) * a;
       return V(o.x + u.x * s + f.x * d, o.y + u.y * s + f.y * d);
     },
   };
 }
+/**
+ * How much of a point above the shoulder joint keeps its rest shape when the trunk is foreshortened (a trunk tipped
+ * toward the camera): the deltoid's cap, from over its top round to its outer side, is a rounded mass and stays round
+ * however the trunk is seen; toward the trunk (its inner side) it joins the trunk's foreshortened outline.
+ */
+const capRound = (t: number, d: number) => smooth((Math.atan2(d, -t) / RAD + 30) / 60);
 /**
  * The shoulder. The cap's top (the acromion and the clavicle) stays with the trunk; round the outside of the joint the
  * weight grows with the angle from the acromion to the deltoid's widest point, so as the arm rises the cap closes
@@ -998,7 +1013,7 @@ const band = (outer: readonly P2[], inner: readonly P2[]): P2[] => [...outer, ..
  * outer half turns with it into the front fold of the armpit; its level is the trunk's.
  */
 function frontArm(s: Side, arm: Required<Arm>, outer: number, rest: Vec, TF: FrontTrunk, pal: Palette, chest: Palette | null, F: FrontShape, table = F.upperArm, deltoid = F.deltoid): FrontLimb {
-  const Ua = skinFrame(s.shoulder, s.elbow, 0.186, arm.upper, outer, rest, TF.k, shoulderWeight, true);
+  const Ua = skinFrame(s.shoulder, s.elbow, 0.186, arm.upper, outer, rest, TF.k, shoulderWeight, true, true);
   const Fa = frontFrame(s.elbow, s.wrist, 0.146, arm.fore, outer);
   const lv = pal.lv('shoulders');
   // As the arm rises the deltoid shortens and gathers into a mound over the joint, and a working one swells: the cap
@@ -1028,10 +1043,11 @@ function frontArm(s: Side, arm: Required<Arm>, outer: number, rest: Vec, TF: Fro
   const [i0, i1] = F.capArc;
   const n = upper.length;
   const nf = fore.length;
-  // The deltoid swells as it works, into the skin bands round it.
-  const delt = deltoid.map(([t0, d]): P2 => {
+  // The deltoid swells as it works, into the skin bands round it: round the cap outward, its front border inward.
+  const delt = deltoid.map(([t0, d], i): P2 => {
     const t = gather(t0);
-    return [t - lift(t, d), d + bulge(t, d) + (d > 0.012 ? 0.003 : d < -0.01 && t0 > 0.01 ? -0.0025 : 0) * lv * smooth((0.11 - t0) / 0.05)];
+    const swell = i >= DELT_CAP[0] && i <= DELT_CAP[1] ? 0.003 : i >= DELT_FRONT[0] && i <= DELT_FRONT[1] ? -0.0025 : 0;
+    return [t - lift(t, d), d + bulge(t, d) + swell * lv * smooth((0.11 - t0) / 0.05)];
   });
   let detail = chest ? muscle(closed(mapped3(Ua, F.pec)), chest.m('chest'), pal) + crease(F.pecFold.map((l) => open(mapped3(Ua, l))).join(''), 0.0026) : '';
   detail += muscle(closed(mapped(Ua, F.biceps)), pal.m('biceps'), pal) + muscle(closed(mapped(Ua, F.triceps)), pal.m('triceps'), pal);
@@ -1267,7 +1283,9 @@ function frontChest(fig: BodyFigure, TF: FrontTrunk, hand: number, c: BodyContex
   o += outline(closed(body) + closed(neck) + arms.map((l) => l.root).join('') + legs.map((l) => l.root).join(''), trunkPal);
   o += skin(union([body, neck]), trunkPal);
   o += muscle(pair(F.trap) + pair(F.lat), trunkPal.m('back'), trunkPal);
-  const oblique = F.oblique.map(([t, x]): P2 => [t, x - (x > 0.066 ? 0 : 0.0015 * core)]);
+  // A working oblique spreads in toward the rectus: its inner edge (obliqueInner) moves in.
+  const [o0, o1] = F.obliqueInner;
+  const oblique = F.oblique.map(([t, x], i): P2 => [t, i >= o0 && i <= o1 ? x - 0.0015 * core : x]);
   o += muscle(pair(oblique) + whole(F.rectus), trunkPal.m('core'), trunkPal);
   o += split(F.rectusLines.map((l) => open(mapped(TF, l)) + (l[0][1] === 0 ? '' : open(mapped(TF, mirror(l))))).join(''), trunkPal, F.rectusLineWidth);
   o += crease(scm(1) + scm(-1) + F.trunkLines.map((l) => open(mapped(TF, l)) + open(mapped(TF, mirror(l)))).join('') + closed(mapped(TF, F.navel)) + (F.cleavage ? open(mapped(TF, F.cleavage)) : ''), 0.0024);
@@ -1375,7 +1393,7 @@ function drawFront(fig: BodyFigure, c: BodyContext, S: Shape): BodyLayers {
     const hand = dot(side, sub(b.shoulder, a.shoulder)) < 0 ? -1 : 1;
     const across = mul(side, hand);
     // t is foreshortened with the trunk all the way up: a trunk tipped toward the camera tips the neck too (see solve).
-    const TF: FrontTrunk = { u, side: across, k, p: (t, x) => V(Hm.x + u.x * t * k + across.x * x, Hm.y + u.y * t * k + across.y * x) };
+    const TF: FrontTrunk = { u, k, p: (t, x) => V(Hm.x + u.x * t * k + across.x * x, Hm.y + u.y * t * k + across.y * x) };
     return { TF, hand };
   };
   // A trunk tipped toward the camera shows its chest while it still points up the picture (a level camera,
@@ -1401,7 +1419,12 @@ function drawFront(fig: BodyFigure, c: BodyContext, S: Shape): BodyLayers {
    0.265, chest 0.17, waist 0.15, hips 0.214 (her hipFlare below the iliac crest), neck 0.062, head 0.088. Where a body
    lies on the floor on its side (the outer hip, the edge of the foot, the elbow, the fist) her outline reaches as far
    from the bone as his: her fuller hip settles flat where it faces the floor. */
-/** Bone to skin, outline included, in the front view, where the lying front-view patterns rest a body on the floor. */
+/**
+ * Bone to skin in the front view, where the lying front-view patterns rest a body on the floor (or the head on the
+ * arm): a part placed this far from the surface touches it with its outline, the middle of the drawn line between on
+ * the surface and the line's half-width (W) off it, for both bodies (the rest tests and tools/demo-sheets measure it).
+ * A fist rests by BODY.hand, as in the side view.
+ */
 export const FRONT_SKIN = {
   /** Lying on the side: the outer hip over the trochanter (both bodies, within the outline's width). */
   hip: 0.043,
@@ -1416,8 +1439,8 @@ export const FRONT_SKIN = {
    */
   knee: 0.0345,
   ankle: 0.023,
-  /** The point of the elbow, along the upper arm past the elbow joint. */
-  elbow: 0.033,
+  /** The point of the elbow, along the upper arm past the elbow joint (a side plank rests on it). */
+  elbow: 0.03,
   /** The side of the head, the ear and the hair. */
   head: 0.059,
   /** The outer side of the upper arm half way down, where a head rests on it. */
@@ -1439,6 +1462,8 @@ interface FrontShape {
   trap: P2[];
   lat: P2[];
   oblique: P2[];
+  /** The oblique's inner edge beside the rectus, from obliqueInner[0] to obliqueInner[1]: it spreads in as the core works. */
+  obliqueInner: [number, number];
   rectus: P2[];
   /** The linea alba (on the midline, once, the rectus's full length) and at most two tendinous lines (both sides). */
   rectusLines: P2[][];
@@ -1563,6 +1588,11 @@ const PEC_FM: P3[] = ([
   [0.285, 0.008, 0], [0.29, 0.03, 0], [0.29, 0.052, 0], [0.286, 0.07, 0.02], [0.276, 0.083, 0.25], [0.262, 0.094, 0.6], [0.246, 0.099, 0.9], [0.234, 0.094, 1],
   [0.227, 0.0775, 0.5], [0.209, 0.0635, 0.22], [0.193, 0.0478, 0.07], [0.185, 0.034, 0], [0.181, 0.02, 0], [0.184, 0.008, 0], [0.21, 0.0055, 0], [0.25, 0.0055, 0],
 ] as P3[]).map(armAt);
+// Every deltoid table (his, hers, and both seen from behind) has this layout: 0-3 along the clavicle to the acromion,
+// 4-12 round the cap, 13-14 the insertion, 15-20 the front border. A working deltoid swells outward round the cap
+// (DELT_CAP) and inward along its front border (DELT_FRONT), into the skin bands round it.
+const DELT_CAP: [number, number] = [5, 12];
+const DELT_FRONT: [number, number] = [16, 19];
 const DELT_FM: P2[] = [
   [-0.006, -0.0385], [-0.012, -0.023], [-0.016, -0.012], [-0.017, -0.003], // along the clavicle's outer third to the acromion
   [-0.013, 0.006], [-0.006, 0.015], [0.003, 0.0219], [0.013, 0.0271], [0.027, 0.0292], [0.046, 0.0282], [0.066, 0.025], [0.086, 0.021], [0.102, 0.017], // round the cap
@@ -1642,8 +1672,10 @@ const HAIR_FM: P2[] = both([
   [0.0, 0.0672], [0.0248, 0.0642], [0.0405, 0.0535], [0.0482, 0.0372], [0.0496, 0.0212], [0.0478, 0.0105],
   [0.0446, 0.0138], [0.0418, 0.0262], [0.0352, 0.0365], [0.0245, 0.0425], [0.012, 0.0452], [0.0, 0.0458],
 ]);
+// The eyes open: an almond about twice as wide as it is tall, so it reads as an open eye even a few pixels across (as
+// the profile's eye does), under the brow.
 const FACE_PAIR_FM: P2[][] = [
-  [[0.0088, 0.0058], [0.0168, 0.0088], [0.0248, 0.0062], [0.0168, 0.0036]],
+  [[0.01, 0.0061], [0.0162, 0.0098], [0.0236, 0.0066], [0.0168, 0.0028]],
   [[0.0068, 0.0162], [0.0172, 0.0194], [0.0282, 0.0172], [0.0278, 0.0144], [0.0172, 0.0162], [0.0075, 0.0134]],
 ];
 const FACE_MID_FM: P2[][] = [
@@ -1665,8 +1697,12 @@ const BACK_FM: P2[] = [
   [0.264, 0.098], [0.262, 0.086], // 14-15 the cap's top (the arm's table)
   [0.28, 0.072], [0.298, 0.058], [0.318, 0.047], [0.338, 0.038], [0.36, 0.032], [0.39, 0.02], [0.41, 0.0], // 16-22 the trapezius to the neck
 ];
-// The hanging arm without the chest's fold: its inner side runs straight up under the cap.
-const UARM_BACK_FM: P3[] = [armBackAt(BACK_FM[15] as P3), armBackAt(BACK_FM[14] as P3), ...UARM_FM.slice(2, 23), [0.05, -0.028], [0.02, -0.03], [-0.006, -0.026]];
+// The hanging arm without the chest's fold: its inner side runs straight up under the cap. Seen from behind and above,
+// the shoulder's mound is the rear deltoid over the back of the joint, rising further toward the hips than the cap's
+// top seen from the front (2-4), from the side of the back round to the deltoid's widest point.
+const UARM_BACK_FM: P3[] = [armBackAt(BACK_FM[15] as P3), armBackAt(BACK_FM[14] as P3), [-0.0288, 0.005], [-0.019, 0.016], [-0.009, 0.024], ...UARM_FM.slice(5, 23), [0.05, -0.028], [0.02, -0.03], [-0.006, -0.026]];
+/** The rear deltoid seen from behind (rearDeltoid), its top round the cap (4-6) following the mound over the back of the joint. */
+const DELT_BACK_FM: P2[] = rearDeltoid(DELT_FM).map((p, i): P2 => ([[-0.0197, 0.007], [-0.0135, 0.0155], [-0.005, 0.0205]] as P2[])[i - 4] ?? p);
 const BACK_VIEW_M: FrontShape['back'] = {
   trunk: BACK_FM,
   glute: [[-0.19, 0.0085], [-0.197, 0.02], [-0.201, 0.037], [-0.195, 0.057], [-0.178, 0.073], [-0.145, 0.0845], [-0.118, 0.085], [-0.128, 0.068], [-0.142, 0.048], [-0.152, 0.028], [-0.158, 0.012]],
@@ -1685,7 +1721,7 @@ const BACK_VIEW_M: FrontShape['back'] = {
   spine: [[0.33, 0.0], [0.2, 0.0], [0.06, 0.0], [-0.075, 0.0]],
   cleft: [[-0.19, 0.0], [-0.17, 0.0], [-0.15, 0.0]],
   upperArm: UARM_BACK_FM,
-  deltoid: rearDeltoid(DELT_FM),
+  deltoid: DELT_BACK_FM,
   head: both([[0.0, 0.056], [0.0245, 0.0525], [0.0395, 0.0425], [0.0465, 0.0265], [0.0475, 0.0075], [0.0445, -0.0125], [0.0385, -0.0305], [0.0285, -0.0445], [0.0155, -0.0535], [0.0, -0.0565]]),
   hair: both([[0.0, 0.0595], [0.026, 0.056], [0.0428, 0.0455], [0.0505, 0.0285], [0.0515, 0.008], [0.0482, -0.0075], [0.0446, -0.0088], [0.0412, -0.0128], [0.0338, -0.0212], [0.022, -0.0265], [0.01, -0.0288], [0.0, -0.0292]]),
   ear: [[0.0442, -0.0085], [0.0512, -0.0065], [0.0545, -0.0158], [0.0526, -0.0285], [0.0468, -0.0352], [0.0418, -0.0302]],
@@ -1717,6 +1753,7 @@ const FRONT_M: FrontShape = {
   trap: TRAP_FM,
   lat: LAT_FM,
   oblique: OBLIQUE_FM,
+  obliqueInner: [6, 11],
   rectus: RECTUS_FM,
   rectusLines: [[[0.19, 0.0], [-0.022, 0.0]], [[0.155, 0.0425], [0.151, 0.022], [0.157, 0.0]], [[0.119, 0.0445], [0.115, 0.022], [0.121, 0.0]]],
   rectusLineWidth: 0.0036,
@@ -1834,8 +1871,9 @@ const HAIR_FW: P2[] = band(HAIR_SIL_FW, [[0.0428, 0.0074], [0.041, 0.0185], [0.0
 // Behind the head: the silhouette, then tucked in behind the ears and closed inside the head.
 const HAIR_BACK_FW: P2[] = both([...HAIR_SIL_FW, [0.0428, 0.0012], [0.024, -0.002], [0.0, -0.002]]);
 const TAIL_FW: P2[] = [[0.033, -0.03], [0.0492, -0.0385], [0.0602, -0.0592], [0.0652, -0.0852], [0.0632, -0.1095], [0.0552, -0.1238], [0.0452, -0.1198], [0.0402, -0.0998], [0.0362, -0.0732], [0.0312, -0.0505]];
+// Her eyes as open as his, with a flick of lashes at the outer corner.
 const FACE_PAIR_FW: P2[][] = [
-  [[0.0088, 0.0062], [0.0165, 0.0094], [0.0242, 0.0072], [0.0272, 0.0092], [0.0252, 0.0052], [0.0168, 0.0036]],
+  [[0.01, 0.0063], [0.016, 0.0101], [0.0224, 0.0083], [0.0252, 0.0092], [0.0236, 0.0059], [0.0168, 0.0029]],
   [[0.0072, 0.017], [0.0168, 0.0212], [0.0272, 0.0186], [0.0268, 0.0168], [0.0168, 0.0192], [0.0078, 0.0154]],
 ];
 const FACE_MID_FW: P2[][] = [
@@ -1865,8 +1903,9 @@ const BACK_VIEW_W: FrontShape['back'] = {
   trap: [[0.405, 0.0], [0.388, 0.015], [0.362, 0.026], [0.338, 0.034], [0.315, 0.045], [0.296, 0.059], [0.28, 0.073], [0.269, 0.0715], [0.264, 0.06], [0.257, 0.048], [0.245, 0.0398], [0.214, 0.031], [0.178, 0.0215], [0.142, 0.0122], [0.114, 0.005], [0.098, 0.0]],
   spine: BACK_VIEW_M.spine,
   cleft: [[-0.194, 0.0], [-0.172, 0.0], [-0.15, 0.0]],
-  upperArm: [armBackAt(BACK_FW[15] as P3), armBackAt(BACK_FW[14] as P3), ...UARM_FW.slice(2, 23), [0.05, -0.0252], [0.02, -0.027], [-0.006, -0.0235]],
-  deltoid: rearDeltoid(DELT_FW),
+  // The mound over the back of her shoulder as his (UARM_BACK_FM, DELT_BACK_FM), from her narrower back to her smaller cap.
+  upperArm: [armBackAt(BACK_FW[15] as P3), armBackAt(BACK_FW[14] as P3), [-0.0385, -0.004], [-0.0206, 0.0065], [-0.0105, 0.0145], ...UARM_FW.slice(5, 23), [0.05, -0.0252], [0.02, -0.027], [-0.006, -0.0235]],
+  deltoid: rearDeltoid(DELT_FW).map((p, i): P2 => ([[-0.0242, 0.0015], [-0.0135, 0.009], [-0.005, 0.0135]] as P2[])[i - 4] ?? p),
   head: both([[0.0, 0.0555], [0.0242, 0.052], [0.039, 0.042], [0.0458, 0.026], [0.0466, 0.0072], [0.0435, -0.0125], [0.0372, -0.0302], [0.0272, -0.0438], [0.0148, -0.0522], [0.0, -0.055]]),
   hair: both([[0.0, 0.0625], [0.0278, 0.059], [0.0452, 0.0478], [0.0535, 0.0295], [0.0552, 0.008], [0.0532, -0.0115], [0.0492, -0.0232], [0.0452, -0.0252], [0.0428, -0.0178], [0.0358, -0.0222], [0.0238, -0.0275], [0.011, -0.0302], [0.0, -0.0308]]),
   part: [[0.0, -0.0296], [0.0004, 0.006], [0.0008, 0.042]],
@@ -1894,6 +1933,7 @@ const FRONT_W: FrontShape = {
     [0.176, 0.0772], [0.166, 0.0688], [0.15, 0.0568], [0.128, 0.0502], [0.104, 0.0482], [0.08, 0.0486], [0.06, 0.0524], [0.045, 0.06], [0.047, 0.0705], [0.056, 0.0778],
     [0.072, 0.0718], [0.09, 0.067], [0.11, 0.0655], [0.132, 0.0678], [0.156, 0.0725],
   ],
+  obliqueInner: [2, 7],
   // The rectus as his strap, from under the bust (which covers its top) to the pubis, with softer definition: the
   // linea alba down its length and no tendinous lines.
   rectus: [

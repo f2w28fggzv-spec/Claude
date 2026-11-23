@@ -34,7 +34,7 @@ export function DevDemos({ still, ids, body }: { still: boolean; ids?: string[];
                   ))}
                 </div>
               ) : (
-                <ExerciseDemo exercise={e} compact />
+                <ExerciseDemo exercise={e} compact body={body} />
               )}
             </div>
           );

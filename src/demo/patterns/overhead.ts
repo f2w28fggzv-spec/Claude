@@ -10,7 +10,7 @@
 // stops just off the floor (or touches it, in a handstand push-up).
 import { BODY } from '../body';
 import { skinPoints } from '../contact';
-import { GRIP, L, PALM, add, along, angleOf, armTo, dir, dist, legTo, lerp, lerpV, mul, solve, sub, twoLink, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
+import { GRIP, L, PALM, add, along, angleOf, armTo, dir, dist, gripTo, legTo, lerp, lerpV, mul, solve, sub, twoLink, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
 import { O, FLOOR, LEG_LEN, FWD, centreOfMass, restingPad, solveFor, type Implement } from './shared';
 
@@ -482,12 +482,12 @@ export function lateralRaise(o: { oneArm?: boolean; cable?: boolean; bentOver?: 
       props: [{ kind: 'dumbbell', at: o.oneArm ? 'wrist' : 'wrists' }],
     };
   }
-  // Cable: the machine stands to the lifter's left, the pulley at its foot; the free hand holds the frame.
+  // Cable: the machine stands to the lifter's left, the pulley at its foot; the free hand holds the frame at about hip
+  // height, the arm angled out to it with the elbow soft.
   const f = solve('front', base);
   const tower = f.b.hip.x + 0.24;
   const pulley: Vec = { x: tower - 0.04, y: FLOOR - 0.07 };
-  const grab: Vec = { x: tower - 0.025, y: f.b.hip.y - 0.1 };
-  const free = armTo(f.b.shoulder, sub(grab, { x: GRIP, y: 0 }), { x: 0.3, y: 1 });
+  const free = gripTo(f.b.shoulder, { x: tower - 0.012, y: f.b.hip.y + 0.01 }, { x: 1, y: 0.2 });
   return {
     view: 'front',
     pose: (s) => ({ ...base, arm: arm(s), arm2: free }),
@@ -500,8 +500,9 @@ export function lateralRaise(o: { oneArm?: boolean; cable?: boolean; bentOver?: 
 }
 
 /**
- * How far the camera looks down on a bent-over lifter (degrees): the rear delt fly's placement (P.frontAbove), a phone
- * propped at chest height or higher in front of them and tilted down.
+ * How far the camera looks down on a bent-over lifter's back (degrees): the rear delt fly's placement (P.frontAbove), a
+ * phone propped sideways at about head height about 2 m in front of them and tilted down. (From 1.5-2 m and head
+ * height or a little above it looks down about 25-35 degrees.)
  */
 const LOOK_DOWN = 28;
 

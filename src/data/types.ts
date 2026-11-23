@@ -89,7 +89,7 @@ export type CameraView = 'side' | 'front';
 export interface Placement {
   view: CameraView;
   /** Where the phone sits, measured from the floor. */
-  phoneHeight: 'floor' | 'knee' | 'hip' | 'chest';
+  phoneHeight: 'floor' | 'knee' | 'hip' | 'chest' | 'head';
   /** Phone-to-lifter distance range in metres. */
   distanceM: [number, number];
   orientation: 'portrait' | 'landscape';

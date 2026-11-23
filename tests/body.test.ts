@@ -428,19 +428,35 @@ describe.each(BODIES)('the front view (%s)', (body) => {
 
   it('keeps the lying compositions: the top palm on the hip, the head on the pillow arm', () => {
     const closest = (a: Pt[], b: Pt[]) => Math.min(...a.map((p) => Math.min(...b.map((q) => Math.hypot(p.x - q.x, p.y - q.y)))));
+    /** Whether p lies inside the polygon through the points (even-odd). */
+    const inside = (p: Pt, poly: Pt[]) => {
+      let c = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [a, b] = [poly[i], poly[j]];
+        if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) c = !c;
+      }
+      return c;
+    };
     for (const id of ['side-plank', 'side-lying-hip-abduction']) {
       const demo = EXERCISES.find((e) => e.id === id)!.demo;
       for (const s of id === 'side-plank' ? [0] : [0, 1]) {
         const fig = figureAt(demo, s);
         const layers = drawBody(fig, ctx({ working: demo.working, body }));
-        // Outlines touching: their paths about two outline widths apart, or closer.
+        // Outlines touching: their paths about two outline widths apart, or closer. (Her fingertips lie a little over
+        // her wider hip below the crest, so the palm only has an upper bound.)
         const palm = drawnPoints(layers.nearArm).filter((p) => Math.hypot(p.x - fig.a.hand.x, p.y - fig.a.hand.y) < 0.03);
         const hip = drawnPoints(layers.core + layers.nearLeg).filter((p) => Math.hypot(p.x - fig.a.hand.x, p.y - fig.a.hand.y) < 0.08);
         expect(closest(palm, hip), `${id} s=${s}: the palm on the hip`).toBeLessThan(2 * OUTLINE + 0.002);
         if (id === 'side-lying-hip-abduction') {
+          // The head rests on the arm: their outlines meet (paths two outline widths apart, within a little either way),
+          // and nothing of the head lies inside the arm's skin.
           const head = drawnPoints(layers.core).filter((p) => Math.hypot(p.x - fig.head.x, p.y - fig.head.y) < 0.075);
           const arm = drawnPoints(layers.nearArm).filter((p) => Math.hypot(p.x - fig.head.x, p.y - fig.head.y) < 0.12);
           expect(closest(head, arm), `${id} s=${s}: the head on the arm`).toBeLessThan(2 * OUTLINE + 0.002);
+          expect(closest(head, arm), `${id} s=${s}: the head not sunk into the arm`).toBeGreaterThan(2 * OUTLINE - 0.002);
+          const skins = [...layers.nearArm.matchAll(/<path d="([^"]+)" fill="var\(--fig-skin\)"\/>/g)].flatMap((m) => m[1].split('M').filter(Boolean).map((sub) => drawnPoints(`<path d="M${sub}"`)));
+          expect(skins.length, `${id} s=${s}: the arms' skin`).toBeGreaterThan(0);
+          expect(head.filter((p) => skins.some((poly) => inside(p, poly))), `${id} s=${s}: the head inside the arm`).toHaveLength(0);
         }
       }
     }
@@ -470,6 +486,46 @@ describe.each(BODIES)('the front view (%s)', (body) => {
       const legRise = Math.min(fig.a.hip.y, fig.b.hip.y) - Math.min(...drawnPoints(layers.far + layers.nearLeg).map((p) => p.y));
       expect(armRise, `arms at ${torsoScale}`).toBeLessThan(0.03);
       expect(legRise, `legs at ${torsoScale}`).toBeLessThan(0.045);
+    }
+  });
+
+  it('turns the shoulder smoothly as an arm sweeps across the body or up overhead', () => {
+    // Half-degree steps of the right arm (image left): in across the body past level (upper 180 -> 25) and out and up
+    // past vertical (180 -> 375). Every drawn point moves about 0.004 a step; nothing jumps where the turn wraps.
+    const at = (upper: number) => {
+      const fig = posed('front', { arm: { upper, fore: upper }, arm2: { upper: 172, fore: 175 } });
+      return [...draw(fig, { shoulders: 0.5 }, body).nearArm.matchAll(/<path d="([^"]+)"/g)].map((m) => (m[1].match(/-?(?:\d+\.?\d*|\.\d+)/g) ?? []).map(Number));
+    };
+    for (const [from, to] of [[180, 25], [180, 375]]) {
+      let prev = at(from);
+      let worst = 0;
+      for (let u = from; Math.abs(u - to) > 1e-9; ) {
+        u += Math.sign(to - from) * 0.5;
+        const next = at(u);
+        expect(next.map((p) => p.length), `arm at ${u}: same drawing`).toEqual(prev.map((p) => p.length));
+        for (let i = 0; i < next.length; i++) for (let k = 0; k + 1 < next[i].length; k += 2) worst = Math.max(worst, Math.hypot(next[i][k] - prev[i][k], next[i][k + 1] - prev[i][k + 1]));
+        prev = next;
+      }
+      expect(worst, `arm swept ${from} -> ${to}`).toBeLessThan(0.008);
+    }
+  });
+
+  it('rounds the shoulder of a lifter bent over toward a camera above: the hanging arm rises into a mound over the joint', () => {
+    // Seen from above, the arm hangs from a rounded deltoid that rises from the side of the back over the back of the
+    // joint, not from a flat ledge: the arm's skin stands well above the joint over it and falls away outward.
+    const demo = EXERCISES.find((e) => e.id === 'rear-delt-fly')!.demo;
+    for (const s of [0, 0.1]) {
+      const fig = figureAt(demo, s);
+      const sh = fig.a.shoulder;
+      const outward = Math.sign(sh.x - fig.b.shoulder.x);
+      const skins = [...drawBody(fig, ctx({ body })).nearArm.matchAll(/<path d="([^"]+)" fill="var\(--fig-skin\)"\/>/g)];
+      const pts = skins.flatMap((m) => drawnPoints(`<path d="${m[1]}"`)).filter((p) => dist(p, sh) < 0.05);
+      const reach = Math.max(...pts.map((p) => (p.x - sh.x) * outward));
+      /** How far the arm's skin stands above the joint, `dx` out from it. */
+      const rise = (dx: number) => sh.y - Math.min(...pts.filter((p) => Math.abs((p.x - sh.x) * outward - dx) < 0.0015).map((p) => p.y));
+      const peak = Math.max(rise(-0.005), rise(0), rise(0.005), rise(0.01));
+      expect(peak, `s=${s}: the mound over the joint`).toBeGreaterThan(0.018);
+      expect(peak - rise(0.6 * reach), `s=${s}: falling away outward`).toBeGreaterThan(0.006);
     }
   });
 

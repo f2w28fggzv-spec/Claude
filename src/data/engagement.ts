@@ -680,14 +680,14 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     ],
     why: 'The same lever as the lateral raise, in front of the body: hanging against the thighs the dumbbells have little moment arm about the shoulders, and it grows to its maximum with the arms level at shoulder height, where the shoulder\'s lifting strength is also lower, so the top is hardest.',
   },
-  // Facing the camera, hinged forward about 65 degrees with a flat back and soft knees, dumbbells hanging straight down under the shoulders. -> Arms raised out to the sides until level with the back, elbows slightly bent.
+  // Facing the camera, seen from in front and above: hinged forward until the flat back is nearly level (about 87 degrees), knees soft, dumbbells hanging straight down under the shoulders. -> Arms raised out to the sides until level with the back (about 88 degrees from hanging), elbows slightly bent.
   'rear-delt-fly': {
     profile: [0.2, 0.65, 1],
     muscles: [
       { group: 'shoulders', role: 'main', peak: 1, note: 'rear of the shoulder sweeps the arms out and back' },
       { group: 'back', role: 'assist', peak: 0.6, profile: [0.3, 0.7, 1], note: 'squeezes the shoulder blades together; the lower back holds the hinge' },
     ],
-    why: 'Bent over, the dumbbells hang straight down under the shoulders with almost no moment arm; raising them out to the sides moves them away from the shoulder joints until, level with the back, the moment arm is longest and the rear deltoid shortest, so the top is hardest. The middle trapezius and rhomboids pull the shoulder blades together as the arms open, and the lower back holds the hinged trunk still from the start.',
+    why: 'Bent over with the back nearly level, the dumbbells hang straight down under the shoulders with almost no moment arm; raising them out to the sides moves them away from the shoulder joints until, level with the back (horizontal), the moment arm is longest and the rear deltoid shortest, so the top is hardest. The middle trapezius and rhomboids pull the shoulder blades together as the arms open, and the lower back holds the hinged trunk still from the start: with the trunk nearly level its lever about the hips is at its longest and stays the same through the rep, as the arms swing across the trunk rather than along it.',
   },
   // Standing tall side-on, knees soft, arms straight with the upper arms angled about 15 degrees forward so the barbell, held palms up, rests against the front of the upper thighs. -> Elbows bent about 140 degrees and drifted a little further forward (upper arms about 20 degrees ahead of the trunk), bar curled to just in front of the shoulders, forearms only about 20 degrees from vertical.
   'barbell-curl': {
