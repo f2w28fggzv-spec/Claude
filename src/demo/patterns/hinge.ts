@@ -341,6 +341,8 @@ export function lyingLegCurl(): Demo {
       return { torso: 90, head: 84, leg: { thigh, shin, foot: shin - 90 }, arm: gripTo(shoulder, handle, BACK), anchor: 'hip', at: hip };
     },
     props: [
+      // The contact report gives the whole trunk BODY.torsoFront, deeper than the drawn belly, so it sees the lower
+      // trunk in this pad; the drawn belly rests a few millimetres above it.
       { kind: 'bench', points: padUnder(top), beside: /arm|hand/ },
       { kind: 'line', from: { x: top[2].x, y: handle.y }, to: handle, width: 0.016 },
       { kind: 'bar', at: handle },

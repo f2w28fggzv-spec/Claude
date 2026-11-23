@@ -629,12 +629,13 @@ export function hackSquat(): Demo {
   const up = dir(torso);
   const travel = outTo(hipB, up, legSpan(165));
   const hipTop = add(hipB, mul(up, travel));
+  const front = dir(torso + 90);
+  // Handles at the front of the shoulder pads, about chest high, where the fists close; elbows down.
+  const grip = add(mul(front, 0.09), mul(up, -0.06));
   const pose = (s: number): DemoPose => {
     const hip = lerpV(hipTop, hipB, s);
     const shoulder = along(hip, torso, L.torso);
-    // Handles at the front of the shoulder pads, about chest high; elbows down.
-    const handle = add(along(shoulder, torso + 90, 0.09), mul(dir(torso), -0.06));
-    return { torso, leg: legTo(hip, O, FWD, foot), arm: gripTo(shoulder, handle, dir(torso + 160), 0.85), anchor: 'hip', at: hip };
+    return { torso, leg: legTo(hip, O, FWD, foot), arm: gripTo(shoulder, add(shoulder, grip), dir(torso + 160), 0.85), anchor: 'hip', at: hip };
   };
   // Platform under the feet, tilted toes up.
   const heel = add(O, heelFrom(foot));
@@ -642,26 +643,34 @@ export function hackSquat(): Demo {
   const plateN = dir(foot + 90);
   const p0 = add(add(heel, mul(plateDir, -0.06)), mul(plateN, 0.014));
   const p1 = add(p0, mul(plateDir, 0.26));
-  // Sled: pad behind the back from the lower back up past the shoulders,
-  // moving with the lifter, and the rails it runs on.
+  // The sled, moving with the lifter: the back pad from the lower back up past the shoulders, on a
+  // carriage that rides the rails; the shoulder pads on top of the carriage reach forward over the
+  // shoulders, a handle at their front end in each fist.
   const behind = dir(torso - 90);
-  const sledPad: Prop = {
-    kind: 'attached',
-    at: 'hip',
-    from: add(mul(behind, BODY.torsoBack + 0.022), mul(up, 0.04)),
-    to: add(mul(behind, BODY.torsoBack + 0.022), mul(up, L.torso + 0.06)),
-    width: 0.04,
-    pad: true,
-  };
-  const railBase = add(hipB, mul(behind, BODY.torsoBack + 0.07));
-  const rails: Prop = { kind: 'line', from: add(railBase, mul(up, -0.12)), to: add(railBase, mul(up, travel + L.torso + 0.2)), width: 0.03 };
-  return {
-    view: 'side',
-    floor: Math.max(p0.y, p1.y) + 0.03,
-    pose,
-    // Rails, sled pad, platform and the shoulder pad resting on top of the shoulder.
-    props: [rails, sledPad, { kind: 'line', from: p0, to: p1, width: 0.028 }, { kind: 'pad', at: 'shoulder', frame: 'trunk', offset: { x: 0.05, y: -0.018 }, block: { along: 0.04, across: 0.11 } }],
-  };
+  const PAD = BODY.torsoBack + 0.022;
+  const CARRIAGE = PAD + 0.035;
+  const RAIL = CARRIAGE + 0.032;
+  const sled: Prop[] = [
+    { kind: 'attached', at: 'hip', from: add(mul(behind, PAD), mul(up, 0.04)), to: add(mul(behind, PAD), mul(up, L.torso + 0.06)), width: 0.04, pad: true },
+    { kind: 'attached', at: 'hip', from: mul(behind, CARRIAGE), to: add(mul(behind, CARRIAGE), mul(up, L.torso + 0.07)), width: 0.03 },
+    { kind: 'pad', at: 'shoulder', frame: 'trunk', offset: { x: 0.05, y: -(CARRIAGE - 0.037) / 2 }, block: { along: 0.04, across: CARRIAGE + 0.037 - 0.015 } },
+    { kind: 'attached', at: 'shoulder', from: add(mul(up, 0.03), mul(front, 0.037)), to: grip, width: 0.018 },
+  ];
+  // One machine: a base frame on the floor holds the platform (propped at its front) and the rails,
+  // which rise from the floor behind the heels past the top of the sled's travel to a post at the back.
+  const floor = Math.max(p0.y, p1.y) + 0.03;
+  const base = floor - 0.012;
+  const railAt = add(hipB, mul(behind, RAIL));
+  const railFoot = add(railAt, mul(up, -(base - railAt.y) / -up.y));
+  const railTop = add(railAt, mul(up, travel + L.torso + 0.12));
+  const frame: Prop[] = [
+    { kind: 'line', from: { x: railTop.x - 0.05, y: base }, to: { x: p1.x + 0.05, y: base }, width: 0.024 },
+    { kind: 'line', from: railFoot, to: railTop, width: 0.026 },
+    { kind: 'line', from: railTop, to: { x: railTop.x, y: base }, width: 0.026 },
+    { kind: 'line', from: { x: p1.x - 0.012, y: p1.y }, to: { x: p1.x - 0.012, y: base }, width: 0.02 },
+    { kind: 'line', from: p0, to: p1, width: 0.028 },
+  ];
+  return { view: 'side', floor, pose, props: [...frame, ...sled] };
 }
 
 /**
