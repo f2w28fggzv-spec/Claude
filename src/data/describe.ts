@@ -12,7 +12,7 @@ const HEIGHT: Record<Placement['phoneHeight'], string> = {
 export function placementLines(p: Placement): string[] {
   return [
     p.view === 'side' ? 'Film from the side (side-on to the camera)' : 'Film from the front (facing the camera)',
-    `Phone ${HEIGHT[p.phoneHeight]}, held upright and level`,
+    `Phone ${HEIGHT[p.phoneHeight]}, held upright and ${p.tiltDown ? 'tilted down toward you' : 'level'}`,
     `About ${p.distanceM[0]}–${p.distanceM[1]} m away`,
     `${p.orientation === 'portrait' ? 'Portrait (upright)' : 'Landscape (sideways)'} orientation, 1x lens`,
     ...(p.notes ? [p.notes] : []),

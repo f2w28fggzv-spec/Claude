@@ -3,7 +3,7 @@
 // Bodies rest on the floor and the bench with the skin from BODY, hands close
 // around what they hold or lie flat, and planted feet stay put: calf raises
 // turn each foot about the ball with the toes flat.
-import { BODY } from '../body';
+import { BODY, FRONT_SKIN } from '../body';
 import { PAD_HALF } from '../contact';
 import { GRIP, L, PALM, add, along, angleOf, dir, dist, gripTo, legTo, lerp, mul, palmTo, solve, sub, type Arm, type DemoPose, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
@@ -248,18 +248,19 @@ function hipThrust(implement: Implement): Demo {
 
 /**
  * Front view, lying on the left side, head to the right, body in one line.
- * The bottom arm stretches overhead along the floor as a pillow; the top hand
- * rests on the hip. The top leg lifts straight from resting on the bottom leg
- * to about 40° above it, without the pelvis rolling.
+ * The bottom arm stretches overhead along the floor as a pillow, its forearm
+ * and palm on the floor and the head resting on the upper arm; the top hand
+ * rests on the iliac crest, its fingers clear of the working gluteus medius. The
+ * top leg lifts straight from resting on the bottom leg to about 40° above
+ * it, without the pelvis rolling.
  */
 export function sideLyingAbduction(): Demo {
   // The shoulders are wider than the hips: the trunk rises a little toward them.
   const torso = 81;
   const across = dir(torso + 90); // from the top side to the bottom side
-  // Bone to the floor (front view): hip, shoulder and ankle on their outer side, the arm.
-  const HIP_SIDE = 0.05;
-  const ANKLE_SIDE = 0.035;
-  const ARM_SIDE = 0.035;
+  // Bone to the floor (front view, see FRONT_SKIN): the outer hip, the outer edge of the foot.
+  const HIP_SIDE = FRONT_SKIN.hip;
+  const ANKLE_SIDE = FRONT_SKIN.foot;
   const hipC: Vec = { x: 0, y: 0 };
   const hipTop = sub(hipC, mul(across, L.hipHalf));
   const hipBottom = add(hipC, mul(across, L.hipHalf));
@@ -273,13 +274,22 @@ export function sideLyingAbduction(): Demo {
   const bottomLeg = toward(hipBottom, floor - ANKLE_SIDE);
   // Top leg at rest: its ankle on the bottom ankle.
   const rest = toward(hipTop, floor - 3 * ANKLE_SIDE);
-  // Head resting on the bottom arm's upper arm.
-  const headY = floor - 2 * ARM_SIDE - BODY.head;
-  const head = angleOf({ x: Math.sqrt(L.neck ** 2 - (headY - shC.y) ** 2), y: headY - shC.y });
-  const pillow = 90 + deg(Math.asin((floor - ARM_SIDE - shBottom.y) / L.upperArm));
-  // Top hand flat on the side of the pelvis, fingers toward the feet, elbow up.
-  const palm = sub(along(hipTop, torso, 0.06), mul(across, HIP_SIDE + BODY.hand / 2));
-  const topArm = palmTo(shTop, palm, torso + 180, mul(across, -1));
+  // The pillow arm: the upper arm slopes from the shoulder to the elbow, whose forearm's inner side rests on the floor;
+  // the forearm slopes on to the wrist (it thins), and the palm lies on the floor bent a little at the wrist.
+  const elbowY = floor - FRONT_SKIN.forearm;
+  const pillow = 90 + deg(Math.asin((elbowY - shBottom.y) / L.upperArm));
+  const wristY = floor - FRONT_SKIN.wrist;
+  const fore = 90 + deg(Math.asin((wristY - elbowY) / L.forearm));
+  const hand = 90 + deg(Math.atan((floor - FRONT_SKIN.palm - wristY) / 0.08));
+  // The head rests on the upper arm: its side on the arm's outer edge, where the head is along the arm.
+  const elbow = along(shBottom, pillow, L.upperArm);
+  const armTop = (x: number) => shBottom.y + ((elbow.y - shBottom.y) * (x - shBottom.x)) / (elbow.x - shBottom.x) - FRONT_SKIN.upperArm;
+  const headAt = (h: number) => along(shC, h, L.neck);
+  const head = solveFor(80, 120, (h) => headAt(h).y + FRONT_SKIN.head - armTop(headAt(h).x), 0);
+  // Top hand flat on the side of the pelvis at the iliac crest, lying along it toward the feet (turned a little off the
+  // body as the hip widens below the crest, and the working gluteus medius stays in view); elbow up.
+  const palm = sub(along(hipTop, torso, 0.065), mul(across, FRONT_SKIN.crest + BODY.hand / 2));
+  const topArm = palmTo(shTop, palm, torso + 187, mul(across, -1));
   // Place the figure so the floor is at FLOOR.
   const at = add(hipTop, { x: 0, y: FLOOR - floor });
   return {
@@ -293,7 +303,7 @@ export function sideLyingAbduction(): Demo {
         leg: { thigh: lift, shin: lift, foot: 0 },
         leg2: { thigh: bottomLeg, shin: bottomLeg, foot: 0 },
         arm: topArm,
-        arm2: { upper: pillow, fore: 90, hand: 90, flat: true },
+        arm2: { upper: pillow, fore, hand, flat: true },
         anchor: 'hip',
         at,
       };

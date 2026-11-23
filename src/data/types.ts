@@ -93,6 +93,8 @@ export interface Placement {
   /** Phone-to-lifter distance range in metres. */
   distanceM: [number, number];
   orientation: 'portrait' | 'landscape';
+  /** The phone tilts down toward the lifter instead of being held level (it looks down on a back bent toward it). */
+  tiltDown?: boolean;
   /** Extra setup notes shown to the user. */
   notes?: string;
 }

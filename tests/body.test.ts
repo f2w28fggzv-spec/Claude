@@ -7,7 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { EXERCISES } from '../src/data/exercises';
 import { MUSCLE_GROUPS, type MuscleGroup } from '../src/data/types';
 import { drawBody, type BodyContext, type BodyFigure, type BodyKind, type BodyLayers } from '../src/demo/body';
-import { RESTING_SIDE, type Levels } from '../src/demo/engagement';
+import { engagementFor } from '../src/data/engagement';
+import { RESTING_SIDE, levelsAt, type Levels } from '../src/demo/engagement';
 import { L, dist, lerpV, solve, type DemoPose } from '../src/demo/figure';
 import { figureAt, floorOf, resolvePose } from '../src/demo/render';
 import { PAD_HALF } from '../src/demo/contact';
@@ -251,11 +252,13 @@ describe('demo figure', () => {
   });
 
   it('fades the hair only a bowed head shows while the chest view fades in, so it never shows through her face', () => {
+    // A trunk tipped toward a camera above, past its line of sight (torsoScale < 0), shows the back and the bowed head;
+    // seen nearly end-on (|torsoScale| < 0.25) the chest view crossfades in.
     const bowed = (torsoScale: number, body: BodyKind) => draw(posed('front', { torsoScale }), {}, body).core;
-    // Fully bowed (k <= 0.6): her knot and parting at full strength; crossfading (k = 0.7): faded; him: no such hair.
-    expect(bowed(0.5, 'female')).not.toMatch(/ opacity="/);
-    expect(bowed(0.7, 'female')).toMatch(/fill="var\(--fig-hair-her\)"[^>]*opacity="\.\d+"/);
-    expect(bowed(0.7, 'male')).not.toMatch(/fill="var\(--fig-hair\)"[^>]*opacity=/);
+    // Fully bowed: her knot and parting at full strength; crossfading: faded; him: no such hair.
+    expect(bowed(-0.5, 'female')).not.toMatch(/ opacity="/);
+    expect(bowed(-0.1, 'female')).toMatch(/fill="var\(--fig-hair-her\)"[^>]*opacity="\.\d+"/);
+    expect(bowed(-0.1, 'male')).not.toMatch(/fill="var\(--fig-hair\)"[^>]*opacity=/);
   });
 
   it('tips the neck with a trunk tipped toward the camera, so a bent-over lifter seen from the front reads as bent over', () => {
@@ -344,5 +347,161 @@ describe.each(BODIES)('the working muscle stays in view (%s)', (body) => {
     // It is about two thirds of the upper arm's muscle: on a straight arm at least the size of the biceps.
     const arm = draw(posed('side'), { biceps: 0.61, triceps: 0.62 }, body).nearArm;
     expect(areaOf(arm, 0.62)).toBeGreaterThan(areaOf(arm, 0.61));
+  });
+});
+
+/** The visible outline lies this far outside its path (the stroke's outer half). */
+const OUTLINE = 0.0058;
+
+/** Visible widths of a standing figure facing the camera, arms straight down: shoulders over all layers, the waist on the trunk, the hips without the arms. */
+function widthsOf(body: BodyKind) {
+  const fig = posed('front');
+  const layers = draw(fig, {}, body);
+  const cx = (fig.a.hip.x + fig.b.hip.x) / 2;
+  const floor = fig.a.ankle.y + L.ankleHeight;
+  const at = (pts: Pt[], h0: number, h1: number) =>
+    2 * (Math.max(...pts.filter((p) => floor - p.y >= h0 && floor - p.y <= h1).map((p) => Math.abs(p.x - cx))) + OUTLINE);
+  const trunk = drawnPoints(layers.core);
+  let waist = Infinity;
+  for (let h = 0.58; h <= 0.68; h += 0.005) waist = Math.min(waist, at(trunk, h - 0.002, h + 0.002));
+  return { shoulders: at(drawnPoints(all(layers)), 0.76, 0.84), waist, hips: at(drawnPoints(layers.core + layers.nearLeg), 0.46, 0.56) };
+}
+
+describe.each(BODIES)('the front view (%s)', (body) => {
+  it('rests the lying front views on the floor at every point of the rep: the resting parts touch it, nothing sinks into it', () => {
+    // Gap from the floor to the drawn path, in body heights: from -0.001 (pressed in by a hair) to the outline's
+    // width (its edge on the floor line). Drawn with the rep's own engagement, so working muscles swell as in the app.
+    /** The foot reaches on past the ankle, along the shin. */
+    const foot = (f: BodyFigure) => f.b.ankle.x + 0.6 * (f.b.ankle.x - f.b.knee.x) * (0.03 / L.shin);
+    const cases: [string, (f: BodyFigure) => [string, 'nearArm' | 'nearLeg', number, number][]][] = [
+      ['side-plank', (f) => [['the fist', 'nearArm', f.b.hand.x, 0.02], ['the elbow', 'nearArm', f.b.elbow.x, 0.015], ['the edge of the foot', 'nearLeg', foot(f), 0.025]]],
+      [
+        'side-lying-hip-abduction',
+        (f) => [
+          ['the outer hip', 'nearLeg', f.b.hip.x - 0.02, 0.03],
+          ['the edge of the foot', 'nearLeg', foot(f), 0.025],
+          ['the pillow forearm', 'nearArm', (f.b.elbow.x + f.b.wrist.x) / 2, 0.06],
+          ['the pillow palm', 'nearArm', f.b.hand.x, 0.02],
+        ],
+      ],
+    ];
+    for (const [id, parts] of cases) {
+      const e = EXERCISES.find((x) => x.id === id)!;
+      const floor = floorOf(e.demo)!;
+      const gap = (p: Pt) => floor - p.y;
+      for (let k = 0; k <= 8; k++) {
+        const s = k / 8;
+        const fig = figureAt(e.demo, s);
+        const level = levelsAt(engagementFor(e), { phase: 'out', s, u: s, action: 'lifting' });
+        const layers = drawBody(fig, ctx({ level, working: e.demo.working, otherSide: e.demo.otherSide, body }));
+        expect(Math.min(...drawnPoints(all(layers)).map(gap)), `${id} s=${s}: nothing below the floor`).toBeGreaterThanOrEqual(-0.001);
+        for (const [name, layer, x, r] of parts(fig)) {
+          const g = Math.min(...drawnPoints(layers[layer]).filter((p) => Math.abs(p.x - x) < r).map(gap));
+          expect(g, `${id} s=${s}: ${name}`).toBeGreaterThanOrEqual(-0.001);
+          expect(g, `${id} s=${s}: ${name}`).toBeLessThanOrEqual(OUTLINE);
+        }
+      }
+    }
+  });
+
+  it('keeps the lying compositions: the top palm on the hip, the head on the pillow arm', () => {
+    const closest = (a: Pt[], b: Pt[]) => Math.min(...a.map((p) => Math.min(...b.map((q) => Math.hypot(p.x - q.x, p.y - q.y)))));
+    for (const id of ['side-plank', 'side-lying-hip-abduction']) {
+      const demo = EXERCISES.find((e) => e.id === id)!.demo;
+      for (const s of id === 'side-plank' ? [0] : [0, 1]) {
+        const fig = figureAt(demo, s);
+        const layers = drawBody(fig, ctx({ working: demo.working, body }));
+        // Outlines touching: their paths about two outline widths apart, or closer.
+        const palm = drawnPoints(layers.nearArm).filter((p) => Math.hypot(p.x - fig.a.hand.x, p.y - fig.a.hand.y) < 0.03);
+        const hip = drawnPoints(layers.core + layers.nearLeg).filter((p) => Math.hypot(p.x - fig.a.hand.x, p.y - fig.a.hand.y) < 0.08);
+        expect(closest(palm, hip), `${id} s=${s}: the palm on the hip`).toBeLessThan(2 * OUTLINE + 0.002);
+        if (id === 'side-lying-hip-abduction') {
+          const head = drawnPoints(layers.core).filter((p) => Math.hypot(p.x - fig.head.x, p.y - fig.head.y) < 0.075);
+          const arm = drawnPoints(layers.nearArm).filter((p) => Math.hypot(p.x - fig.head.x, p.y - fig.head.y) < 0.12);
+          expect(closest(head, arm), `${id} s=${s}: the head on the arm`).toBeLessThan(2 * OUTLINE + 0.002);
+        }
+      }
+    }
+  });
+
+  it('gives a standing body real adult proportions: shoulders, waist and hips', () => {
+    // Visible widths (outline included) in body heights. Adults (ANSUR anthropometry, Winter 2009): shoulders 0.28
+    // (men) / 0.26 (women), waist 0.165 / 0.15, hips 0.2 / 0.21.
+    const w = widthsOf(body);
+    const [shoulders, waist, hips] = body === 'male' ? [[0.27, 0.29], [0.155, 0.175], [0.19, 0.208]] : [[0.25, 0.275], [0.14, 0.158], [0.205, 0.225]];
+    expect(w.shoulders).toBeGreaterThan(shoulders[0]);
+    expect(w.shoulders).toBeLessThan(shoulders[1]);
+    expect(w.waist).toBeGreaterThan(waist[0]);
+    expect(w.waist).toBeLessThan(waist[1]);
+    expect(w.hips).toBeGreaterThan(hips[0]);
+    expect(w.hips).toBeLessThan(hips[1]);
+  });
+
+  it('turns from the chest view into the back seen from above through edge-on with nothing rising out of the trunk', () => {
+    // Near edge-on the trunk is a thin band: the shoulders keep their cap round the joint whichever way the trunk is
+    // tipped, and the hips' tops stay with the trunk instead of rising past it.
+    for (const torsoScale of [0.42, 0.3, 0.2, 0.12, 0.05, 0.01, 0, -0.01, -0.05, -0.12, -0.2, -0.3, -0.42]) {
+      const fig = posed('front', { torsoScale });
+      const layers = draw(fig, {}, body);
+      expect(all(layers), `${torsoScale}`).not.toMatch(/NaN|undefined|Infinity/);
+      const armRise = Math.min(fig.a.shoulder.y, fig.b.shoulder.y) - Math.min(...drawnPoints(layers.nearArm).map((p) => p.y));
+      const legRise = Math.min(fig.a.hip.y, fig.b.hip.y) - Math.min(...drawnPoints(layers.far + layers.nearLeg).map((p) => p.y));
+      expect(armRise, `arms at ${torsoScale}`).toBeLessThan(0.03);
+      expect(legRise, `legs at ${torsoScale}`).toBeLessThan(0.045);
+    }
+  });
+
+  it('gathers a raised deltoid into a mound over the shoulder', () => {
+    // Raised level, the cap stands above the line of the arm beyond it, and the deltoid ends nearer the joint than
+    // its insertion half way down the hanging arm.
+    const level = posed('front', { arm: { upper: 270, fore: 266 }, arm2: { upper: 90, fore: 94 } });
+    const arm = drawnPoints(draw(level, { shoulders: 0.9 }, body).nearArm);
+    const sh = level.a.shoulder;
+    const topAt = (dx: number) => Math.min(...arm.filter((p) => Math.abs(p.x - (sh.x - dx)) < 0.004).map((p) => p.y));
+    expect(topAt(0.12) - topAt(0.035), 'the cap stands above the arm').toBeGreaterThan(0.011);
+    // The deltoid on the lifter's right (image left): of the two drawn, the one nearer that shoulder.
+    const deltoidOf = (fig: BodyFigure) => {
+      const both = [...draw(fig, { shoulders: 0.9 }, body).nearArm.matchAll(new RegExp(`<path d="([^"]+)" fill="${fill(0.9)}"`, 'g'))].map((m) => outlinesOf(m[1]).flat());
+      const near = (pts: Pt[]) => Math.min(...pts.map((p) => dist(p, fig.a.shoulder)));
+      return both.reduce((a, b) => (near(a) <= near(b) ? a : b));
+    };
+    const reach = (fig: BodyFigure) => Math.max(...deltoidOf(fig).map((p) => dist(p, fig.a.shoulder)));
+    expect(reach(level)).toBeLessThan(reach(posed('front')) - 0.008);
+  });
+});
+
+describe('the front view, his and hers', () => {
+  it('draws her as a woman and him as a man: her shoulders and waist narrower, her hips flaring, a bust, her hair tied back', () => {
+    const him = widthsOf('male');
+    const her = widthsOf('female');
+    expect(him.shoulders - her.shoulders).toBeGreaterThan(0.01);
+    expect(him.waist - her.waist).toBeGreaterThan(0.01);
+    // Her hips flare from her waist, his are straighter: waist-to-hip and shoulder-to-hip ratios as in adults.
+    expect(her.hips - her.waist).toBeGreaterThan(him.hips - him.waist + 0.02);
+    expect(her.waist / her.hips).toBeLessThan(0.72);
+    expect(him.waist / him.hips).toBeGreaterThan(0.8);
+    expect(her.shoulders / her.hips).toBeLessThan(him.shoulders / him.hips - 0.12);
+    const fig = posed('front');
+    // The chest group: his pectorals end higher than her bust, which is fuller below.
+    const lowestChest = (body: BodyKind) =>
+      Math.max(...drawnPoints(draw(fig, {}, body).nearArm.split('<path').filter((p) => p.includes(fill(LEVELS.chest))).map((p) => '<path' + p).join('')).map((p) => p.y));
+    expect(lowestChest('female') - lowestChest('male')).toBeGreaterThan(0.015);
+    // Her hair tied back shows past her head and neck (drawn behind them with its own outline); he has none.
+    expect(draw(fig, {}, 'female').core).toMatch(/fill="var\(--fig-hair-her\)" stroke=/);
+    expect(draw(fig, {}, 'male').core).not.toMatch(/fill="var\(--fig-hair\)" stroke=/);
+  });
+
+  it('lets her ponytail fall toward the floor when she lies on her side, never over her top shoulder', () => {
+    for (const id of ['side-plank', 'side-lying-hip-abduction']) {
+      const fig = figureAt(EXERCISES.find((e) => e.id === id)!.demo, 0);
+      const hair = draw(fig, {}, 'female').core.match(/<path d="([^"]+)" fill="var\(--fig-hair-her\)" stroke=/)?.[1] ?? '';
+      const pts = drawnPoints(`<path d="${hair}"`);
+      // The hair behind her head and neck hangs further below the head's centre (toward the floor) than it reaches
+      // above it, where it stays within the head's own width.
+      const down = Math.max(...pts.map((p) => p.y)) - fig.head.y;
+      const up = fig.head.y - Math.min(...pts.map((p) => p.y));
+      expect(down, id).toBeGreaterThan(up + 0.003);
+      expect(up, id).toBeLessThan(0.065);
+    }
   });
 });

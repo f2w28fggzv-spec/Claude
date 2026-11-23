@@ -7,7 +7,7 @@
 // it. The spine curls (pose.bend) only where the exercise curls it on
 // purpose: crunches, the hollow hold's dish and the pelvis tucking under at
 // the top of a hanging raise.
-import { BODY } from '../body';
+import { BODY, FRONT_SKIN } from '../body';
 import { skinPoints } from '../contact';
 import { GRIP, L, PALM, add, angleOf, dir, gripTo, legTo, lerp, mul, palmTo, solve, sub, type Arm, type DemoPose, type Leg, type Vec } from '../figure';
 import type { Demo } from '../types';
@@ -68,9 +68,8 @@ export function plank(): Demo {
  * rests on the hip, elbow up.
  */
 export function sidePlank(): Demo {
-  // Front view, bone to skin on the outer side: the hip, the edge of the foot, the elbow.
-  const HIP_SIDE = 0.05;
-  const FOOT_SIDE = 0.035;
+  // Front view, bone to skin on the outer side (see FRONT_SKIN): the edge of the foot, the point of the elbow.
+  const FOOT_SIDE = FRONT_SKIN.foot;
   const ELBOW_SIDE = 0.03;
   const legLen = L.thigh + L.shin;
   /** A point in the body's frame, from the middle of the hips: u toward the head along the body at `t`, v across toward the floor (the left side). */
@@ -92,9 +91,10 @@ export function sidePlank(): Demo {
   const fist: Vec = { x: elbow.x + 0.7 * (L.forearm + GRIP), y: FLOOR - BODY.hand };
   const fore = angleOf(sub(fist, elbow));
   const foreScale = Math.hypot(fist.x - elbow.x, fist.y - elbow.y) / (L.forearm + GRIP);
-  // Top hand flat on the side of the hip, fingers toward the feet, elbow pointing up.
-  const palm = p(0.06, -(L.hipHalf + HIP_SIDE + BODY.hand / 2));
-  const topArm = palmTo(p(L.torso, -L.shoulderHalf), palm, t + 180, dir(t - 90));
+  // Top hand flat on the side of the pelvis at the iliac crest, lying along it toward the feet (turned a little off the
+  // body, as the hip widens below the crest), elbow pointing up.
+  const palm = p(0.06, -(L.hipHalf + FRONT_SKIN.crest + BODY.hand / 2));
+  const topArm = palmTo(p(L.torso, -L.shoulderHalf), palm, t + 185, dir(t - 90));
   const pose: DemoPose = {
     torso: t,
     head: t, // neck in line with the body

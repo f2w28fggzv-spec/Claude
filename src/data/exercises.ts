@@ -1206,7 +1206,7 @@ const DRAFT_EXERCISES: Exercise[] = [
     equipment: ['dumbbell'],
     role: 'isolation',
     demo: D.lateralRaise({ bentOver: true }),
-    placement: P.frontStanding,
+    placement: P.frontAbove,
     tracking: up('wrist'),
     checks: [C.rom('shoulder', 40)],
     faults: [F.partialRange('chest-supported-dumbbell-row', 'Raise your arms out until they are level with your torso.'), F.swinging('chest-supported-dumbbell-row', 'Keep your torso still and lift with your shoulders.')],
