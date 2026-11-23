@@ -374,7 +374,8 @@ const FOREARM: P2[] = [
   [0.13, -0.0145], [0.1, -0.017], [0.065, -0.0205], [0.035, -0.0225], [0.01, -0.0225], // 10-14 back
   [-0.014, -0.021], [-0.026, -0.008], [-0.024, 0.01], // 15-17 elbow cap
 ];
-const TRICEPS_IN: P2[] = [[0.05, -0.016], [0.09, -0.0135], [0.13, -0.013], [0.165, -0.013], [0.19, -0.017]];
+// Triceps: the back half of the upper arm, its lateral head bulging from under the deltoid to the elbow.
+const TRICEPS_IN: P2[] = [[0.045, -0.014], [0.08, -0.008], [0.12, -0.0065], [0.158, -0.008], [0.188, -0.014]];
 // Fist closed around the hand point (GRIP past the wrist): t along the hand, d toward the palm. The thumb crosses
 // the front of the fingers; one line marks the knuckles.
 const FIST: P2[] = [
@@ -391,12 +392,15 @@ const FLAT_HAND: P2[] = [
 const THUMB_LINE: P2[][] = [[[0.026, -0.006], [0.042, -0.002], [0.058, 0.003]]];
 // Deltoid: a cap over the shoulder whose three heads (front, middle, back) converge in a V at mid-arm.
 const DELT: P2[] = [
-  [0.1, 0.002], [0.1, 0.002], [0.078, 0.015], [0.048, 0.029], [0.016, 0.0355], [-0.016, 0.033], [-0.036, 0.022], [-0.046, 0.002],
-  [-0.042, -0.018], [-0.026, -0.032], [0.002, -0.0365], [0.032, -0.0335], [0.06, -0.022], [0.084, -0.008],
+  [0.085, 0.002], [0.085, 0.002], [0.066, 0.012], [0.04, 0.024], [0.012, 0.0325], [-0.016, 0.033], [-0.036, 0.022], [-0.046, 0.002],
+  [-0.042, -0.018], [-0.026, -0.032], [0.0, -0.034], [0.026, -0.029], [0.05, -0.018], [0.07, -0.007],
 ];
-const DELT_SPLITS: P2[][] = [[[0.09, 0.003], [0.055, 0.013], [0.022, 0.02], [-0.012, 0.022], [-0.03, 0.017]], [[0.09, 0.0], [0.056, -0.01], [0.024, -0.017], [-0.01, -0.022], [-0.03, -0.02]]];
+const DELT_SPLITS: P2[][] = [[[0.076, 0.003], [0.046, 0.011], [0.018, 0.018], [-0.012, 0.021], [-0.03, 0.017]], [[0.076, 0.0], [0.047, -0.009], [0.02, -0.015], [-0.01, -0.02], [-0.03, -0.019]]];
 // The pectoral's tendon running into the front of the upper arm under the deltoid (the front fold of the armpit).
-const PEC_TAIL: P2[] = [[-0.004, 0.026], [0.03, 0.0345], [0.07, 0.0335], [0.106, 0.0285], [0.13, 0.019], [0.112, 0.008], [0.075, 0.004], [0.04, 0.006], [0.012, 0.012]];
+const PEC_TAIL: P2[] = [[-0.004, 0.028], ...runOf(UARM, 1, 5), [0.15, 0.019], [0.12, 0.006], [0.08, 0.002], [0.04, 0.004], [0.012, 0.012]];
+// The back fold of the armpit: the lat and teres major running out from under the deltoid's back head along the back
+// of the upper arm.
+const BACK_TAIL: P2[] = [[-0.004, -0.03], ...runOf(UARM, 16, 12), [0.15, -0.02], [0.12, -0.007], [0.08, -0.002], [0.04, -0.004], [0.012, -0.012]];
 
 const TRUNK: P2[] = [
   [-0.05, 0.028], [-0.02, 0.043], [0.02, 0.0485], [0.065, 0.0535], [0.105, 0.0585], [0.14, 0.0655], [0.172, 0.0735], [0.2, 0.0795], // 0-7
@@ -406,29 +410,43 @@ const TRUNK: P2[] = [
   [0.108, -0.0515], [0.078, -0.054], [0.048, -0.062], [0.015, -0.067], // 23-26 back
   [-0.02, -0.06], [-0.045, -0.035], [-0.058, -0.005], // 27-29 seat (under the glute and the thigh)
 ];
-// Pectoralis major: a tall fan from the clavicle and sternum down to the lower chest, converging on the armpit.
-const PEC_RUN: P2[] = runOf(TRUNK, 6, 11);
+/** The trunk with the chest (TRUNK 6-10) swelling forward as the pectoral works (chest 0..1), as working muscles do. */
+const CHEST_SWELL = [0.004, 0.009, 0.012, 0.01, 0.005];
+const trunkProfile = (chest: number): P2[] => TRUNK.map(([t, d], i): P2 => [t, d + chest * (CHEST_SWELL[i - 6] ?? 0)]);
+// Pectoralis major: a tall fan from the clavicle and sternum down to the lower chest (along the chest's contour,
+// TRUNK 6-11), converging on the armpit.
 const PEC_IN: P2[] = [[0.293, 0.031], [0.288, 0.017], [0.276, 0.006], [0.256, -0.002], [0.234, 0.0], [0.212, 0.01], [0.193, 0.028], [0.179, 0.048], [0.171, 0.063]];
 /** Points over the pectoral, for judging how much of it the near arm covers. */
 const PEC_SAMPLES: P2[] = [[0.19, 0.045], [0.2, 0.065], [0.215, 0.025], [0.225, 0.05], [0.235, 0.072], [0.25, 0.03], [0.255, 0.058], [0.27, 0.015], [0.275, 0.042], [0.285, 0.03]];
-// Rectus abdominis: a strip along the front crossed by three tendinous lines ([t inside, t at the skin, d at the skin]).
-const RECTUS: P2[] = [...runOf(TRUNK, 1, 6), [0.176, 0.06], [0.168, 0.047], [0.14, 0.043], [0.1, 0.038], [0.06, 0.033], [0.02, 0.029], [-0.008, 0.027], [-0.02, 0.033]];
+/** Points over the lat, the scapular back and the lower back, for judging how much of the back the near arm covers. */
+const BACK_SAMPLES: P2[] = [
+  [0.08, -0.05], [0.11, -0.052], [0.12, -0.035], [0.15, -0.03], [0.15, -0.05], [0.18, -0.02], [0.18, -0.045],
+  [0.2, -0.06], [0.21, -0.01], [0.22, -0.035], [0.24, -0.055], [0.25, -0.02], [0.27, -0.04], [0.29, -0.03],
+];
+// Rectus abdominis: a strip along the front, seen mostly in profile, so narrow until it works and thickens; three
+// tendinous lines cross it ([t inside, t at the skin, d at the skin]).
+const RECTUS_RUN: P2[] = runOf(TRUNK, 1, 6);
+const RECTUS_IN: P2[] = [[0.176, 0.063], [0.168, 0.053], [0.14, 0.049], [0.1, 0.044], [0.06, 0.039], [0.02, 0.034], [-0.008, 0.031], [-0.02, 0.035]];
 const RECTUS_LINES: [number, number, number][] = [[0.157, 0.152, 0.062], [0.126, 0.121, 0.058], [0.094, 0.09, 0.053]];
-// External oblique on the flank: a scalloped upper edge where it meets the serratus, a diagonal back border, and its
-// lower edge on the iliac crest.
+// External oblique on the front of the flank: a scalloped upper edge where it meets the serratus, a diagonal back
+// border in front of the lat, and its lower edge on the iliac crest. Working, it spreads into the skin bands beside
+// the lat and the rectus (obliqueAt).
 const OBLIQUE: P2[] = [
-  [0.166, 0.038], [0.186, 0.032], [0.178, 0.022], [0.197, 0.015], [0.188, 0.005], [0.204, -0.003], [0.192, -0.011],
-  [0.166, -0.014], [0.138, -0.018], [0.114, -0.023], [0.098, -0.027],
-  [0.094, -0.012], [0.096, 0.006], [0.09, 0.02], [0.078, 0.029],
+  [0.166, 0.038], [0.184, 0.033], [0.177, 0.026], [0.193, 0.022], [0.184, 0.015],
+  [0.172, 0.012], [0.148, 0.004], [0.124, -0.005], [0.106, -0.014], [0.098, -0.019],
+  [0.094, -0.006], [0.096, 0.008], [0.09, 0.02], [0.078, 0.029],
   [0.1, 0.033], [0.13, 0.036], [0.15, 0.037],
 ];
-// Latissimus dorsi: a wing from under the armpit sweeping down and back to the iliac crest.
+/** The oblique working (core 0..1): its back border (5-10) moves back toward the lat, its front edge (13-16, 0) toward the rectus. */
+const obliqueAt = (core: number): P2[] => OBLIQUE.map(([t, d], i): P2 => [t, d + core * (i >= 5 && i <= 10 ? -0.006 : i >= 13 || i === 0 ? 0.003 : 0)]);
+// Latissimus dorsi: a wing from under the armpit sweeping down and back to the iliac crest, its lower fibres wrapping
+// round the side of the lower ribs in front of the erectors.
 const LAT: P2[] = [
-  [0.264, -0.008], [0.246, 0.003], [0.222, 0.005], [0.198, -0.003], [0.172, -0.019], [0.145, -0.024], [0.122, -0.029], [0.104, -0.034], [0.092, -0.04],
-  [0.1, -0.046], [0.12, -0.046], [0.145, -0.05], [0.172, -0.056], ...runOf(TRUNK, 20, 20), [0.224, -0.064], [0.244, -0.053], [0.258, -0.034],
+  [0.264, -0.008], [0.246, 0.003], [0.222, 0.005], [0.198, 0.006], [0.172, 0.006], [0.145, -0.003], [0.122, -0.011], [0.104, -0.02], [0.09, -0.028],
+  [0.096, -0.034], [0.12, -0.033], [0.145, -0.038], [0.172, -0.048], ...runOf(TRUNK, 20, 20), [0.224, -0.064], [0.244, -0.053], [0.258, -0.034],
 ];
 // Erector spinae along the lower back, and the scapular back (middle trapezius, infraspinatus, teres) behind the shoulder.
-const ERECTORS: P2[] = [...runOf(TRUNK, 21, 25), [0.054, -0.05], [0.08, -0.044], [0.11, -0.041], [0.14, -0.046], [0.163, -0.054]];
+const ERECTORS: P2[] = [...runOf(TRUNK, 21, 25), [0.05, -0.044], [0.078, -0.039], [0.11, -0.038], [0.14, -0.043], [0.163, -0.053]];
 const UPPER_BACK: P2[] = [...runOf(TRUNK, 16, 20), [0.21, -0.064], [0.232, -0.058], [0.252, -0.043], [0.272, -0.029], [0.296, -0.024], [0.316, -0.022]];
 
 // Head in profile, [x toward the face, y toward the crown] from the centre of the skull.
@@ -589,32 +607,44 @@ function armShape(s: Side, arm: Required<Arm>): ArmShape {
   return { Ua, Fa, H, flex, prof, upper: mapped(Ua, prof), fore: mapped(Fa, FOREARM), hand: mapped(H, arm.flat ? FLAT_HAND : FIST) };
 }
 const outlineOf = (A: ArmShape) => [A.upper, A.fore, A.hand];
+/** How far an upper arm has turned to point at the camera: 0 along the picture, 1 seen end-on. */
+const endOnOf = (A: ArmShape) => 1 - smooth((A.Ua.k - 0.15) / 0.2);
 /**
  * The triceps along the back of the upper arm, or the biceps along its front:
  * from under the deltoid's edge to the elbow; the biceps shortens and thickens
  * as the elbow bends.
  */
-function armMuscle(A: ArmShape, g: 'triceps' | 'biceps', pal: Palette): string {
+function armMuscle(A: ArmShape, g: 'triceps' | 'biceps', pal: Palette, seen = 1): string {
   const { Ua, flex, prof } = A;
+  // `seen` < 1 (an arm turning end-on) thins the belly toward the skin it lies on.
+  const thin = (list: readonly P2[], skin: number): P2[] => list.map(([t, d]) => [t, skin + (d - skin) * seen]);
   const shape =
     g === 'triceps'
-      ? belly([...runOf(prof, 11, 15), [0.028, -0.03]], TRICEPS_IN, -1, 0.008 * pal.lv(g))
+      ? belly([...runOf(prof, 11, 15), [0.026, -0.031]], thin(TRICEPS_IN, -0.031), -1, 0.006 * seen * pal.lv(g))
       : belly(
           [...runOf(prof, 2, 6), [0.196 - 0.008 * flex, 0.017], [0.2 - 0.008 * flex, 0.006]],
-          [[0.182, 0.005 - 0.003 * flex], [0.15, 0.007 - 0.005 * flex], [0.11, 0.009 - 0.006 * flex], [0.075, 0.013 - 0.004 * flex], [0.05, 0.023]],
+          thin([[0.182, 0.005 - 0.003 * flex], [0.15, 0.007 - 0.005 * flex], [0.11, 0.009 - 0.006 * flex], [0.075, 0.013 - 0.004 * flex], [0.05, 0.023]], 0.03),
           1,
-          0.008 * pal.lv(g),
+          0.008 * seen * pal.lv(g),
         );
   return muscle(closed(mapped(Ua, shape)), pal.m(g), pal);
 }
 
 /**
- * One arm. `pecTail` (0..1) grows the pectoral's tendon onto the front of the
- * upper arm when this arm covers most of the chest (bench press, push-up, dip),
- * so the main mover never vanishes behind the arm.
+ * One arm. `pecTail` / `backTail` (0..1) grow the pectoral's tendon onto the
+ * front of the upper arm, or the back's fold onto its back, when this arm
+ * covers most of that working muscle (a press, a row), so the main mover never
+ * vanishes behind the arm.
+ *
+ * An upper arm pointing at the camera (short apparent length) is drawn as seen
+ * end-on: one smooth limb with the round deltoid cap at the shoulder and the
+ * fist at its end. The details that only read along a full-length arm (the
+ * elbow crease, the biceps and triceps, the tendons, the deltoid's head lines)
+ * thin out and give way as it shortens, so it never folds into a knot.
  */
-function sideArm(A: ArmShape, arm: Required<Arm>, pal: Palette, pecTail = 0): string {
+function sideArm(A: ArmShape, arm: Required<Arm>, pal: Palette, pecTail = 0, backTail = 0): string {
   const { Ua, H, prof, upper, fore, hand } = A;
+  const endOn = endOnOf(A);
   let o: string;
   let fist = '';
   if (arm.flat) {
@@ -624,21 +654,29 @@ function sideArm(A: ArmShape, arm: Required<Arm>, pal: Palette, pecTail = 0): st
     fist = solid(closed(hand), pal) + crease(lines(H, FIST_LINES), 0.0024);
   }
   o += skin(closed(fore), pal) + skin(closed(upper), pal);
-  o += outline(arcOf(mapped(Ua, grow(prof, W / 2)), 3, 8), pal, W); // the elbow crease
-  o += armMuscle(A, 'triceps', pal) + armMuscle(A, 'biceps', pal);
-  if (pecTail > 0) o += muscle(closed(mapped(Ua, PEC_TAIL.map(([t, d]): P2 => [t * pecTail, d * (0.6 + 0.4 * pecTail)]))), pal.m('chest'), pal);
-  o += muscle(closed(mapped(Ua, DELT)), pal.m('shoulders'), pal) + split(lines(Ua, DELT_SPLITS), pal);
+  if (endOn < 0.5) {
+    const seen = 1 - 2 * endOn;
+    o += outline(arcOf(mapped(Ua, grow(prof, W / 2)), 3, 8), pal, W * seen); // the elbow crease
+    o += armMuscle(A, 'triceps', pal, seen) + armMuscle(A, 'biceps', pal, seen);
+    const tail = (list: readonly P2[], k: number): P2[] => list.map(([t, d]) => [t * k, d * (0.6 + 0.4 * k)]);
+    if (pecTail > 0) o += muscle(closed(mapped(Ua, tail(PEC_TAIL, pecTail * seen))), pal.m('chest'), pal);
+    if (backTail > 0) o += muscle(closed(mapped(Ua, tail(BACK_TAIL, backTail * seen))), pal.m('back'), pal);
+  }
+  // The deltoid's front head gives way to the pectoral's tendon, its back head to the back fold, below the cap.
+  const deltoid = (list: readonly P2[]): P2[] => list.map(([t, d]) => [t, d * (1 - 0.55 * smooth((t + 0.02) / 0.05) * (d > 0 ? pecTail : backTail))]);
+  o += muscle(closed(mapped(Ua, deltoid(DELT))), pal.m('shoulders'), pal);
+  if (endOn < 1) o += split(lines(Ua, DELT_SPLITS.map(deltoid)), pal, 0.8 * GAP * (1 - endOn));
   return o + fist;
 }
 
-/** Share of the pectoral hidden behind the near arm. */
-function pecCovered(T: TrunkFrame, s: Side): number {
+/** Share of a trunk region (its sample points) hidden behind the near arm. */
+function covered(T: TrunkFrame, s: Side, samples: readonly P2[]): number {
   const parts: [Vec, Vec, number][] = [[s.shoulder, s.elbow, 0.036], [s.elbow, s.wrist, 0.026], [s.wrist, s.hand, 0.026]];
-  const hidden = PEC_SAMPLES.filter(([t, d]) => {
+  const hidden = samples.filter(([t, d]) => {
     const q = T.p(t, d);
     return parts.some(([a, b, r]) => distToSegment(q, a, b) < r);
   });
-  return hidden.length / PEC_SAMPLES.length;
+  return hidden.length / samples.length;
 }
 
 function sideHead(fig: BodyFigure, pal: Palette): string {
@@ -654,16 +692,18 @@ function sideHead(fig: BodyFigure, pal: Palette): string {
 function sideTrunk(fig: BodyFigure, T: TrunkFrame, pal: Palette): string {
   const Hf = headFrame(fig);
   const neck = [T.p(0.265, 0.02), T.p(0.29, 0.034), Hf.p(0.028, -0.066), Hf.p(0.018, -0.04), Hf.p(-0.02, -0.03), Hf.p(-0.034, -0.042), T.p(0.33, -0.036), T.p(0.3, -0.04)];
-  let o = solid(union([mapped(T, TRUNK), neck]), pal);
+  const ch = pal.lv('chest');
+  const prof = trunkProfile(ch);
+  let o = solid(union([mapped(T, prof), neck]), pal);
   // Back: erectors, scapular back, the lat wing, and the upper trapezius running up the back of the neck.
   const trapezius = [Hf.p(-0.031, -0.04), T.p(0.334, -0.031), T.p(0.322, -0.043), T.p(0.304, -0.03), T.p(0.298, -0.014), T.p(0.305, 0.0), Hf.p(-0.012, -0.05)];
   o += muscle(closed(mapped(T, ERECTORS)) + closed(mapped(T, UPPER_BACK)) + closed(mapped(T, LAT)) + closed(trapezius), pal.m('back'), pal);
   // Core: the external oblique on the flank, the rectus along the front with its tendinous lines.
-  o += muscle(closed(mapped(T, OBLIQUE)) + closed(mapped(T, RECTUS)), pal.m('core'), pal);
-  o += split(RECTUS_LINES.map(([t0, t1, d1]) => open(mapped(T, [[t0, 0.043], [t1, 0.05], [t1 - 0.001, d1]]))).join(''), pal, 0.0042);
+  const core = pal.lv('core');
+  o += muscle(closed(mapped(T, obliqueAt(core))) + closed(mapped(T, belly(RECTUS_RUN, RECTUS_IN, 1, 0.009 * core))), pal.m('core'), pal);
+  o += split(RECTUS_LINES.map(([t0, t1, d1]) => open(mapped(T, [[t0, 0.04], [t1, 0.051], [t1 - 0.001, d1]]))).join(''), pal, 0.0042);
   // Chest: the pectoral's lower border drops a little as it works.
-  const ch = pal.lv('chest');
-  o += muscle(closed(mapped(T, [...PEC_RUN, ...PEC_IN.map(([t, d], i): P2 => (i >= 4 ? [t - 0.006 * ch, d - 0.002 * ch] : [t, d]))])), pal.m('chest'), pal);
+  o += muscle(closed(mapped(T, [...runOf(prof, 6, 11), ...PEC_IN.map(([t, d], i): P2 => (i >= 4 ? [t - 0.012 * ch, d - 0.004 * ch] : [t, d]))])), pal.m('chest'), pal);
   return o + sideHead(fig, pal);
 }
 
@@ -689,7 +729,8 @@ function faceOverArm(fig: BodyFigure, s: Side, A: ArmShape, pal: Palette, armPal
   if (PROFILE_PTS.filter(([x, y]) => !covers(arm, Hf.p(x, y))).length >= 3) return '';
   let o = solid(closed(mapped(Hf, FACE)), pal) + path(closed(mapped(Hf, EYE)) + closed(mapped(Hf, BROW)), 'fill="var(--fig-face)"');
   const hardest = Math.max(...MUSCLE_GROUPS.map((g) => pal.lv(g)));
-  for (const g of ['triceps', 'biceps'] as const) if (armPal.lv(g) > 0.05 && armPal.lv(g) >= hardest - 0.05) o += armMuscle(A, g, armPal);
+  const seen = 1 - 2 * endOnOf(A);
+  for (const g of ['triceps', 'biceps'] as const) if (seen > 0 && armPal.lv(g) > 0.05 && armPal.lv(g) >= hardest - 0.05) o += armMuscle(A, g, armPal, seen);
   return o;
 }
 
@@ -704,13 +745,15 @@ function drawSide(fig: BodyFigure, c: BodyContext): BodyLayers {
   // The far limbs are drawn only where they show (not hidden exactly behind the near ones).
   const legHidden = (['hip', 'knee', 'ankle', 'heel', 'ball', 'toe'] as const).every((k) => samePoint(a[k], b[k]));
   const armHidden = (['shoulder', 'elbow', 'wrist', 'hand'] as const).every((k) => samePoint(a[k], b[k])) && pose.arm.flat === pose.arm2.flat;
-  const pecTail = smooth((pecCovered(T, a) - 0.45) / 0.3);
+  // When the near arm covers most of the chest or of a working back, that muscle's tendon is drawn onto the arm.
+  const pecTail = smooth((covered(T, a, PEC_SAMPLES) - 0.35) / 0.3) * smooth(trunkPal.lv('chest') / 0.3);
+  const backTail = smooth((covered(T, a, BACK_SAMPLES) - 0.35) / 0.3) * smooth(trunkPal.lv('back') / 0.3);
   const nearArm = armShape(a, pose.arm);
   return {
     far: (armHidden ? '' : sideArm(armShape(b, pose.arm2), pose.arm2, farPal)) + (legHidden ? '' : sideLeg(b, pose.leg2, T, farPal)),
     core: sideTrunk(fig, T, trunkPal),
     nearLeg: sideLeg(a, pose.leg, T, nearPal),
-    nearArm: sideArm(nearArm, pose.arm, nearPal, pecTail) + faceOverArm(fig, a, nearArm, trunkPal, nearPal),
+    nearArm: sideArm(nearArm, pose.arm, nearPal, pecTail, backTail) + faceOverArm(fig, a, nearArm, trunkPal, nearPal),
   };
 }
 
