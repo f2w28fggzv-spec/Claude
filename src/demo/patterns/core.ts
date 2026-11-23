@@ -254,12 +254,23 @@ export function hangingRaise(o: { straight?: boolean }): Demo {
       at: sub(bar, mul(dir(arm), reach)),
     };
   };
+  // The trunk tilts (hips back) until the centre of mass hangs under the bar.
+  const pose = (s: number) => build(s, solveFor(-30, 60, (u) => -centreOfMass(solve('side', build(s, u))).x, -bar.x));
+  // A wall-mounted bar: its bracket stands out from the wall behind the lifter, clear of the hips as they move back;
+  // the floor a hand's width under the pointed toes.
+  const skin = [0, 0.25, 0.5, 0.75, 1].flatMap((s) => skinPoints({ view: 'side', pose }, s));
+  const floor = Math.max(...skin.map((sp) => sp.p.y)) + 0.08;
+  const wall = Math.min(...skin.map((sp) => sp.p.x)) - 0.12;
   return {
     view: 'side',
-    floor: null,
-    // The trunk tilts (hips back) until the centre of mass hangs under the bar.
-    pose: (s) => build(s, solveFor(-30, 60, (u) => -centreOfMass(solve('side', build(s, u))).x, -bar.x)),
-    props: [{ kind: 'bar', at: bar }],
+    floor,
+    pose,
+    props: [
+      { kind: 'wall', x: wall, top: bar.y - 0.12 },
+      { kind: 'line', from: { x: wall, y: bar.y - 0.035 }, to: { x: wall, y: bar.y + 0.035 }, width: 0.014 },
+      { kind: 'line', from: { x: wall, y: bar.y }, to: bar, width: 0.024 },
+      { kind: 'bar', at: bar },
+    ],
     // Up under control, a brief pause, a slow lowering with no swing.
     timing: { out: 1.4, far: 0.5, back: 2.2 },
   };
@@ -323,7 +334,8 @@ export function cableCrunch(): Demo {
     props: [
       // The tower's base plate on the floor.
       { kind: 'line', from: { x: tower - 0.08, y: FLOOR - 0.008 }, to: { x: tower + 0.08, y: FLOOR - 0.008 }, width: 0.016 },
-      { kind: 'cable', from: pulley, at: 'wrist', rope: true, column: tower },
+      // The cable comes down behind the head to the rope's middle; the rope runs down beside the head into the fist.
+      { kind: 'cable', from: pulley, at: 'wrist', rope: true, column: tower, behind: true },
     ],
     // A short squeeze at the bottom.
     timing: { far: 0.5 },

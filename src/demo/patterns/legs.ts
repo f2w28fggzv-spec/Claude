@@ -2,7 +2,7 @@
 import { BODY } from '../body';
 import { attachPoints } from '../attach';
 import { PAD_HALF } from '../contact';
-import { L, PALM, add, along, armTo, dir, gripTo, legTo, lerp, lerpV, mul, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
+import { GRIP, L, PALM, add, along, angleOf, armTo, dir, dist, gripTo, legTo, lerp, lerpV, mul, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
 import { O, FLOOR, LEG_LEN, HANG, FWD, centreOfMass, handProp, restingPad, solveFor, type Implement } from './shared';
 
@@ -19,6 +19,33 @@ type SquatHold = 'back' | 'front' | 'goblet' | 'arms';
 
 /** Legs from the shin's forward lean and the knee's inner angle (180 = straight). */
 const squatLegs = (shinLean: number, knee: number): Leg => ({ thigh: shinLean + knee, shin: 180 + shinLean, foot: 90 });
+
+/** A point `fwd` ahead of the trunk line and `up` along it (toward the head) from p. */
+const inTrunk = (p: Vec, torso: number, fwd: number, up: number): Vec => add(along(p, torso, up), mul(dir(torso + 90), fwd));
+
+/**
+ * An arm through a given elbow whose fist closes around `grip`, bent `hand`
+ * degrees at the wrist or in line with the forearm. Each segment is
+ * foreshortened to fit, as when the elbows point in or out toward the camera.
+ */
+function armVia(shoulder: Vec, elbow: Vec, grip: Vec, hand?: number): Arm {
+  const upper = sub(elbow, shoulder);
+  const d = sub(grip, elbow);
+  const dd = d.x * d.x + d.y * d.y;
+  if (hand === undefined) {
+    return { upper: angleOf(upper), fore: angleOf(d), scale: Math.hypot(upper.x, upper.y) / L.upperArm, foreScale: Math.sqrt(dd) / (L.forearm + GRIP) };
+  }
+  // The fist reaches GRIP·k past the wrist along `hand`, the forearm is L.forearm·k long: solve for k.
+  const h = dir(hand);
+  const dh = d.x * h.x + d.y * h.y;
+  const a = L.forearm ** 2 - GRIP ** 2;
+  const k = (-GRIP * dh + Math.sqrt(GRIP ** 2 * dh * dh + a * dd)) / a;
+  const wrist = sub(grip, mul(h, GRIP * k));
+  return { upper: angleOf(upper), fore: angleOf(sub(wrist, elbow)), scale: Math.hypot(upper.x, upper.y) / L.upperArm, foreScale: k, hand };
+}
+
+/** Front rack: the bar on the front of the shoulders against the throat, just under the chin. */
+const frontBar = (shoulder: Vec, torso: number): Vec => inTrunk(shoulder, torso, 0.066, 0.012);
 
 /**
  * A squat with the feet flat and planted. The knee bends steadily while the
@@ -53,17 +80,18 @@ export function squat(o: {
         return gripTo(shoulder, bar, dir(torso + 200), 0.8);
       }
       case 'front': {
-        // Front rack: bar on the front of the shoulders, fingers under it,
-        // elbows pointing forward and up. Wrist ahead of the bar, hand bent back to it.
-        const bar = attachPoints(f, 'frontRack')[0];
-        const hand = torso + 245;
-        const wrist = along(bar, hand + 180, 0.07);
-        return { ...armTo(shoulder, wrist, dir(torso + 120), 0.88), hand, flat: true };
+        // Front rack: the bar rests on the front of the shoulders, held in the fingers with the wrist
+        // bent back; the elbows point forward at about shoulder height, upper arms about 12° below
+        // level, and stay up all the way to the bottom.
+        const elbow = along(shoulder, 102, L.upperArm * 0.95);
+        return armVia(shoulder, elbow, frontBar(shoulder, torso), torso + 258);
       }
       case 'goblet': {
-        // Dumbbell held upright against the chest, both hands cupping the top head, elbows down.
-        const db = add(along(shoulder, torso + 180, 0.08), mul(dir(torso + 90), BODY.torsoFront + 0.04));
-        return gripTo(shoulder, db, dir(torso + 160), 0.95);
+        // Goblet: the dumbbell upright against the sternum, both hands cupped under its top head just
+        // below the chin, wrists bent back; elbows down in front of the ribs (upper arms angled
+        // forward), forearms upright.
+        const top = inTrunk(shoulder, torso, BODY.torsoFront + 0.032, 0.004);
+        return armVia(shoulder, inTrunk(shoulder, torso, 0.1, -0.14), top, torso + 90);
       }
       case 'arms':
         // Arms straight out in front at shoulder height, palms down, as a counterweight.
@@ -77,7 +105,7 @@ export function squat(o: {
   const balance = (p: DemoPose): number => {
     const f = solve('side', p);
     if (o.hold === 'back') return attachPoints(f, 'backRack')[0].x;
-    if (o.hold === 'front') return attachPoints(f, 'frontRack')[0].x;
+    if (o.hold === 'front') return f.a.hand.x;
     return centreOfMass(f, o.hold === 'goblet' ? [{ at: f.a.hand, share: dumbbell }] : []).x;
   };
   // Bottom: depth and knee travel as given; the torso leans until balanced.
@@ -94,7 +122,8 @@ export function squat(o: {
 
   const props: Prop[] = [];
   if (o.hold === 'back') props.push({ kind: 'barbell', at: 'backRack' });
-  if (o.hold === 'front') props.push({ kind: 'barbell', at: 'frontRack' });
+  // Front rack: the bar sits in the near fist (see `arms`).
+  if (o.hold === 'front') props.push({ kind: 'barbell', at: 'wrist' });
   if (o.hold === 'goblet') props.push({ kind: 'dumbbell', at: 'wrist', upright: true, cupped: true });
   if (o.box) {
     // Box under the glutes at the bottom: its top just under the back of the thighs.
@@ -187,6 +216,17 @@ function handsOnHips(hip: Vec, torso: number): Arm {
 
 /** Gap under the back knee (joint centre) at the bottom of a lunge: the kneecap nearly touches the floor. */
 const KNEE_GAP = 0.05;
+/** Share of the front leg's effort the back leg shows when its foot is on the floor (Demo.otherSide). */
+const BACK_LEG = 0.5;
+/**
+ * A foot lying laces down on a pad, toes pointing back: heel to ball pointing LACES degrees (18° below
+ * level), the ankle LACES_HEIGHT above the pad's top and the pad's flat top ending LACES_EDGE behind
+ * the ankle. The top of the foot then lies on the pad from the toes to its rounded front edge (within
+ * 0.004 either way), and the ankle and the shin pass just in front of that edge.
+ */
+const LACES = 252;
+const LACES_HEIGHT = 0.0124;
+const LACES_EDGE = 0.04;
 
 /**
  * Split stance, near (front) foot flat at the origin. At the bottom the front
@@ -195,8 +235,10 @@ const KNEE_GAP = 0.05;
  * with the toes flat (the heel rising as the knee drops) or rests on its
  * laces on a bench.
  *
- * `step` starts each rep from standing: stepping back into the lunge (reverse
- * lunge) or forward into it (walking lunge), and back again.
+ * `step` starts each rep from standing: stepping back into the lunge and back
+ * again (reverse lunge), or forward into it (walking lunge), whose way back
+ * is its own: the back foot comes through to land beside the front one, a
+ * stride further on.
  */
 export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; implement?: Implement; lean?: number }): Demo {
   const imp = o.implement ?? 'none';
@@ -218,13 +260,15 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
   let rearAt: (s: number) => Foot;
   let hipAt: (s: number) => Vec;
   let frontAt = (_s: number): Foot => ({ ankle: O, foot: 90 });
+  let walk: Walk | undefined;
   if (bench) {
-    // Laces on the bench, ankle just past its front edge; the foot stays put.
-    const y = benchTop - 0.025;
+    // Laces down on the bench, toes pointing back, the ankle just past its front edge (see LACES);
+    // the foot stays put.
+    const y = benchTop - LACES_HEIGHT;
     const ankle = { x: kneeR.x - Math.sqrt(L.shin ** 2 - (y - kneeR.y) ** 2), y };
     // Top: standing on the front leg, back knee hanging under the hip.
     const hipTop = { x: hipB.x + 0.03, y: -Math.sqrt((LEG_LEN * 0.98) ** 2 - (hipB.x + 0.03) ** 2) };
-    rearAt = () => ({ ankle, foot: 262 });
+    rearAt = () => ({ ankle, foot: LACES });
     hipAt = (s) => lerpV(hipTop, hipB, s);
   } else {
     // On the ball of the foot: the ball and the flat toes stay planted while the heel rises and falls.
@@ -272,6 +316,38 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
         return toes(foot);
       };
       frontAt = (s) => (s >= a ? { ankle: O, foot: 90 } : stepFoot({ ankle: start, foot: 90 }, { ankle: O, foot: 90 }, s / a, 0.05));
+      // The way back (s from 1 to 0): drive up through the front foot to stand on it. The back foot
+      // pivots on its ball, the heel rising only as far as that leg needs (knee straightening to
+      // 170°), up to the tips of the toes; then it leaves the floor, swings through and lands beside
+      // the front foot, a whole stride ahead of where the rep began.
+      const stride = -start.x;
+      const end = { x: stand.x + stride, y: stand.y };
+      const rise = (s: number) => lerpV(hipB, end, 1 - s);
+      const first = rearAt(0);
+      const land: Foot = { ...first, ankle: { x: first.ankle.x + stride, y: first.ankle.y } };
+      const ON_TIPS = 176;
+      const reach = (hip: Vec, foot: number) => dist(hip, toes(foot).ankle);
+      const pushOff = (hip: Vec) => (reach(hip, footB) <= legSpan(170) ? footB : solveFor(footB, ON_TIPS, (f) => -reach(hip, f), -legSpan(170)));
+      const leave = solveFor(0, 1, (u) => reach(rise(1 - u), ON_TIPS), legSpan(170));
+      const touch = 0.85;
+      const off = toes(ON_TIPS);
+      const swing = (v: number): Foot => {
+        const e = smooth(v);
+        const foot = lerp(ON_TIPS, land.foot, e);
+        // The toes leave the floor last and relax into line with the foot, then land flat.
+        const toesAt = lerp(lerp(90, foot, smooth(v / 0.3)), land.toes ?? land.foot, smooth((v - 0.7) / 0.3));
+        const ankle = add(lerpV(off.ankle, land.ankle, e), { x: 0, y: -0.06 * Math.sin(Math.PI * v) });
+        return { ankle: { x: ankle.x, y: Math.min(ankle.y, FLOOR - soleDepth(foot, toesAt)) }, foot, toes: toesAt };
+      };
+      walk = {
+        hipAt: rise,
+        rearAt: (s) => {
+          const u = 1 - s;
+          if (u <= leave) return toes(pushOff(rise(s)));
+          return u >= touch ? land : swing((u - leave) / (touch - leave));
+        },
+        stride,
+      };
     } else {
       rearAt = onToes;
       hipAt = split;
@@ -279,14 +355,22 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
   }
   const pad: Prop | undefined = bench
     ? (() => {
-        const edge = rearAt(1).ankle.x - 0.02;
+        const edge = rearAt(1).ankle.x - LACES_EDGE;
         const y = benchTop + PAD_HALF;
         return { kind: 'bench', points: [{ x: edge - 0.3, y }, { x: edge, y }] };
       })()
     : undefined;
-  const demo = lungeDemo(o, imp, hipAt, rearAt, frontAt, pad);
-  // Back foot up on a bench: the front (near) leg does the work. On the floor both legs share it.
-  return bench ? { ...demo, working: 'a' } : demo;
+  const demo = lungeDemo(o, imp, hipAt, rearAt, frontAt, pad, walk);
+  // The front (near) leg does the work. With the back foot on the floor that leg helps at about half
+  // the effort (it carries part of the weight on a bent knee); up on a bench it only steadies.
+  return { ...demo, working: 'a', ...(!bench && { otherSide: BACK_LEG }) };
+}
+
+/** A walking lunge's way back (the front foot stays planted at the origin) and how far one rep travels. */
+interface Walk {
+  hipAt: (s: number) => Vec;
+  rearAt: (s: number) => Foot;
+  stride: number;
 }
 
 function lungeDemo(
@@ -296,12 +380,12 @@ function lungeDemo(
   rearAt: (s: number) => Foot,
   frontAt: (s: number) => Foot,
   bench: Prop | undefined,
+  walk?: Walk,
 ): Demo {
-  const pose = (s: number): DemoPose => {
-    const hip = hipAt(s);
+  // A walking lunge travels: the picture follows the hips (they keep one x) and the ground moves back under the feet.
+  const x0 = hipAt(0).x;
+  const build = (s: number, hip: Vec, rear: Foot, front: Foot): DemoPose => {
     const torso = lerp(3, o.lean ?? 6, s);
-    const rear = rearAt(s);
-    const front = frontAt(s);
     return {
       torso,
       // Dumbbells hang straight down at the sides; without them, hands on the hips.
@@ -309,12 +393,19 @@ function lungeDemo(
       leg: withToes(kneeForward(hip, front.ankle, front.foot), front.toes),
       leg2: withToes(kneeForward(hip, rear.ankle, rear.foot), rear.toes),
       anchor: 'hip',
-      at: hip,
+      at: walk ? { x: x0, y: hip.y } : hip,
     };
   };
   const props: Prop[] = [...handProp(imp, 'wrists', { lengthwise: true })];
   if (bench) props.push(bench);
-  return { view: 'side', pose, props };
+  const demo: Demo = { view: 'side', pose: (s) => build(s, hipAt(s), rearAt(s), frontAt(s)), props };
+  if (!walk) return demo;
+  return {
+    ...demo,
+    back: (s) => build(s, walk.hipAt(s), walk.rearAt(s), frontAt(1)),
+    // Floor marks a third of a stride apart, so each rep moves the ground a whole number of them.
+    ground: { at: (s, back) => (back ? walk.hipAt(s) : hipAt(s)).x - x0, spacing: walk.stride / 3 },
+  };
 }
 
 // ── Step-up ──────────────────────────────────────────────────────────────

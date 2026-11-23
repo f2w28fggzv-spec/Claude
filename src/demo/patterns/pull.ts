@@ -9,7 +9,7 @@
 // their skin (BODY), and planted feet stay where they are.
 import { BODY } from '../body';
 import { PAD_HALF } from '../contact';
-import { L, GRIP, PALM, add, along, angleOf, dir, dist, legTo, lerp, lerpV, mul, palmTo, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
+import { L, GRIP, PALM, add, along, angleOf, dir, dist, gripTo, legTo, lerp, lerpV, mul, palmTo, solve, sub, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
 import { O, FLOOR, LEG_LEN, HANG, BACK, FWD, centreOfMass, handProp, restingPad, solveFor, type Implement } from './shared';
 
@@ -17,6 +17,8 @@ import { O, FLOOR, LEG_LEN, HANG, BACK, FWD, centreOfMass, handProp, restingPad,
 const REACH = L.upperArm + L.forearm + GRIP;
 /** A bar's end as ../equipment draws it. */
 const BAR_R = 0.02;
+/** A rack's J-hook: from the upright out to the bar it holds (about 14 cm). */
+const HOOK = 0.08;
 /** The middle of a flat foot, ahead of the ankle (heel to toe). */
 const MIDFOOT = (L.foot - L.heel) / 2;
 /** A flat bench's pad top above the floor (43 cm on a 1.75 m lifter). */
@@ -97,14 +99,37 @@ function sideArm(shoulder: Vec, grip: Vec, out: number, toward: Dir3): Arm {
   return { upper: angleOf(elbow), fore: angleOf(fore), scale: Math.hypot(elbow.x, elbow.y) / l1, foreScale: Math.hypot(fore.x, fore.y) / l2 };
 }
 
+/** Most a rowing forearm leans from plumb on the way up (the hand ahead of the elbow). */
+const ROW_TILT = 15;
+
 /**
  * A dumbbell row with a neutral grip, elbow close to the side: from hanging
- * straight under the shoulder (s = 0) the upper arm swings back until it
- * points `past` degrees beyond the trunk line, the elbow above the back. The
- * forearm hangs straight down all the way, so the dumbbell rises under the
- * elbow and finishes beside the waist.
+ * straight under the shoulder (s = 0) to the finish beside the waist (s = 1),
+ * where the upper arm points `past` degrees beyond the trunk line, the elbow
+ * above the back, and the forearm hangs plumb. On the way the dumbbell rises
+ * from the first moment, up and back along a nearly straight line: the
+ * straight line from hang to finish, bowed toward the arc a plumb forearm
+ * would swing through just enough that the forearm never leans more than
+ * ROW_TILT. (Swinging the arm with the forearm plumb all the way would first
+ * carry the dumbbell back toward the knees, hardly rising.) The elbow leads,
+ * up and back.
  */
-const rowArm = (torso: number, past: number, s: number): Arm => ({ upper: lerp(180, torso + 180 + past, s), fore: 180 });
+function rowArm(shoulder: Vec, torso: number, past: number): (s: number) => Arm {
+  const hang = add(shoulder, { x: 0, y: REACH });
+  const plumb = (s: number) => add(along(shoulder, lerp(180, torso + 180 + past, s), L.upperArm), { x: 0, y: L.forearm + GRIP });
+  const finish = plumb(1);
+  const back = { x: -1, y: -0.3 };
+  const armFor = (bow: number) => (s: number): Arm => gripTo(shoulder, lerpV(lerpV(hang, finish, s), plumb(s), bow), back);
+  const tilt = (bow: number) => {
+    let most = 0;
+    for (let k = 1; k < 20; k++) {
+      const arm = armFor(bow)(k / 20);
+      most = Math.max(most, Math.abs(((arm.fore - 180 + 540) % 360) - 180));
+    }
+    return most;
+  };
+  return armFor(solveFor(0, 1, (bow) => -tilt(bow), -ROW_TILT));
+}
 
 /**
  * Where the floor pushes back on a standing body (its x), with a cable pulling
@@ -169,9 +194,10 @@ function bentOverRow(implement: 'barbell' | 'dumbbell', torso: number): Demo {
   );
   const st = stance(thighBack);
   if (!barbell) {
+    const arm = rowArm(st.shoulder, torso, 38);
     return {
       view: 'side',
-      pose: (s) => ({ ...hanging(st.leg), arm: rowArm(torso, 38, s) }),
+      pose: (s) => ({ ...hanging(st.leg), arm: arm(s) }),
       props: handProp('dumbbell', 'wrist', { lengthwise: true }),
     };
   }
@@ -215,7 +241,8 @@ function oneArmRow(implement: Implement): Demo {
   const arm2 = palmTo(shoulder, palm, 90, BACK);
   // Near foot flat on the floor a little ahead of the hip, knee soft.
   const leg = legTo(hip, { x: hip.x + 0.05, y: FLOOR - L.ankleHeight }, FWD);
-  const pose = (s: number): DemoPose => ({ torso, head: headFor(torso), leg, leg2, arm: rowArm(torso, 38, s), arm2, anchor: 'hip', at: hip });
+  const arm = rowArm(shoulder, torso, 38);
+  const pose = (s: number): DemoPose => ({ torso, head: headFor(torso), leg, leg2, arm: arm(s), arm2, anchor: 'hip', at: hip });
   // The bench runs from just behind the far foot to past the far hand.
   const f = solve('side', pose(0));
   const padY = padTop + PAD_HALF;
@@ -242,8 +269,9 @@ function chestSupportedRow(implement: Implement, torso: number): Demo {
   const shin = thigh + 10;
   const leg: Leg = { thigh, shin, foot: shin - 100, toes: 90 };
   const base: DemoPose = { torso, head: headFor(torso), leg, arm: HANG, anchor: 'toe', at: { x: 0, y: FLOOR } };
-  const pose = (s: number): DemoPose => ({ ...base, arm: rowArm(torso, 36, s) });
   const { hip, shoulder } = solve('side', base).a;
+  const arm = rowArm(shoulder, torso, 36);
+  const pose = (s: number): DemoPose => ({ ...base, arm: arm(s) });
   const front = dir(torso + 90);
   // The pad under the front of the trunk, from the hips to the upper chest, resting on the skin.
   const onPad = (t: number) => add(lerpV(hip, shoulder, t), mul(front, BODY.torsoFront + PAD_HALF));
@@ -266,18 +294,44 @@ function chestSupportedRow(implement: Implement, torso: number): Demo {
 // ── Pull-ups ─────────────────────────────────────────────────────────────
 
 /**
+ * A pull-up station seen from the side: the bar end-on at `bar`, on an arm
+ * reaching back from a post that stands in front of the lifter (`post` = its
+ * x) on a T-foot. In front, so neither the post nor the arm passes behind the
+ * hanging body.
+ */
+function station(bar: Vec, post: number, floor: number): Prop[] {
+  return [
+    { kind: 'line', from: { x: post, y: floor - 0.008 }, to: { x: post, y: bar.y - 0.05 }, width: 0.03 },
+    { kind: 'line', from: { x: post - 0.06, y: floor - 0.008 }, to: { x: post + 0.06, y: floor - 0.008 }, width: 0.018 },
+    { kind: 'line', from: { x: post, y: bar.y }, to: bar, width: 0.026 },
+    { kind: 'bar', at: bar },
+  ];
+}
+
+/** How far forward any part of the legs reaches over a movement (toes, or the front of a bent knee). */
+function legsFront(pose: (s: number) => DemoPose, back?: (s: number) => DemoPose): number {
+  let x = -Infinity;
+  for (let k = 0; k <= 16; k++) {
+    for (const p of back ? [pose, back] : [pose]) {
+      const f = solve('side', p(k / 16));
+      x = Math.max(x, f.a.toe.x, f.a.knee.x + BODY.thighFront);
+    }
+  }
+  return x;
+}
+
+/**
  * Hanging from a bar at the origin. Dead hang (s = 0): arms straight, body
  * plumb under the bar. Pulling, the shoulders drift back so the bar passes in
  * front of the face; top (s = 1): chin over the bar, which is level with the
  * collarbones. At every frame the body leans just enough to keep its centre of
- * mass under the bar, legs straight and together a little ahead of the hips.
- * `chin`: underhand grip at shoulder width, elbows forward. Otherwise an
- * overhand grip a little wider than the shoulders: the elbows travel down and
- * out to the sides, so from the side they stay under the bar and the upper
- * arms look short. `startTop`: a negative, lowered from the top; the toes find
- * a box at the bottom (the way back up). `scapular`: arms stay straight; the
- * shoulder blades pull down and the chest lifts, raising the body a few
- * centimetres.
+ * mass under the bar, legs straight and together a little ahead of the hips,
+ * toes a hand's width above the floor at the dead hang. `chin`: underhand grip
+ * at shoulder width, elbows forward. Otherwise an overhand grip a little wider
+ * than the shoulders: the elbows travel down and out to the sides, so from the
+ * side they stay under the bar and the upper arms look short. `startTop`: a
+ * negative (see negativePullUp). `scapular`: arms stay straight; the shoulder
+ * blades pull down and the chest lifts, raising the body a few centimetres.
  */
 export function pullUp(o: { startTop?: boolean; scapular?: boolean; chin?: boolean }): Demo {
   const bar = O;
@@ -293,33 +347,80 @@ export function pullUp(o: { startTop?: boolean; scapular?: boolean; chin?: boole
     const y = lerp(hang.y, top.y, s);
     return { x: lerp(hang.x, top.x, smooth((hang.y - y) / ((hang.y - top.y) * 0.55))), y };
   };
-  const build = (s: number, torso: number): DemoPose => {
+  const armAt = (s: number): Arm => {
+    const shoulder = shoulderAt(s);
+    // Scapular: straight arms; the shoulders pulling down from the ears shows as a shorter reach.
+    return o.scapular
+      ? { upper: angleOf(sub(bar, shoulder)), fore: angleOf(sub(bar, shoulder)), scale: dist(bar, shoulder) / REACH }
+      : sideArm(shoulder, bar, out, elbows);
+  };
+  const build = (s: number, torso: number, leg?: (hip: Vec) => Leg): DemoPose => {
     const shoulder = shoulderAt(s);
     const thigh = torso + 172;
     const shin = thigh + 3;
-    // Scapular: straight arms; the shoulders pulling down from the ears shows as a shorter reach.
-    const arm: Arm = o.scapular
-      ? { upper: angleOf(sub(bar, shoulder)), fore: angleOf(sub(bar, shoulder)), scale: dist(bar, shoulder) / REACH }
-      : sideArm(shoulder, bar, out, elbows);
     return {
       torso,
       head: torso * 0.4,
-      leg: { thigh, shin, foot: shin - 40 }, // toes pointed
-      arm,
+      leg: leg ? leg(along(shoulder, torso + 180, L.torso)) : { thigh, shin, foot: shin - 40 }, // toes pointed
+      arm: armAt(s),
       anchor: 'shoulder',
       at: shoulder,
     };
   };
   // Lean so the centre of mass hangs under the bar (it moves forward as the trunk tips back).
-  const pose = (s: number): DemoPose => build(s, solveFor(-45, 25, (t) => -centreOfMass(solve('side', build(s, t))).x, -bar.x));
-  const props: Prop[] = [{ kind: 'bar', at: bar }];
-  if (!o.startTop) return { view: 'side', floor: null, pose, props };
-  // Negative: from the top (s = 0) down to a dead hang (s = 1), toes just touching a box.
-  const toe = solve('side', pose(0)).a.toe;
-  const boxH = 0.3;
-  props.push({ kind: 'box', x: toe.x - 0.17, y: toe.y, w: 0.3, h: boxH });
-  // Lowered slowly (about four seconds); stepping back up off the box is quicker.
-  return { view: 'side', floor: toe.y + boxH, pose: (s) => pose(1 - s), props, timing: { out: 4 } };
+  const lean = (s: number, leg?: (hip: Vec) => Leg) => solveFor(-45, 25, (t) => -centreOfMass(solve('side', build(s, t, leg))).x, -bar.x);
+  if (o.startTop) return negativePullUp(bar, build, lean);
+  const pose = (s: number): DemoPose => build(s, lean(s));
+  // The floor a hand's width under the toes at the dead hang (the bar about 2.3 m up).
+  let lowest = -Infinity;
+  for (let k = 0; k <= 8; k++) lowest = Math.max(lowest, solve('side', pose(k / 8)).a.toe.y);
+  const floor = lowest + 0.07;
+  return { view: 'side', floor, pose, props: station(bar, legsFront(pose) + 0.09, floor) };
+}
+
+/**
+ * Negative pull-up with a box under the bar, tall enough that standing on it
+ * puts the chin over the bar. Start (s = 0): chin over the bar, feet flat on
+ * the box, knees a little bent. Lowering (about four seconds), the feet come
+ * off the box and the knees bend up in front, so the arms alone let the body
+ * down to a dead hang (s = 1), where the feet land on the box again in a deep
+ * squat. The way back up is the legs' job: feet planted, they stand the body
+ * up to the top while the arms just follow.
+ */
+function negativePullUp(bar: Vec, build: (s: number, torso: number, leg?: (hip: Vec) => Leg) => DemoPose, lean: (s: number, leg?: (hip: Vec) => Leg) => number): Demo {
+  // The motion runs from the top (s = 0 here) to the dead hang, so the hanging pull-up is played backwards.
+  const at = (s: number) => 1 - s;
+  // Top: hips a little bent, shins upright, feet flat on the box; the body hangs balanced under the bar as it will once the feet lift.
+  const standing = (torso: number): Leg => ({ thigh: torso + 145, shin: 180, foot: 90 });
+  const topTorso = solveFor(-45, 25, (t) => -centreOfMass(solve('side', build(at(0), t, () => standing(t)))).x, -bar.x);
+  const topPose = build(at(0), topTorso, () => standing(topTorso));
+  const feet = solve('side', topPose).a.ankle;
+  const boxTop = feet.y + L.ankleHeight;
+  // Off the box while lowering: the feet rise a little above where they will land, then come down onto it.
+  const LIFT = 0.07;
+  const lift = (s: number) => LIFT * smooth(s / 0.12) * (1 - smooth((s - 0.82) / 0.18));
+  const legFor = (s: number, planted: boolean) => (hip: Vec): Leg => {
+    const up = planted ? 0 : lift(s);
+    // Knees forward; in the air the toes point a little.
+    return legTo(hip, { x: feet.x, y: feet.y - up }, { x: 1, y: -0.4 }, 90 + 25 * (up / LIFT));
+  };
+  // The trunk leans so the body hangs balanced under the bar while the feet are off the box; the way back keeps the same lean.
+  const torsoAt = (s: number) => (s <= 0 ? topTorso : lean(at(s), legFor(s, false)));
+  const pose = (s: number): DemoPose => (s <= 0 ? topPose : build(at(s), torsoAt(s), legFor(s, false)));
+  const back = (s: number): DemoPose => (s <= 0 ? topPose : build(at(s), torsoAt(s), legFor(s, true)));
+  // A floor about 2.1 m under the bar; the box reaches up to where the feet stand.
+  const floor = bar.y + 1.22;
+  const box: Prop = { kind: 'box', x: feet.x - 0.13, y: boxTop, w: 0.3, h: floor - boxTop };
+  const front = Math.max(legsFront(pose, back), box.x + box.w);
+  return {
+    view: 'side',
+    floor,
+    pose,
+    back,
+    props: [box, ...station(bar, front + 0.07, floor)],
+    // Lowered slowly; the legs stand the body back up at an ordinary pace.
+    timing: { out: 4, back: 1.6 },
+  };
 }
 
 /**
@@ -360,10 +461,13 @@ export function invertedRow(): Demo {
         at: ankleAt(lift),
       };
     },
-    // The bar sits in a rack: its far upright stands behind the lifter.
+    // The bar rests in a J-hook on a rack upright, which stands behind the lifter a hand's width toward the
+    // feet: the hook's arm runs out from the upright under the bar (clear of the fist, which closes on the
+    // bar from the head's side) and turns up past it.
     props: [
-      { kind: 'line', from: { x: barAt.x + 0.035, y: FLOOR - 0.01 }, to: { x: barAt.x + 0.035, y: barAt.y - 0.08 }, width: 0.026 },
-      { kind: 'line', from: { x: barAt.x + 0.035, y: barAt.y + 0.012 }, to: { x: barAt.x - 0.012, y: barAt.y + 0.012 }, width: 0.014 },
+      { kind: 'line', from: { x: barAt.x + HOOK, y: FLOOR - 0.01 }, to: { x: barAt.x + HOOK, y: barAt.y - 0.07 }, width: 0.026 },
+      { kind: 'line', from: { x: barAt.x + HOOK, y: barAt.y + BAR_R + 0.007 }, to: { x: barAt.x - BAR_R - 0.004, y: barAt.y + BAR_R + 0.007 }, width: 0.014 },
+      { kind: 'line', from: { x: barAt.x - BAR_R - 0.004, y: barAt.y + BAR_R + 0.007 }, to: { x: barAt.x - BAR_R - 0.004, y: barAt.y - 0.004 }, width: 0.012 },
       { kind: 'bar', at: barAt },
     ],
   };

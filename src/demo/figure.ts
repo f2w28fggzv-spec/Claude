@@ -177,7 +177,8 @@ export function solve(view: 'side' | 'front', pose: DemoPose): Figure {
     1,
   );
   const headDir = pose.head ?? upperDir;
-  const head = along(shC, headDir, L.neck);
+  // Front view: a trunk tipped toward the camera (torsoScale < 1) tips the neck with it, so the neck foreshortens too.
+  const head = along(shC, headDir, L.neck * (view === 'front' ? (pose.torsoScale ?? 1) : 1));
   const nose = view === 'side' ? along(head, headDir + 90, L.headRadius * 0.95) : along(head, headDir + 180, 0.012);
   const ear = view === 'side' ? along(head, headDir - 90, 0.01) : along(head, headDir - 90, L.headRadius);
   const ear2 = view === 'side' ? ear : along(head, headDir + 90, L.headRadius);

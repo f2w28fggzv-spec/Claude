@@ -309,11 +309,26 @@ export function pushdown(o: { band?: boolean }): Demo {
   const lean = stillLean((v, s) => build(v, fwd, flexTop * (1 - s)), (v) => ({ share: 0.2, from: pulley(v) }));
   const from = pulley(lean);
   const pose = (s: number) => build(lean, fwd, flexTop * (1 - s));
-  const props: Prop[] = o.band
-    ? [{ kind: 'bar', at: { x: from.x, y: from.y - 0.012 } }, { kind: 'band', from, at: 'wrist' }]
-    : // A straight bar on the cable, seen end-on (a bar with no plates).
+  const props: Prop[] = o.band ? bandOverBar(from) : // A straight bar on the cable, seen end-on (a bar with no plates).
       [{ kind: 'cable', from, at: 'wrist', column: from.x + 0.12 }, { kind: 'barbell', at: 'wrist', plate: 0 }];
   return { view: 'side', pose, props };
+}
+
+/**
+ * A band looped over a pull-up bar (about 2.1 m up) and hanging from `from`,
+ * just under it, to the hands: the bar seen end-on on an arm from a rack
+ * upright that stands on the floor in front of the lifter.
+ */
+function bandOverBar(from: Vec): Prop[] {
+  const bar: Vec = { x: from.x, y: from.y - 0.012 };
+  const post = bar.x + 0.15;
+  return [
+    { kind: 'line', from: { x: post, y: FLOOR - 0.008 }, to: { x: post, y: bar.y - 0.05 }, width: 0.03 },
+    { kind: 'line', from: { x: post - 0.06, y: FLOOR - 0.008 }, to: { x: post + 0.06, y: FLOOR - 0.008 }, width: 0.018 },
+    { kind: 'line', from: { x: post, y: bar.y }, to: bar, width: 0.026 },
+    { kind: 'bar', at: bar },
+    { kind: 'band', from, at: 'wrist' },
+  ];
 }
 
 /**
