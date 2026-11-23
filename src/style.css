@@ -71,6 +71,7 @@
   --fig-skin-far: #dccbba;
   --fig-edge-far: #a8937f;
   --fig-hair: #7a6555;
+  --fig-hair-her: #7a6555;
   --fig-face: #6e5a4c;
   --fig-crease: #4a3326;
   --floor: #d6c8ba;
@@ -144,6 +145,7 @@
     --fig-skin-far: #2c2e33;
     --fig-edge-far: #5a5e67;
     --fig-hair: #17181b;
+    --fig-hair-her: #4a4d55;
     --fig-face: #a7abb3;
     --fig-crease: #000000;
     --floor: #3d4047;
@@ -213,6 +215,7 @@
   --fig-skin-far: #2c2e33;
   --fig-edge-far: #5a5e67;
   --fig-hair: #17181b;
+  --fig-hair-her: #4a4d55;
   --fig-face: #a7abb3;
   --fig-crease: #000000;
   --floor: #3d4047;

@@ -25,8 +25,8 @@ export const L = {
   heel: 0.03,
   neck: 0.115,
   headRadius: 0.058,
-  /** Front view: half the distance between shoulder joints / hip joints. */
-  shoulderHalf: 0.115,
+  /** Front view: half the distance between the shoulder joints (the centres of the humeral heads, a little inside the acromion) / the hip joints. */
+  shoulderHalf: 0.105,
   hipHalf: 0.055,
 };
 
@@ -83,7 +83,12 @@ export interface DemoPose {
    */
   bend?: number;
   head?: number;
-  /** Apparent torso length (1 = full), e.g. a hinged torso seen from the front. */
+  /**
+   * Apparent torso length (1 = full), e.g. a hinged torso seen from the front.
+   * Negative: tipped toward the camera past its line of sight (a camera above
+   * a lifter bent over toward it), so the shoulders and the head show below
+   * the hips.
+   */
   torsoScale?: number;
   /** Side view: near leg/arm. Front view: the lifter's right (image left). */
   leg: Leg;

@@ -79,6 +79,19 @@ export const PLACEMENTS = {
     distanceM: [2.5, 4],
     orientation: 'portrait',
   },
+  /**
+   * Bent over toward the camera, the phone looking down on the back from about head height, so the shoulders and the
+   * back show (as the demo, which looks down 28 degrees). Sideways, so the hands stay in view with the arms out to the
+   * sides and the bent-over body still fills the frame; a phone at chest height would see the back nearly end-on.
+   */
+  frontAbove: {
+    view: 'front',
+    phoneHeight: 'head',
+    distanceM: [1.5, 1.75],
+    orientation: 'landscape',
+    tiltDown: true,
+    notes: 'Turn the phone sideways and prop it up at about head height or higher (on a rack, a shelf or a tripod), tilted down toward you, and measure the distance from your feet. Hinge until your back is nearly level, so the phone looks down on your back and shoulders. With your arms out to the sides your hands should stay in view.',
+  },
   frontFloor: {
     view: 'front',
     phoneHeight: 'floor',

@@ -534,6 +534,7 @@ const HEIGHT_TEXT: Record<Placement['phoneHeight'], string> = {
   knee: 'Knee height',
   hip: 'Hip height',
   chest: 'Chest height',
+  head: 'Head height',
 };
 
 /** Camera placement as four glanceable tiles. */
@@ -541,9 +542,10 @@ function PlacementTiles({ exercise }: { exercise: Exercise }) {
   const p = exercise.placement;
   const tiles: [IconName, string][] = [
     [p.view === 'side' ? 'side' : 'front', p.view === 'side' ? 'Film from the side' : 'Face the camera'],
-    ['height', HEIGHT_TEXT[p.phoneHeight]],
+    ['height', `${HEIGHT_TEXT[p.phoneHeight]}${p.tiltDown ? ', tilted down' : ''}`],
     ['distance', `${p.distanceM[0]}–${p.distanceM[1]} m away`],
-    [p.orientation === 'portrait' ? 'phone' : 'phoneSideways', p.orientation === 'portrait' ? 'Phone upright, 1x' : 'Phone sideways, 1x'],
+    // "Upright" would read as the opposite of tilted down next to it.
+    [p.orientation === 'portrait' ? 'phone' : 'phoneSideways', p.orientation === 'portrait' ? (p.tiltDown ? 'Portrait, 1x' : 'Phone upright, 1x') : 'Phone sideways, 1x'],
   ];
   return (
     <div class="place-grid">

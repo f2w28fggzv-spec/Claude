@@ -7,7 +7,7 @@
 // it. The spine curls (pose.bend) only where the exercise curls it on
 // purpose: crunches, the hollow hold's dish and the pelvis tucking under at
 // the top of a hanging raise.
-import { BODY } from '../body';
+import { BODY, FRONT_SKIN } from '../body';
 import { skinPoints } from '../contact';
 import { GRIP, L, PALM, add, angleOf, dir, gripTo, legTo, lerp, mul, palmTo, solve, sub, type Arm, type DemoPose, type Leg, type Vec } from '../figure';
 import type { Demo } from '../types';
@@ -68,38 +68,41 @@ export function plank(): Demo {
  * rests on the hip, elbow up.
  */
 export function sidePlank(): Demo {
-  // Front view, bone to skin on the outer side: the hip, the edge of the foot, the elbow.
-  const HIP_SIDE = 0.05;
-  const FOOT_SIDE = 0.035;
-  const ELBOW_SIDE = 0.03;
-  const legLen = L.thigh + L.shin;
+  // Front view, bone to skin on the outer side (see FRONT_SKIN): the edge of the foot, the point of the elbow; the fist
+  // rests by BODY.hand.
+  const FOOT_SIDE = FRONT_SKIN.foot;
+  const ELBOW_SIDE = FRONT_SKIN.elbow;
   /** A point in the body's frame, from the middle of the hips: u toward the head along the body at `t`, v across toward the floor (the left side). */
   const frame = (t: number, u: number, v: number): Vec => add(mul(dir(t), u), mul(dir(t + 90), v));
-  // Feet stacked: the top ankle rests on the bottom one, so the straight legs close in a little toward the feet.
-  const ankleU = -Math.sqrt(legLen ** 2 - (L.hipHalf - FOOT_SIDE) ** 2);
+  // Legs stacked, the top one resting on the bottom one: the knees together and the ankles together (their inner sides
+  // touching, see FRONT_SKIN), so the thighs close in from the hips to the knees and the shins run on together.
+  const kneeU = -Math.sqrt(L.thigh ** 2 - (L.hipHalf - FRONT_SKIN.knee) ** 2);
+  const ankleU = kneeU - Math.sqrt(L.shin ** 2 - (FRONT_SKIN.knee - FRONT_SKIN.ankle) ** 2);
   // The body rises from the feet until the bottom elbow, under its shoulder, and the bottom foot both reach the floor.
-  const footFloor = (t: number) => frame(t, ankleU, FOOT_SIDE).y + FOOT_SIDE;
+  const footFloor = (t: number) => frame(t, ankleU, FRONT_SKIN.ankle).y + FOOT_SIDE;
   const elbowFloor = (t: number) => frame(t, L.torso, L.shoulderHalf).y + L.upperArm + ELBOW_SIDE;
   const t = solveFor(40, 89, (deg) => elbowFloor(deg) - footFloor(deg), 0);
   const shift: Vec = { x: 0, y: FLOOR - footFloor(t) };
   const p = (u: number, v: number) => add(frame(t, u, v), shift);
-  const legDir = (side: -1 | 1) => angleOf(sub(p(ankleU, side * FOOT_SIDE), p(0, side * L.hipHalf)));
-  const top = legDir(-1);
-  const bottom = legDir(1);
+  const legOf = (side: -1 | 1): Leg => {
+    const knee = p(kneeU, side * FRONT_SKIN.knee);
+    return { thigh: angleOf(sub(knee, p(0, side * L.hipHalf))), shin: angleOf(sub(p(ankleU, side * FRONT_SKIN.ankle), knee)), foot: 0 };
+  };
   // Bottom arm: upper arm upright; the forearm on the floor angles forward and toward the head (about 45°), so it
   // shows at about 70% of its length, the fist resting on the floor.
   const elbow = add(p(L.torso, L.shoulderHalf), { x: 0, y: L.upperArm });
   const fist: Vec = { x: elbow.x + 0.7 * (L.forearm + GRIP), y: FLOOR - BODY.hand };
   const fore = angleOf(sub(fist, elbow));
   const foreScale = Math.hypot(fist.x - elbow.x, fist.y - elbow.y) / (L.forearm + GRIP);
-  // Top hand flat on the side of the hip, fingers toward the feet, elbow pointing up.
-  const palm = p(0.06, -(L.hipHalf + HIP_SIDE + BODY.hand / 2));
-  const topArm = palmTo(p(L.torso, -L.shoulderHalf), palm, t + 180, dir(t - 90));
+  // Top hand flat on the side of the pelvis at the iliac crest, lying along it toward the feet (turned a little off the
+  // body, as the hip widens below the crest), elbow pointing up.
+  const palm = p(0.06, -(L.hipHalf + FRONT_SKIN.crest + BODY.hand / 2));
+  const topArm = palmTo(p(L.torso, -L.shoulderHalf), palm, t + 185, dir(t - 90));
   const pose: DemoPose = {
     torso: t,
     head: t, // neck in line with the body
-    leg: { thigh: top, shin: top, foot: 0 },
-    leg2: { thigh: bottom, shin: bottom, foot: 0 },
+    leg: legOf(-1),
+    leg2: legOf(1),
     arm: topArm,
     arm2: { upper: 180, fore, foreScale },
     anchor: 'hip',

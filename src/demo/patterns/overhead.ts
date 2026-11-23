@@ -10,7 +10,7 @@
 // stops just off the floor (or touches it, in a handstand push-up).
 import { BODY } from '../body';
 import { skinPoints } from '../contact';
-import { GRIP, L, PALM, add, along, angleOf, armTo, dir, dist, legTo, lerp, lerpV, mul, solve, sub, twoLink, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
+import { GRIP, L, PALM, add, along, angleOf, armTo, dir, dist, gripTo, legTo, lerp, lerpV, mul, solve, sub, twoLink, type Arm, type DemoPose, type Figure, type Leg, type Vec } from '../figure';
 import type { Demo, Prop } from '../types';
 import { O, FLOOR, LEG_LEN, FWD, centreOfMass, restingPad, solveFor, type Implement } from './shared';
 
@@ -461,19 +461,18 @@ export function handstandPushUp(): Demo {
  * sides until level with the shoulders, leading with the elbows (hands no
  * higher than them), no shrug, the body still. `oneArm` + `cable`: the right
  * arm raises the handle of a low cable on the lifter's left, the cable across
- * the front of the body, the free hand holding the machine. `bentOver`: hinged
- * forward with soft knees (the trunk foreshortened), arms hanging under the
- * shoulders and raised out to the sides level with the back.
+ * the front of the body, the free hand holding the machine. `bentOver`: see
+ * rearDeltFly.
  */
 export function lateralRaise(o: { oneArm?: boolean; cable?: boolean; bentOver?: boolean }): Demo {
-  const torsoScale = o.bentOver ? 0.42 : 1;
-  const leg: Leg = o.bentOver ? { thigh: 186, shin: 178, foot: 0 } : { thigh: 184, shin: 180, foot: 0 };
-  const leg2: Leg = o.bentOver ? { thigh: 174, shin: 182, foot: 0 } : { thigh: 176, shin: 180, foot: 0 };
-  // The lifter's right arm is on the image left (270 = out to the side). Hanging: beside the thighs, or
-  // bent over straight down under the shoulders; with the cable, in front of the hip.
-  const low = o.bentOver ? { upper: 182, fore: 180 } : o.cable ? { upper: 174, fore: 172 } : { upper: 188, fore: 185 };
+  if (o.bentOver) return rearDeltFly();
+  const leg: Leg = { thigh: 184, shin: 180, foot: 0 };
+  const leg2: Leg = { thigh: 176, shin: 180, foot: 0 };
+  // The lifter's right arm is on the image left (270 = out to the side). Hanging: beside the thighs, or with the
+  // cable in front of the hip.
+  const low = o.cable ? { upper: 174, fore: 172 } : { upper: 188, fore: 185 };
   const high = { upper: 268, fore: 262 };
-  const base: DemoPose = { torso: 0, torsoScale, leg, leg2, arm: low, anchor: 'ankle', at: O };
+  const base: DemoPose = { torso: 0, leg, leg2, arm: low, anchor: 'ankle', at: O };
   const arm = (s: number) => ({ upper: lerp(low.upper, high.upper, s), fore: lerp(low.fore, high.fore, s) });
   const mirror = (a: { upper: number; fore: number }) => ({ upper: 360 - a.upper, fore: 360 - a.fore });
   if (!o.cable) {
@@ -483,12 +482,12 @@ export function lateralRaise(o: { oneArm?: boolean; cable?: boolean; bentOver?: 
       props: [{ kind: 'dumbbell', at: o.oneArm ? 'wrist' : 'wrists' }],
     };
   }
-  // Cable: the machine stands to the lifter's left, the pulley at its foot; the free hand holds the frame.
+  // Cable: the machine stands to the lifter's left, the pulley at its foot; the free hand holds the frame at about hip
+  // height, the arm angled out to it with the elbow soft.
   const f = solve('front', base);
   const tower = f.b.hip.x + 0.24;
   const pulley: Vec = { x: tower - 0.04, y: FLOOR - 0.07 };
-  const grab: Vec = { x: tower - 0.025, y: f.b.hip.y - 0.1 };
-  const free = armTo(f.b.shoulder, sub(grab, { x: GRIP, y: 0 }), { x: 0.3, y: 1 });
+  const free = gripTo(f.b.shoulder, { x: tower - 0.012, y: f.b.hip.y + 0.01 }, { x: 1, y: 0.2 });
   return {
     view: 'front',
     pose: (s) => ({ ...base, arm: arm(s), arm2: free }),
@@ -497,6 +496,47 @@ export function lateralRaise(o: { oneArm?: boolean; cable?: boolean; bentOver?: 
       { kind: 'cable', from: pulley, at: 'wrist', column: tower },
     ],
     working: 'a',
+  };
+}
+
+/**
+ * How far the camera looks down on a bent-over lifter's back (degrees): the rear delt fly's placement (P.frontAbove), a
+ * phone propped sideways at about head height about 2 m in front of them and tilted down. (From 1.5-2 m and head
+ * height or a little above it looks down about 25-35 degrees.)
+ */
+const LOOK_DOWN = 28;
+
+/**
+ * Bent-over rear delt fly, from the front and above (the phone propped up
+ * and tilted down, P.frontAbove): hinged until the back is nearly level, knees
+ * soft. The camera looks down on the back, so the trunk is tipped past its
+ * line of sight (torsoScale < 0): the hips show beyond the shoulders at the
+ * top of the picture, the bowed head nearest at the bottom of the back, and
+ * the legs below it. The arms hang under the shoulders (foreshortened, as they
+ * point down and away) and rise out to the sides, elbows soft, until level
+ * with the back.
+ */
+function rearDeltFly(): Demo {
+  const cosLook = Math.cos((LOOK_DOWN * Math.PI) / 180);
+  const leg: Leg = { thigh: 186, shin: 178, foot: 0 };
+  const leg2: Leg = { thigh: 174, shin: 182, foot: 0 };
+  /** The lifter's right arm (image left) raised `deg` out to the side from hanging, as the camera sees it. */
+  const raised = (deg: number): Arm => {
+    const b = (deg * Math.PI) / 180;
+    const seenFromDown = (Math.atan2(Math.sin(b), Math.cos(b) * cosLook) * 180) / Math.PI;
+    const scale = Math.hypot(Math.sin(b), Math.cos(b) * cosLook);
+    const soft = lerp(3, 6, deg / 90); // the hands a little below the elbows
+    return { upper: 180 + seenFromDown, fore: 180 + seenFromDown - soft, scale };
+  };
+  const mirror = (a: Arm): Arm => ({ ...a, upper: 360 - a.upper, fore: 360 - a.fore });
+  const base: DemoPose = { torso: 0, torsoScale: -0.42, leg, leg2, arm: raised(3), anchor: 'ankle', at: O };
+  return {
+    view: 'front',
+    pose: (s) => {
+      const arm = raised(lerp(3, 88, s));
+      return { ...base, arm, arm2: mirror(arm) };
+    },
+    props: [{ kind: 'dumbbell', at: 'wrists' }],
   };
 }
 

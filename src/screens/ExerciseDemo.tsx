@@ -2,8 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/ho
 import { engagementFor } from '../data/engagement';
 import { MUSCLE_LABELS, type Exercise } from '../data/types';
 import { ROLE_LABEL, engageColour, levelsAt, momentAt, peakLevels, type Engagement, type Levels, type Moment, type MuscleRole, type MuscleUse } from '../demo/engagement';
+import type { BodyKind } from '../demo/body';
 import { demoBounds, frameMarkup, viewBoxOf } from '../demo/render';
 import { timeline } from '../demo/timeline';
+import { figureOf, loadProfile } from '../profile';
 
 function reducedMotion(): boolean {
   try {
@@ -70,9 +72,10 @@ function MuscleLegend({ muscles, levels, bars }: { muscles: MuscleUse[]; levels:
  * Animated demo of the exercise, drawn from the same camera angle the setup
  * check asks for: a figure whose working muscles glow hotter the harder they
  * work through the rep. Tap to pause. With reduced motion: the start and the
- * turnaround side by side.
+ * turnaround side by side. `body` picks the figure (the hidden demos page's ?body); by default the profile's body
+ * drawing, as for the muscle icons and the body map.
  */
-export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise; compact?: boolean }) {
+export function ExerciseDemo({ exercise, compact = false, body: bodyKind }: { exercise: Exercise; compact?: boolean; body?: BodyKind }) {
   const demo = exercise.demo;
   const hold = exercise.tracking.kind === 'hold';
   const box = useMemo(() => demoBounds(demo), [demo]);
@@ -81,6 +84,7 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
   const muscles = useMemo(() => legendOrder(spec), [spec]);
   const still = useMemo(reducedMotion, []);
   const uid = useMemo(() => `demo${++instances}`, []);
+  const body = useMemo(() => bodyKind ?? figureOf(loadProfile()), [bodyKind]);
   const [playing, setPlaying] = useState(true);
   const svg = useRef<SVGSVGElement>(null);
   const bars = useRef<(HTMLElement | null)[]>([]);
@@ -89,7 +93,8 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
   /** Seconds of animation shown so far, kept across pauses. */
   const clock = useRef(0);
 
-  const view = demo.view === 'side' ? 'side view' : 'front view';
+  // A phone tilted down (Placement.tiltDown) sees the lifter from in front and above, and the demo is drawn that way.
+  const view = demo.view === 'side' ? 'side view' : exercise.placement.tiltDown ? 'front view from above' : 'front view';
   const viewBox = viewBoxOf(box);
   const words = musclesInWords(muscles);
 
@@ -106,7 +111,7 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
     const key = `${m.s.toFixed(4)}|${back}|${colours.join()}`;
     if (key !== painted.current) {
       painted.current = key;
-      el.innerHTML = frameMarkup(demo, m.s, levels, box, uid, back);
+      el.innerHTML = frameMarkup(demo, m.s, levels, box, { id: uid, back, body });
       muscles.forEach((u, i) => {
         const bar = bars.current[i];
         if (!bar) return;
@@ -124,7 +129,7 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
     if (still) return;
     painted.current = '';
     paint();
-  }, [still, exercise, box]);
+  }, [still, exercise, box, body]);
 
   useEffect(() => {
     if (still || !playing) return;
@@ -167,7 +172,7 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
       io?.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [still, playing, exercise, box]);
+  }, [still, playing, exercise, box, body]);
 
   if (still) {
     // Reduced motion: still pictures, each muscle at the level it has in that position.
@@ -176,7 +181,7 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
       <figure class={`demo ${compact ? 'compact' : ''}`} aria-label={`${exercise.name}: demo, ${view}. Muscles working: ${words}.`}>
         <div class="demo-pair">
           {shots.map((shot, k) => (
-            <svg viewBox={viewBox} role="img" aria-label={shot.label} dangerouslySetInnerHTML={{ __html: frameMarkup(demo, shot.s, shot.levels, box, `${uid}-${k}`) }} />
+            <svg viewBox={viewBox} role="img" aria-label={shot.label} dangerouslySetInnerHTML={{ __html: frameMarkup(demo, shot.s, shot.levels, box, { id: `${uid}-${k}`, body }) }} />
           ))}
         </div>
         {!compact && <MuscleLegend muscles={muscles} levels={peakLevels(spec)} />}
@@ -211,7 +216,7 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
       {!compact && <MuscleLegend muscles={muscles} levels={levelsAt(spec, hold ? { phase: 'hold', s: 0, u: 0, action: 'holding' } : AT_START)} bars={bars} />}
       {!compact && (
         <figcaption class="muted small">
-          {demo.view === 'side' ? 'Side view' : 'Front view'}, the way your camera should see you · tap to {playing ? 'pause' : 'play'}
+          {view[0].toUpperCase() + view.slice(1)}, the way your camera should see you · tap to {playing ? 'pause' : 'play'}
         </figcaption>
       )}
     </figure>
