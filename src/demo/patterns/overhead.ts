@@ -303,17 +303,20 @@ function dumbbellPress(arnold: boolean): Demo {
 
 /**
  * Seated shoulder press machine, side view: back against the upright pad,
- * feet flat, hands on the handles just above and in front of the shoulders,
- * elbows out to the sides under them. The handles sit on a carriage that
- * rides straight up a guide column standing in front of the seat, pressed to
- * straight arms a little in front of the head.
+ * feet flat, hands on the handles at about shoulder height just in front of
+ * the shoulders (below the face), elbows out to the sides under them, pressed
+ * straight up to straight arms a little in front of the head. The handles
+ * ride on a carriage up a guide column standing behind the back pad; the
+ * carriage's arms reach forward from it past the lifter's sides, drawn behind
+ * the trunk and head so only the handle shows under the fist (the camera
+ * films from the side the machine leaves open).
  */
 function machinePress(): Demo {
   const torso = -8; // back pad reclined a little
   const shoulder = along(O, torso, L.torso);
-  // Handles wider than the shoulders, about chin high at the bottom, pressed straight up.
+  // Handles wider than the shoulders, at shoulder height at the bottom, pressed straight up.
   const out = 0.07;
-  const bottom = add(shoulder, { x: 0.065, y: -0.05 });
+  const bottom = add(shoulder, { x: 0.06, y: -0.025 });
   const reach = Math.sqrt(L.upperArm ** 2 + REACH ** 2 + 2 * L.upperArm * REACH * Math.cos(rad(4)) - out ** 2);
   const top = { x: bottom.x, y: shoulder.y - Math.sqrt(reach ** 2 - (bottom.x - shoulder.x) ** 2) };
   const lockTilt = angleOf(sub(top, shoulder));
@@ -330,20 +333,22 @@ function machinePress(): Demo {
   const [s0, s1] = restingPad(pose, { x: -0.08, y: BODY.thighBack + 0.023 }, { x: 0.17, y: BODY.thighBack + 0.023 }, /hand|forearm|upper arm/);
   const seatX = (s0.x + s1.x) / 2;
   const backPost = lerpV(b0, b1, 0.6);
-  // The guide column stands on the base in front of the toes; the carriage arm reaches back from it to the handles.
-  const column = L.thigh + L.foot + 0.07;
+  // The guide column stands on the base behind the back pad, taller than the handles go.
+  const column = Math.min(b0.x, b1.x) - 0.075;
   const arm = column - bottom.x;
   const props: Prop[] = [
-    { kind: 'line', from: { x: b1.x - 0.05, y: floor - 0.008 }, to: { x: column + 0.05, y: floor - 0.008 }, width: 0.016 },
-    { kind: 'line', from: { x: column, y: floor - 0.01 }, to: { x: column, y: top.y - 0.08 }, width: 0.034 },
+    { kind: 'line', from: { x: column - 0.06, y: floor - 0.008 }, to: { x: s1.x + 0.02, y: floor - 0.008 }, width: 0.016 },
+    { kind: 'line', from: { x: column, y: floor - 0.01 }, to: { x: column, y: top.y - 0.07 }, width: 0.034 },
     // Seat post, and the back pad's post down to the base.
     { kind: 'line', from: { x: seatX, y: s0.y }, to: { x: seatX, y: floor - 0.01 }, width: 0.026 },
-    { kind: 'line', from: add(backPost, mul(dir(torso - 90), 0.02)), to: { x: b1.x - 0.05, y: floor - 0.01 }, width: 0.026 },
+    { kind: 'line', from: add(backPost, mul(dir(torso - 90), 0.02)), to: { x: backPost.x - 0.02, y: floor - 0.01 }, width: 0.026 },
+    // The carriage, behind the lifter: its arm from the handle back to the column, and its sleeve on the column.
+    { kind: 'attached', at: 'wrist', from: { x: 0, y: 0 }, to: { x: arm, y: 0 }, width: 0.024, pad: true },
+    { kind: 'attached', at: 'wrist', from: { x: arm, y: -0.045 }, to: { x: arm, y: 0.045 }, width: 0.05, pad: true },
+    // The pads over the carriage arm.
     { kind: 'bench', points: [b0, b1], legs: false },
     { kind: 'bench', points: [s0, s1], legs: false },
-    // The carriage: its sleeve on the column, the arm back to the handle (seen end-on under the fist).
-    { kind: 'attached', at: 'wrist', from: { x: arm, y: -0.045 }, to: { x: arm, y: 0.045 }, width: 0.05 },
-    { kind: 'attached', at: 'wrist', from: { x: 0, y: 0 }, to: { x: arm, y: 0 }, width: 0.022 },
+    // The handle, seen end-on under the fist.
     { kind: 'attached', at: 'wrist', from: { x: 0, y: 0 }, to: { x: 0, y: 0 }, width: 0.036 },
   ];
   return { view: 'side', floor, pose, props };

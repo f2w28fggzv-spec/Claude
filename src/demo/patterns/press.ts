@@ -359,6 +359,11 @@ export function dip(o: { onBench: boolean }): Demo {
   return o.onBench ? benchDip() : barDip();
 }
 
+/** Dip bars about 1 m high: the floor this far below them, the bent legs clear of it at the bottom. */
+const DIP_FLOOR = 0.58;
+/** The near bar runs front to back, from this far behind the hands to this far in front (about 55 cm). */
+const DIP_BAR: [number, number] = [-0.17, 0.16];
+
 /**
  * Parallel-bar dip: hands on the bars by the hips, knees bent with the feet
  * behind. From straight arms, lower until the upper arms are level, elbows
@@ -381,13 +386,22 @@ function barDip(): Demo {
     const shoulder = along(elbow, upper(s), L.upperArm);
     return { torso: t, head: t * 0.5, leg: legs(t), arm: { upper: upper(s) + 180, fore: fore(s) + 180 }, anchor: 'shoulder', at: shoulder };
   };
+  // A dip station: the near bar on an upright at each end, standing on a base rail on the floor.
+  const [back, front] = DIP_BAR.map((x) => bar.x + x - Math.sign(x) * 0.012);
+  const foot = DIP_FLOOR - 0.008;
   return {
     view: 'side',
-    floor: null,
+    floor: DIP_FLOOR,
     // The trunk leans until the body balances over the hands.
     pose: (s) => build(s, solveFor(-20, 75, (t) => -centreOfMass(solve('side', build(s, t))).x, -bar.x)),
-    // The near bar runs front to back, between the body and the near arm.
-    props: [{ kind: 'attached', at: 'wrist', from: { x: -0.17, y: 0 }, to: { x: 0.16, y: 0 }, width: 0.024 }],
+    props: [
+      // Uprights and base behind the lifter, the legs hanging between the bars.
+      { kind: 'line', from: { x: back, y: bar.y }, to: { x: back, y: foot }, width: 0.024 },
+      { kind: 'line', from: { x: front, y: bar.y }, to: { x: front, y: foot }, width: 0.024 },
+      { kind: 'line', from: { x: back - 0.06, y: foot }, to: { x: front + 0.06, y: foot }, width: 0.016 },
+      // The near bar runs front to back, between the body and the near arm.
+      { kind: 'attached', at: 'wrist', from: { x: DIP_BAR[0], y: 0 }, to: { x: DIP_BAR[1], y: 0 }, width: 0.024 },
+    ],
   };
 }
 
