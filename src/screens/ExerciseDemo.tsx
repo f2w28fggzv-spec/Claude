@@ -114,8 +114,10 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
         bar.style.background = colours[i];
       });
     }
-    lowering.current?.classList.toggle('on', m.action === 'lowering');
-    lifting.current?.classList.toggle('on', m.action === 'lifting');
+    // An assisted way back (Engagement.returnShare) isn't the lift itself: neither label lights.
+    const assisted = m.phase === 'back' && spec.returnShare !== undefined;
+    lowering.current?.classList.toggle('on', m.action === 'lowering' && !assisted);
+    lifting.current?.classList.toggle('on', m.action === 'lifting' && !assisted);
   };
 
   useLayoutEffect(() => {

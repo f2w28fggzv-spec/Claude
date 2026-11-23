@@ -534,6 +534,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
   'negative-pull-up': {
     profile: [1, 0.8, 0.3],
     lowering: 1,
+    returnShare: 0.3,
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'lengthens under load to lower the body slowly' },
       { group: 'biceps', role: 'assist', peak: 0.65, profile: [0.7, 1, 0.1], note: 'let the elbows straighten slowly' },

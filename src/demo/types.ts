@@ -52,8 +52,10 @@ export type Prop =
   /**
    * Machine pad on a joint: a round roller, or with `block` a padded block
    * (`along` the segment by `across` it). `offset` is on screen, or with
-   * `frame` in that segment's own frame (x along it from the joint above, y
-   * toward its +90° side: the back of a hanging limb, the front of the trunk),
+   * `frame` in that segment's own frame (x along it from the attach point,
+   * positive in the segment's direction, e.g. from the knee toward the ankle
+   * for the shin; y toward its +90° side: the back of a hanging limb, the
+   * front of the trunk),
    * so the pad turns with it (leg curl, leg extension, hack squat shoulders).
    * `lever`: the machine's arm from the joint at the top of that segment (the
    * knee for a shin pad), on which the pad turns.

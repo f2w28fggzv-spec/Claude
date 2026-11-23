@@ -28,7 +28,7 @@ export function DevDemos({ still, ids }: { still: boolean; ids?: string[] }) {
                     <svg
                       class="demo-svg"
                       viewBox={viewBoxOf(box)}
-                      dangerouslySetInnerHTML={{ __html: frameMarkup(e.demo, s, levelsAt(spec, { phase: 'out', s, u: s, action: 'lifting' }), box, `${e.id}-${s * 2}`) }}
+                      dangerouslySetInnerHTML={{ __html: frameMarkup(e.demo, s, levelsAt(spec, { phase: 'out', s, u: s, action: e.tracking.kind === 'reps' && e.tracking.firstPhase === 'eccentric' ? 'lowering' : 'lifting' }), box, `${e.id}-${s * 2}`) }}
                     />
                   ))}
                 </div>

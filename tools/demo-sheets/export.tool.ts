@@ -18,6 +18,9 @@ it('export demo frames', () => {
     const box = demoBounds(e.demo);
     const spec = engagementFor(e);
     const hold = e.tracking.kind === 'hold';
+    // The way out lowers first for eccentric-first lifts (squat, bench); the way back is the other action.
+    const outAction = e.tracking.kind === 'reps' && e.tracking.firstPhase === 'eccentric' ? 'lowering' : 'lifting';
+    const backAction = outAction === 'lowering' ? 'lifting' : 'lowering';
     const steps = hold ? [0] : Array.from({ length: count }, (_, k) => k / (count - 1));
     return {
       id: e.id,
@@ -30,8 +33,8 @@ it('export demo frames', () => {
       frames: [
         ...steps.map((s) => ({
           s: String(s),
-          // Levels as when lifting through (or holding at) this position.
-          svg: frameMarkup(e.demo, s, hold ? peakLevels(spec) : levelsAt(spec, { phase: 'out', s, u: s, action: 'lifting' }), box, `${e.id}-${Math.round(s * 100)}`),
+          // Levels as when moving out through (or holding at) this position.
+          svg: frameMarkup(e.demo, s, hold ? peakLevels(spec) : levelsAt(spec, { phase: 'out', s, u: s, action: outAction }), box, `${e.id}-${Math.round(s * 100)}`),
         })),
         // A demo with its own way back (Demo.back) also shows that path, from the turnaround back to the start.
         ...(e.demo.back
@@ -40,7 +43,7 @@ it('export demo frames', () => {
               .reverse()
               .map((s) => ({
                 s: `back ${s}`,
-                svg: frameMarkup(e.demo, s, levelsAt(spec, { phase: 'back', s, u: 1 - s, action: 'lifting' }), box, `${e.id}-b${Math.round(s * 100)}`, true),
+                svg: frameMarkup(e.demo, s, levelsAt(spec, { phase: 'back', s, u: 1 - s, action: backAction }), box, `${e.id}-b${Math.round(s * 100)}`, true),
               }))
           : []),
       ],

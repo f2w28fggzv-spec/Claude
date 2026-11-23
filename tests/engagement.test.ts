@@ -171,3 +171,15 @@ describe('exercises built around the lowering', () => {
     expect(levelsAt(eccentric, mid).hamstrings).toBeCloseTo(1);
   });
 });
+
+describe('an assisted way back', () => {
+  it('rests the movers mid-way back and keeps both ends at full level', () => {
+    const muscles = [{ group: 'back' as const, role: 'main' as const, peak: 1 }];
+    const spec: Engagement = { profile: [1, 1, 1], returnShare: 0.3, muscles };
+    const at = (u: number): Moment => ({ phase: 'back', s: 1 - u, u, action: 'lifting' });
+    expect(levelsAt(spec, at(0.5)).back).toBeCloseTo(0.3);
+    expect(levelsAt(spec, at(0)).back).toBeCloseTo(1);
+    expect(levelsAt(spec, at(1)).back).toBeCloseTo(1);
+    expect(levelsAt({ ...spec, returnShare: undefined }, at(0.5)).back).toBeCloseTo(1);
+  });
+});

@@ -182,7 +182,7 @@ const DRAFT_EXERCISES: Exercise[] = [
   ex({
     id: 'walking-lunge',
     name: 'Dumbbell walking lunge',
-    summary: 'Step forward into a lunge, then bring the back leg through into the next step.',
+    summary: 'Step forward into a lunge, then drive up and bring the back foot through to meet the front one; step again.',
     primary: ['quads', 'glutes'],
     secondary: ['hamstrings'],
     equipment: ['dumbbell'],

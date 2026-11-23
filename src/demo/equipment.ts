@@ -141,13 +141,13 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
         break;
       }
       case 'kettlebell':
-        for (const c of attachPoints(f, p.at)) {
+        attachPoints(f, p.at).forEach((c, i) => {
           // Drawn hanging (handle up, bell below the fist); a swing turns it to fly in line with the arm.
-          const side = p.at === 'wrist2' ? f.b : f.a;
+          const side = i === 1 || p.at === 'wrist2' ? f.b : f.a;
           const turn = p.swing ? 180 + angleOf(sub(side.hand, side.wrist)) : 0;
           const bell = `<path d="M-0.03 0.05 C-0.045 -0.02 0.045 -0.02 0.03 0.05" fill="none" stroke="${STEEL}" stroke-width="0.014" stroke-linecap="round"/>` + circle({ x: 0, y: 0.09 }, 0.052, `fill="${STEEL}"`);
           out.mid += `<g transform="translate(${n(c.x)} ${n(c.y)})${turn ? ` rotate(${n(turn)})` : ''}">${bell}</g>`;
-        }
+        });
         break;
       case 'bench': {
         let s = '';

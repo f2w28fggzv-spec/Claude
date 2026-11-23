@@ -16,22 +16,20 @@ const MEASURED_SHARE = 0.65;
 
 export function timeline(exercise: Exercise, pauseFar = 0): Timeline {
   if (exercise.tracking.kind === 'hold') return { segments: [1, 0, 0, 0], total: 1 };
-  let ecc = ECCENTRIC;
-  let con = CONCENTRIC;
-  // Demos show controlled tempo: always slower than any tempo check needs.
+  // The slowest a tempo check needs each phase to be (0 = no check), and the demo's default pace:
+  // controlled, and always slower than any tempo check needs.
+  const need = { eccentric: 0, concentric: 0 };
   for (const c of exercise.checks) {
-    if (c.type !== 'tempo') continue;
-    if (c.phase === 'eccentric' && c.minSec) ecc = Math.max(ecc, c.minSec / MEASURED_SHARE + 0.2);
-    if (c.phase === 'concentric' && c.minSec) con = Math.max(con, c.minSec / MEASURED_SHARE + 0.2);
+    if (c.type === 'tempo' && c.minSec) need[c.phase] = Math.max(need[c.phase], c.minSec / MEASURED_SHARE + 0.2);
   }
+  const ecc = Math.max(ECCENTRIC, need.eccentric);
+  const con = Math.max(CONCENTRIC, need.concentric);
   const eccFirst = exercise.tracking.firstPhase === 'eccentric';
   // A demo can set its own pace (a ballistic swing), but never faster than a tempo check allows.
   const t = exercise.demo?.timing ?? {};
   const minFirst = eccFirst ? ecc : con;
   const minSecond = eccFirst ? con : ecc;
-  const hasTempo = (phase: 'eccentric' | 'concentric') => exercise.checks.some((c) => c.type === 'tempo' && c.phase === phase && c.minSec);
-  const pace = (own: number | undefined, fallback: number, phase: 'eccentric' | 'concentric') =>
-    own === undefined ? fallback : hasTempo(phase) ? Math.max(own, fallback) : own;
+  const pace = (own: number | undefined, fallback: number, phase: 'eccentric' | 'concentric') => (own === undefined ? fallback : Math.max(own, need[phase]));
   const first = pace(t.out, minFirst, eccFirst ? 'eccentric' : 'concentric');
   const second = pace(t.back, minSecond, eccFirst ? 'concentric' : 'eccentric');
   const segments: Timeline['segments'] = [t.start ?? 0.7, first, (t.far ?? 0.35) + pauseFar, second];

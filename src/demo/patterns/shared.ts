@@ -75,7 +75,10 @@ export const handProp = (imp: Implement, at: 'wrist' | 'wrists' = 'wrist', o: { 
 
 /** The same movement played from the other end (start ↔ turnaround). */
 export function reversed(d: Demo): Demo {
-  return { ...d, pose: (s) => d.pose(1 - s) };
+  // Its own way back or a moving floor would no longer meet the reversed path at the ends.
+  if (d.back || d.ground) throw new Error('reversed() needs a demo that returns the way it went out');
+  const t = d.timing;
+  return { ...d, pose: (s) => d.pose(1 - s), ...(t && { timing: { start: t.far, out: t.back, far: t.start, back: t.out } }) };
 }
 
 // ── Balance and resting on equipment ───────────────────────────────────────

@@ -568,7 +568,7 @@ progress { width: 100%; height: 10px; accent-color: var(--accent); margin: 8px 0
 .dm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
 .dm-head strong { font-weight: 800; }
 .dm-key { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.72rem; }
-.dm-key i { display: block; width: 54px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--an-muscle), var(--heat-glow) 11%, var(--amber) 22%, var(--orange) 50%, var(--flame) 76%, var(--red)); }
+.dm-key i { display: block; width: 54px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--an-muscle), var(--heat-glow) 7%, var(--amber) 14%, var(--orange) 45%, var(--flame) 75%, var(--red)); }
 .demo-muscles ul { list-style: none; padding: 0; margin: 0; }
 .demo-muscles li { display: grid; grid-template-columns: minmax(8.5em, auto) 1fr; align-items: center; column-gap: 10px; padding: 5px 0; font-size: 0.92rem; }
 .demo-muscles li + li { border-top: 1px solid var(--line); }

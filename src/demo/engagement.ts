@@ -46,6 +46,12 @@ export interface Engagement {
    * pull-up), where lowering under control is the hard part.
    */
   lowering?: number;
+  /**
+   * Share of their level the movers show on the way back when the body gets
+   * back to the start with help rather than by the lift itself (a negative
+   * pull-up steps back up off a box). Full at both ends, dipping between.
+   */
+  returnShare?: number;
   muscles: MuscleUse[];
   /** The mechanics behind the profile (for maintainers; not shown in the app). */
   why?: string;
@@ -126,9 +132,10 @@ export function levelOf(use: MuscleUse, spec: Engagement, m: Moment, t = 0): num
     demand = mixN(READY, demand, on);
   }
   if (use.role === 'stabilize') return clamp01(use.peak * (STEADY + (1 - STEADY) * demand) * mixN(0.4, 1, on));
-  // Movers dip while lowering, smoothly so the colour never jumps at a pause.
+  // Movers dip while lowering, smoothly so the colour never jumps at a pause; an assisted way back dips the same way.
   const lowering = m.action === 'lowering' ? 1 - (1 - (spec.lowering ?? LOWERING)) * Math.sin(Math.PI * clamp01(m.u)) : 1;
-  return clamp01(use.peak * demand * lowering);
+  const assisted = m.phase === 'back' && spec.returnShare !== undefined ? 1 - (1 - spec.returnShare) * Math.sin(Math.PI * clamp01(m.u)) : 1;
+  return clamp01(use.peak * demand * lowering * assisted);
 }
 
 /** Muscle groups that belong to one side's arm or leg (the rest are shared by the trunk). */
