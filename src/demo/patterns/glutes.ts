@@ -414,9 +414,11 @@ function machineCalfRaise(): Demo {
   const high = 90 + RISE; // heels well above it
   const shoulderX = ball.x; // pads over the balls of the feet
   const column = ball.x + 0.26;
-  // On the carriage, from the shoulder joints: the pads' centre line, and the handles ahead of the shoulders.
-  const padY = -0.072;
-  const handle: Vec = { x: 0.125, y: padY };
+  // The carriage, from the shoulder joints: the shoulder pad on top of the shoulder (over the side of the
+  // neck), and an arm from the pad's lower front edge, under the chin, through the handles to the column.
+  const PAD = { along: 0.05, back: 0.018, thick: 0.04, long: 0.11 };
+  const armY = -(PAD.along - PAD.thick / 2);
+  const handle: Vec = { x: 0.125, y: armY };
   const pose = (s: number): DemoPose => {
     const foot = lerp(low, high, s);
     const ankle = ankleFrom(ball, foot);
@@ -432,9 +434,8 @@ function machineCalfRaise(): Demo {
     props: [
       { kind: 'box', x: ball.x, y: ball.y, w: column + 0.03 - ball.x, h: step },
       { kind: 'line', from: { x: column, y: FLOOR - 0.01 }, to: { x: column, y: top.y - 0.26 }, width: 0.045 },
-      // The near shoulder pad on top of the shoulder (over the side of the neck), and the carriage arm from the handles to the column.
-      { kind: 'pad', at: 'shoulder', frame: 'trunk', offset: { x: 0.05, y: -0.018 }, block: { along: 0.04, across: 0.11 } },
-      { kind: 'attached', at: 'shoulder', from: { x: handle.x - 0.015, y: padY }, to: { x: column - shoulderX, y: padY }, width: 0.024 },
+      { kind: 'pad', at: 'shoulder', frame: 'trunk', offset: { x: PAD.along, y: -PAD.back }, block: { along: PAD.thick, across: PAD.long } },
+      { kind: 'attached', at: 'shoulder', from: { x: PAD.long / 2 - PAD.back, y: armY }, to: { x: column - shoulderX, y: armY }, width: 0.024 },
     ],
     pauseFar: 0.5,
   };
