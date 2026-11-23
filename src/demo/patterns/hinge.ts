@@ -24,7 +24,7 @@ const ROLLER = 0.035;
  * (0.21); thigh front 0.06 and 0.19 from the hip; the back of the lower calf 0.03 to 0.05 above the ankle, just above
  * the heel; the front of the shin where a bar on the floor touches it.
  */
-const SKIN = { groin: 0.0546, chest: 0.0858, thighHigh: 0.0599, thighLow: 0.0505, calfLow: 0.027, shinFront: 0.024 };
+const SKIN = { groin: 0.0546, chest: 0.0858, thighHigh: 0.0599, thighLow: 0.0505, calfLow: 0.027, shinFront: 0.025 };
 
 const clamp01 = (u: number) => Math.min(1, Math.max(0, u));
 /** Eases in and out over u = 0..1. */
@@ -41,9 +41,9 @@ function segDist(p: Vec, a: Vec, b: Vec): number {
   return Math.hypot(p.x - (a.x + ab.x * t), p.y - (a.y + ab.y * t));
 }
 
-/** How far p is outside the near leg's front (thigh and shin skin); negative inside. */
+/** How far p is outside the near leg's front (thigh and shin skin, the shin as drawn); negative inside. */
 function offLegs(p: Vec, hip: Vec, knee: Vec, ankle: Vec): number {
-  return Math.min(segDist(p, hip, knee) - BODY.thighFront, segDist(p, knee, ankle) - BODY.shinFront);
+  return Math.min(segDist(p, hip, knee) - BODY.thighFront, segDist(p, knee, ankle) - SKIN.shinFront);
 }
 
 /**
@@ -177,11 +177,14 @@ function freeLeg(torso: number, s: number): Leg {
   return { thigh, shin, foot: shin - 90 - 22 * (1 - s) };
 }
 
-/** The bar's centre on the floor, touching the front of shins tilted `shin` degrees forward. */
+/**
+ * The bar's centre on the floor, touching the front of shins tilted `shin` degrees forward (the shin as drawn). The
+ * drawn shin and bar are thicker than real ones, so only near-vertical shins keep the bar over the middle of the foot.
+ */
 function barOnShins(shin: number): Vec {
   const h = PLATE_R - FLOOR; // bar height above the ankle joint
   const r = (shin * Math.PI) / 180;
-  return { x: (BODY.shinFront + BAR_R + h * Math.sin(r)) / Math.cos(r), y: FLOOR - PLATE_R };
+  return { x: (SKIN.shinFront + BAR_R + h * Math.sin(r)) / Math.cos(r), y: FLOOR - PLATE_R };
 }
 
 /** Trunk lean at which straight arms hold the bar at height y against legs with these angles. */

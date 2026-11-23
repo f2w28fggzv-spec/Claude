@@ -332,11 +332,11 @@ export function lunge(o: { rear: 'floor' | 'bench'; step?: 'back' | 'forward'; i
       const touch = 0.85;
       const off = toes(ON_TIPS);
       const swing = (v: number): Foot => {
-        const e = smooth(v);
-        const foot = lerp(ON_TIPS, land.foot, e);
-        // The toes leave the floor last and relax into line with the foot, then land flat.
-        const toesAt = lerp(lerp(90, foot, smooth(v / 0.3)), land.toes ?? land.foot, smooth((v - 0.7) / 0.3));
-        const ankle = add(lerpV(off.ankle, land.ankle, e), { x: 0, y: -0.06 * Math.sin(Math.PI * v) });
+        // Off the toes the foot lifts at once and turns up toward the shin, so the toes clear the floor;
+        // the toes leave last and relax into line with the foot, then the foot lands flat.
+        const foot = lerp(ON_TIPS, land.foot, 1 - (1 - v) ** 2);
+        const toesAt = lerp(lerp(90, foot, smooth(v / 0.25)), land.toes ?? land.foot, smooth((v - 0.7) / 0.3));
+        const ankle = add(lerpV(off.ankle, land.ankle, smooth(v)), { x: 0, y: -0.07 * Math.sin(Math.PI * v) ** 0.6 });
         return { ankle: { x: ankle.x, y: Math.min(ankle.y, FLOOR - soleDepth(foot, toesAt)) }, foot, toes: toesAt };
       };
       walk = {
@@ -572,23 +572,42 @@ export function legPress(): Demo {
     anchor: 'hip',
     at: O,
   });
-  // Footplate under the soles, moving with the feet; its lower end rides on the rails.
+  // The sled, moving with the feet: the footplate under the soles, a carriage riding the rails from
+  // the plate's lower end, and a brace from the plate's top to the carriage.
+  const n = dir(rail + 90); // across the rails, away from the lifter
   const sole = mul(dir(plate + 90), L.ankleHeight + 0.014);
   const plateLow = add(sole, mul(dir(plate), -0.11));
-  const footplate: Prop = { kind: 'attached', at: 'ankle', from: plateLow, to: add(sole, mul(dir(plate), 0.2)), width: 0.028 };
-  const rails: Prop = { kind: 'line', from: add(add(ankleB, plateLow), mul(u, -0.12)), to: add(add(ankleTop, plateLow), mul(u, 0.25)), width: 0.03 };
-  // Seat: back pad from behind the head to the hips, seat pan under the glutes.
+  const plateTop = add(sole, mul(dir(plate), 0.2));
+  const shoe = add(plateLow, mul(u, 0.24));
+  const sled: Prop[] = [
+    { kind: 'attached', at: 'ankle', from: plateLow, to: shoe, width: 0.04 },
+    { kind: 'attached', at: 'ankle', from: plateTop, to: shoe, width: 0.02 },
+    { kind: 'attached', at: 'ankle', from: plateLow, to: plateTop, width: 0.028 },
+  ];
+  // Seat: back pad from behind the head to the hips, seat pan under the glutes, on legs.
   const behind = mul(dir(torso - 90), BODY.torsoBack + PAD_HALF);
   const [b0, b1] = restingPad(pose, add(along(O, torso, 0.5), behind), add(along(O, torso, 0.02), behind), /hand|forearm/);
   const panDir = dir(62);
   const pan0 = add(O, mul(dir(torso - 90), BODY.glute + PAD_HALF));
   const [p0, p1] = restingPad(pose, add(pan0, mul(panDir, -0.04)), add(pan0, mul(panDir, 0.12)), /hand|forearm/);
   const corner = crossing(b0, b1, p0, p1);
+  // One machine: a base frame on the floor under the seat's legs and the rails, which rise from the
+  // floor just in front of the seat, under the carriage, to a post at the top.
+  const floor = 0.3;
+  const base = floor - 0.012;
+  const railAt = add(add(ankleB, plateLow), mul(n, 0.033));
+  const railFoot = add(railAt, mul(u, (railAt.y - base) / -u.y));
+  const railTop = add(add(ankleTop, shoe), add(mul(n, 0.033), mul(u, 0.05)));
+  const frame: Prop[] = [
+    { kind: 'line', from: { x: b0.x - 0.06, y: base }, to: { x: railTop.x + 0.06, y: base }, width: 0.024 },
+    { kind: 'line', from: railFoot, to: railTop, width: 0.026 },
+    { kind: 'line', from: railTop, to: { x: railTop.x, y: base }, width: 0.026 },
+  ];
   return {
     view: 'side',
-    floor: 0.3,
+    floor,
     pose,
-    props: [rails, { kind: 'bench', points: [b0, corner, p1], legs: true }, { kind: 'bar', at: PRESS_HANDLE }, footplate],
+    props: [...frame, { kind: 'bench', points: [b0, corner, p1], legs: true }, { kind: 'bar', at: PRESS_HANDLE }, ...sled],
   };
 }
 /** Leg-press handle beside the seat, by the hip. */

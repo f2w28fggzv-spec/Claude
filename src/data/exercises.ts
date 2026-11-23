@@ -372,7 +372,7 @@ const DRAFT_EXERCISES: Exercise[] = [
     equipment: ['barbell'],
     role: 'compound',
     analysis: 'full',
-    demo: D.deadlift({ shin: 10, ahead: 0.03, pastKnees: 25 }),
+    demo: D.deadlift({ shin: 4, ahead: 0.02, pastKnees: 25 }),
     placement: P.sideStanding,
     tracking: up('wrist'),
     checks: [
