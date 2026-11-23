@@ -50,7 +50,7 @@ export function skinPoints(demo: Demo, s: number, back = false): SkinPoint[] {
   ];
   // Trunk: lower part hip to waist (glutes at the back by the hip), upper part waist to shoulder.
   const hip = f.a.hip;
-  segmentSkin(hip, f.waist, pose.torso + 90, BODY.torsoFront, BODY.torsoBack, 'lower trunk', out);
+  segmentSkin(hip, f.waist, pose.torso + 90, BODY.bellyFront, BODY.torsoBack, 'lower trunk', out);
   segmentSkin(f.waist, f.a.shoulder, pose.torso + pose.bend + 90, BODY.torsoFront, BODY.torsoBack, 'upper trunk', out);
   out.push({ p: add(hip, mul(dir(pose.torso - 90), BODY.glute)), part: 'glutes' });
   out.push({ p: add(f.head, mul(dir(pose.head), BODY.head)), part: 'head (top)' });

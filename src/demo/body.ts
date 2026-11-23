@@ -72,6 +72,8 @@ export interface BodyLayers {
 export const BODY = {
   torsoBack: 0.076,
   torsoFront: 0.084,
+  /** Front of the lower trunk (hip to waist): the belly is slimmer than the chest. */
+  bellyFront: 0.062,
   glute: 0.086,
   thighBack: 0.05,
   thighFront: 0.059,
