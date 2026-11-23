@@ -12,6 +12,12 @@
 // follow its contour, separated by thin skin-coloured gaps, and filled with the
 // heat ramp. Working muscles swell into the skin bands between them, so effort
 // shows in shape as well as colour.
+//
+// Two bodies, his and hers, are drawn by this same code on the same skeleton,
+// each from its own shape set (MALE, FEMALE at the end of the file): the
+// profiles, a few numbers, and for her limbs a warp that reshapes everything
+// drawn in that limb's frame. Where a body rests on a floor, a bench or a pad
+// her outline is his.
 import { MUSCLE_GROUPS, type MuscleGroup } from '../data/types';
 import { restingSide, type Levels } from './engagement';
 import type { Arm, Figure, Leg, Side, Vec } from './figure';
@@ -189,27 +195,168 @@ interface Frame {
   k: number;
   p(t: number, d: number): Vec;
 }
-const flatFrame = (o: Vec, u: Vec, f: Vec, k: number): Frame => ({ u, f, k, p: (t, d) => V(o.x + u.x * t * k + f.x * d, o.y + u.y * t * k + f.y * d) });
+/**
+ * A body's own contour for a limb: moves a profile point [t, d] before it is
+ * mapped, so everything drawn in that limb's frame (its outline, its muscles,
+ * the glute's seam on the thigh) follows the same shape. His limbs have none.
+ */
+type Warp = (t: number, d: number) => P2;
+const flatFrame = (o: Vec, u: Vec, f: Vec, k: number, w?: Warp): Frame => ({
+  u,
+  f,
+  k,
+  p: (t, d) => {
+    if (w) [t, d] = w(t, d);
+    return V(o.x + u.x * t * k + f.x * d, o.y + u.y * t * k + f.y * d);
+  },
+});
 /**
  * A limb segment from joint `o` to joint `tip`. The bone is scaled to its
  * apparent length, but whatever lies beyond either joint (the shoulder cap, the
  * elbow, the knee) keeps its true size, so a limb pointing at the camera ends
  * round and keeps its deltoid cap instead of shrinking to a sliver.
  */
-function boneFrame(o: Vec, tip: Vec, nominal: number, deg: number, sideOf: (u: Vec) => Vec): Frame {
+function boneFrame(o: Vec, tip: Vec, nominal: number, deg: number, sideOf: (u: Vec) => Vec, w?: Warp): Frame {
   const v = sub(tip, o);
   const L = len(v);
   const u = L > 1e-6 ? mul(v, 1 / L) : dir(deg);
   const k = L > 1e-6 ? Math.min(L / nominal, 1.2) : 1;
   const f = sideOf(u);
   const along = (t: number) => (t <= 0 ? t : t >= nominal ? nominal * k + (t - nominal) : t * k);
-  return { u, f, k, p: (t, d) => V(o.x + u.x * along(t) + f.x * d, o.y + u.y * along(t) + f.y * d) };
+  return {
+    u,
+    f,
+    k,
+    p: (t, d) => {
+      if (w) [t, d] = w(t, d);
+      return V(o.x + u.x * along(t) + f.x * d, o.y + u.y * along(t) + f.y * d);
+    },
+  };
 }
 /** Side view: d > 0 is the front of the segment (its direction - 90 degrees). */
-const sideFrame = (o: Vec, tip: Vec, nominal: number, deg: number) => boneFrame(o, tip, nominal, deg, (u) => V(u.y, -u.x));
+const sideFrame = (o: Vec, tip: Vec, nominal: number, deg: number, w?: Warp) => boneFrame(o, tip, nominal, deg, (u) => V(u.y, -u.x), w);
 const mapped = (F: { p(t: number, d: number): Vec }, list: readonly P2[]) => list.map(([t, d]) => F.p(t, d));
 /** A profile pushed outward by w (lines that sit on the visible outline). */
 const grow = (list: readonly P2[], w: number): P2[] => list.map(([t, d]) => [t, d + (d >= 0 ? w : -w)]);
+
+/* ---------------- shape sets ---------------- */
+/** The buttock's outline in side view (see glutes). */
+interface GluteShape {
+  /** Where it leaves the lower back, on the trunk's back contour, and two points of that contour giving its tangent. */
+  sacrum: P2;
+  contour: [P2, P2];
+  /** How far it turns out from that tangent as it leaves the back (degrees): the shelf of a rounder buttock. */
+  shelf: number;
+  /** Where it meets the back of the thigh: q[0] + q[1] * flexion down the thigh, q[2] across it. */
+  q: [number, number, number];
+  /** The angle across the thigh it arrives at when standing, into the gluteal fold (degrees). */
+  fold: number;
+  /** Its apex: apex[0] - apex[1] * flexion out from the hip joint, and apex[2] * (1 - flexion) down the thigh. */
+  apex: [number, number, number];
+  /** Handles of the upper and the lower arc, as a share of the chord: larger is fuller. */
+  handles: [number, number];
+  /**
+   * A fuller buttock relaxes as the hip bends: by flexion share `at` it has
+   * become `to` (his), so a seat, a bench, a wall or the floor meets it where
+   * it meets his.
+   */
+  relax?: { at: number; to: GluteShape };
+}
+/**
+ * One body's shapes: every profile the drawing code maps, and the few numbers
+ * it reads. Both bodies are drawn by the same code on the same skeleton and
+ * rest on the same surfaces; his (MALE) are the tables in this file, hers
+ * (FEMALE) differ in the contour between the places a body rests on.
+ */
+interface Shape {
+  /** Limb contours (none: the tables as they are). Side view, then front view. */
+  warp: { thigh?: Warp; shin?: Warp; foot?: Warp; toes?: Warp; upperArm?: Warp; forearm?: Warp; fist?: Warp; flatHand?: Warp; thighF?: Warp; shinF?: Warp; footF?: Warp; upperArmF?: Warp; forearmF?: Warp };
+  /** Height of the top of the toe joint over the ball of the foot. */
+  toeJoint: number;
+  thighGroove: P2[][];
+  glute: GluteShape;
+  // Side-view trunk, its muscles, the neck and the head.
+  trunk: P2[];
+  /** How far the chest swells as the pectoral works, from trunk[chestFrom] on. */
+  chestSwell: number[];
+  chestFrom: number;
+  /** The pectoral: a run of the trunk's front contour (indices), and its inner edge; inner points from pecDropFrom on drop as it works. */
+  pecRun: [number, number];
+  pecIn: P2[];
+  pecDropFrom: number;
+  pecSamples: P2[];
+  backSamples: P2[];
+  rectusRun: P2[];
+  rectusIn: P2[];
+  rectusSplits: P2[][];
+  oblique: P2[];
+  /** How far each oblique point moves as the core works. */
+  obliqueSwell: number[];
+  lat: P2[];
+  erectors: P2[];
+  upperBack: P2[];
+  /** The neck: points on the trunk, on the head (head frame), then on the trunk again. */
+  neck: { front: P2[]; head: P2[]; back: P2[] };
+  /** The upper trapezius up the back of the neck: head point, trunk points, head point. */
+  trap: { start: P2; trunk: P2[]; end: P2 };
+  head: P2[];
+  hair: P2[];
+  /** The hair's colour (a theme token). */
+  hairFill: string;
+  /** The hair covers the tops of the ears: the ears are drawn before it. */
+  earUnder?: boolean;
+  /**
+   * Hair tied back (head frame): drawn behind the neck, so only what lies past
+   * its outline shows; `tie` is the band round it, `strands` a line or two
+   * along it.
+   */
+  tail?: P2[];
+  tie?: P2[];
+  strands?: P2[][];
+  face: P2[];
+  ear: P2[];
+  eye: P2[];
+  brow: P2[];
+  // Front view: trunk halves (chest, and the back seen from above), muscles, neck and head.
+  trunkFH: P2[];
+  trunkBH: P2[];
+  pecF: P2[];
+  rectusFH: P2[];
+  /** The linea alba from t[0] down to t[1], and the tendinous lines across the rectus. */
+  lineaF: [number, number];
+  rectusFLines: number[];
+  obliqueF: P2[];
+  latF: P2[];
+  trapF: P2[];
+  trapB: P2[];
+  latB: P2[];
+  erectorB: P2[];
+  /** Where the front fold of the armpit leaves the chest (two trunk points). */
+  foldF: [P2, P2];
+  neckF: { trunk: P2[]; head: P2[] };
+  headF: P2[];
+  /** Hair in front view, and on a head bowed toward the camera; `part` lines are partings (skin-coloured). */
+  hairF: P2[];
+  hairTop: P2[];
+  partF?: P2[];
+  partTop?: P2[];
+  /**
+   * Front view: the hair seen past the head and neck (at the temples, over the
+   * ears, behind the jaw), drawn with an outline behind them so only that
+   * part shows.
+   */
+  hairBackF?: P2[];
+  /**
+   * A bowed head: the hair seen past it (the knot of hair tied back, over the
+   * ears), drawn with an outline behind the head. It and `partTop` fade out as
+   * the chest view fades in.
+   */
+  knotTop?: P2[];
+  faceBowed: P2[][];
+  earF: P2[];
+  facePair: P2[][];
+  faceMid: P2[][];
+}
 
 /** Width of the skin-coloured gap between neighbouring muscles (a stroke round each muscle). */
 const GAP = 0.0045;
@@ -391,7 +538,7 @@ const TRUNK: P2[] = [
 ];
 /** The trunk with the chest (TRUNK 6-10) swelling forward as the pectoral works (chest 0..1), as working muscles do. */
 const CHEST_SWELL = [0.004, 0.009, 0.012, 0.01, 0.005];
-const trunkProfile = (chest: number): P2[] => TRUNK.map(([t, d], i): P2 => [t, d + chest * (CHEST_SWELL[i - 6] ?? 0)]);
+const trunkProfile = (S: Shape, chest: number): P2[] => S.trunk.map(([t, d], i): P2 => [t, d + chest * (S.chestSwell[i - S.chestFrom] ?? 0)]);
 // Pectoralis major: a tall fan from the clavicle and sternum down to the lower chest (along the chest's contour,
 // TRUNK 6-11), converging on the armpit.
 const PEC_IN: P2[] = [[0.293, 0.031], [0.288, 0.017], [0.276, 0.006], [0.256, -0.002], [0.234, 0.0], [0.212, 0.01], [0.193, 0.028], [0.179, 0.048], [0.171, 0.063]];
@@ -417,7 +564,9 @@ const OBLIQUE: P2[] = [
   [0.1, 0.033], [0.13, 0.036], [0.15, 0.037],
 ];
 /** The oblique working (core 0..1): its back border (5-10) moves back toward the lat, its front edge (13-16, 0) toward the rectus. */
-const obliqueAt = (core: number): P2[] => OBLIQUE.map(([t, d], i): P2 => [t, d + core * (i >= 5 && i <= 10 ? -0.006 : i >= 13 || i === 0 ? 0.003 : 0)]);
+const obliqueAt = (S: Shape, core: number): P2[] => S.oblique.map(([t, d], i): P2 => [t, d + core * (S.obliqueSwell[i] ?? 0)]);
+/** His: the back border (5-10) by -0.006, the front edge (13-16, 0) by 0.003. */
+const OBLIQUE_SWELL = OBLIQUE.map((_, i) => (i >= 5 && i <= 10 ? -0.006 : i >= 13 || i === 0 ? 0.003 : 0));
 // Latissimus dorsi: a wing from under the armpit sweeping down and back to the iliac crest, its lower fibres wrapping
 // round the side of the lower ribs in front of the erectors.
 const LAT: P2[] = [
@@ -459,7 +608,7 @@ const BROW: P2[] = [[0.025, 0.02], [0.036, 0.024], [0.048, 0.021], [0.047, 0.018
  * under the iliac crest that shares a straight border with gluteus maximus, so
  * the two stay flush at any hip angle.
  */
-function glutes(hip: Vec, T: TrunkFrame, Th: Frame) {
+function glutes(hip: Vec, T: TrunkFrame, Th: Frame, G: GluteShape) {
   const flexion = clamp(wrap(angleOf(T.u1) + 180 - angleOf(Th.u)), -45, 170);
   const fl = clamp(flexion / 120, 0, 1);
   const opened = smooth(flexion / 70);
@@ -467,24 +616,33 @@ function glutes(hip: Vec, T: TrunkFrame, Th: Frame) {
   const thighBack = mul(Th.f, -1);
   const wF = 0.5 - 0.25 * fl;
   const m = unit(add(mul(trunkBack, 1 - wF), mul(thighBack, wF)), trunkBack);
-  // S lies on the trunk's back contour between TRUNK[24] and TRUNK[25], leaving along the contour's own tangent.
-  const S = T.p(0.063, -0.058);
-  const tS = unit(sub(T.p(0.048, -0.062), T.p(0.078, -0.054)), mul(T.u1, -1));
-  const tq = 0.072 + 0.08 * fl;
-  const Q = Th.p(tq, -0.0462);
+  // A fuller buttock (hers) becomes the leaner one (his) as the hip bends.
+  const k = G.relax ? smooth(fl / G.relax.at) : 0;
+  const R = G.relax?.to ?? G;
+  const mix = (a: number, b: number) => a + (b - a) * k;
+  const shelf = mix(G.shelf, R.shelf);
+  const handles = [mix(G.handles[0], R.handles[0]), mix(G.handles[1], R.handles[1])];
+  // S lies on the trunk's back contour (his: between TRUNK[24] and TRUNK[25]), leaving along the contour's own
+  // tangent, or turned out from it into a shelf.
+  const S = T.p(G.sacrum[0], G.sacrum[1]);
+  let tS = unit(sub(T.p(G.contour[0][0], G.contour[0][1]), T.p(G.contour[1][0], G.contour[1][1])), mul(T.u1, -1));
+  if (shelf) tS = unit(add(mul(tS, Math.cos(shelf * RAD)), mul(trunkBack, Math.sin(shelf * RAD))), tS);
+  const tq = mix(G.q[0], R.q[0]) + mix(G.q[1], R.q[1]) * fl;
+  const Q = Th.p(tq, mix(G.q[2], R.q[2]));
   // Arrival at Q: across the thigh into the fold when standing, along the thigh once the fold has opened.
-  const beta = 72 * (1 - opened) * RAD;
+  const beta = mix(G.fold, R.fold) * (1 - opened) * RAD;
   const tQ = unit(add(mul(Th.u, Math.cos(beta)), mul(Th.f, Math.sin(beta))), Th.u);
-  const A = add(add(hip, mul(m, 0.0805 - 0.004 * fl)), mul(Th.u, 0.018 * (1 - fl)));
+  const A = add(add(hip, mul(m, mix(G.apex[0], R.apex[0]) - mix(G.apex[1], R.apex[1]) * fl)), mul(Th.u, mix(G.apex[2], R.apex[2]) * (1 - fl)));
   let tA = rot90(m);
   if (dot(tA, sub(Q, S)) < 0) tA = mul(tA, -1);
-  const arc = (P0: Vec, t0: Vec, P3: Vec, t3: Vec): Vec[] => {
-    const h = 0.4 * len(sub(P3, P0));
+  // Each arc's handles are a share of its chord: a larger share makes it fuller.
+  const arc = (P0: Vec, t0: Vec, P3: Vec, t3: Vec, share: number): Vec[] => {
+    const h = share * len(sub(P3, P0));
     const P1 = add(P0, mul(t0, h));
     const P2 = sub(P3, mul(t3, h));
     return [0.2, 0.4, 0.6, 0.8, 1].map((t) => cubic(P0, P1, P2, P3, t));
   };
-  const curve = [S, ...arc(S, tS, A, tA), ...arc(A, tA, Q, tQ)];
+  const curve = [S, ...arc(S, tS, A, tA, handles[0]), ...arc(A, tA, Q, tQ, handles[1])];
   // Skin under the outline, unioned with the thigh and the trunk.
   const blob = [T.p(0.05, -0.02), ...curve, Th.p(tq, -0.02), Th.p(0.02, 0.0)];
   const inset = curve.map((p) => add(p, mul(sub(hip, p), GAP / 2 / Math.max(len(sub(hip, p)), 0.02))));
@@ -504,7 +662,7 @@ function glutes(hip: Vec, T: TrunkFrame, Th: Frame) {
  * included), so a raised heel keeps the toes flat on the floor and a foot on
  * its ball shows the crease over the toe joint.
  */
-function footOutline(s: Side, leg: Leg): Vec[] {
+function footOutline(s: Side, leg: Leg, S: Shape): Vec[] {
   const { heel, ball } = s;
   const e = sub(ball, heel);
   const Lf = len(e);
@@ -516,26 +674,26 @@ function footOutline(s: Side, leg: Leg): Vec[] {
   const bend = clamp(Math.atan2(dot(toward, up), dot(toward, u)) / RAD, -40, 100) * RAD;
   const u2 = add(mul(u, Math.cos(bend)), mul(up, Math.sin(bend)));
   const up2 = add(mul(u, -Math.sin(bend)), mul(up, Math.cos(bend)));
-  const F = flatFrame(heel, u, up, Lf > 1e-6 ? Lf / 0.102 : 1);
-  const toes = flatFrame(ball, u2, up2, 1);
+  const F = flatFrame(heel, u, up, Lf > 1e-6 ? Lf / 0.102 : 1, S.warp.foot);
+  const toes = flatFrame(ball, u2, up2, 1, S.warp.toes);
   const bisector = unit(add(up, up2), up);
   const c = Math.max(0.5, Math.cos(bend / 2));
   return [
     F.p(0.012, W), F.p(0.05, W + 0.001), F.p(0.084, W),
     add(ball, mul(bisector, W / c)), // the ball's pad, where the two parts of the sole meet
     toes.p(0.016, W), toes.p(0.031, W + 0.0005), toes.p(0.04, 0.006), toes.p(0.035, 0.0125), toes.p(0.017, 0.0145),
-    add(ball, mul(bisector, Math.min(0.03, 0.0175 / c))), // top of the toe joint
+    add(ball, mul(bisector, Math.min(0.03, S.toeJoint / c))), // top of the toe joint
     F.p(0.074, 0.029), F.p(0.05, 0.043), F.p(0.034, 0.058), F.p(0.012, 0.064), F.p(-0.006, 0.047), F.p(-0.016, 0.026), F.p(-0.012, 0.009),
   ];
 }
 
-function sideLeg(s: Side, leg: Leg, T: TrunkFrame, pal: Palette): string {
-  const Th = sideFrame(s.hip, s.knee, 0.245, leg.thigh);
-  const Sh = sideFrame(s.knee, s.ankle, 0.246, leg.shin);
+function sideLeg(s: Side, leg: Leg, T: TrunkFrame, pal: Palette, S: Shape): string {
+  const Th = sideFrame(s.hip, s.knee, 0.245, leg.thigh, S.warp.thigh);
+  const Sh = sideFrame(s.knee, s.ankle, 0.246, leg.shin, S.warp.shin);
   const thigh = mapped(Th, THIGH);
   const shin = mapped(Sh, SHIN);
-  const foot = footOutline(s, leg);
-  const g = glutes(s.hip, T, Th);
+  const foot = footOutline(s, leg, S);
+  const g = glutes(s.hip, T, Th, S.glute);
   let o = outline(arcOf(thigh, 1, 18) + closed(shin) + closed(foot) + open(g.curve), pal);
   o += skin(union([shin, foot]), pal);
   o += muscle(closed(mapped(Sh, SOLEUS)) + closed(mapped(Sh, belly(GASTRO_RUN, GASTRO_IN, -1, 0.006 * pal.lv('calves')))), pal.m('calves'), pal);
@@ -543,7 +701,7 @@ function sideLeg(s: Side, leg: Leg, T: TrunkFrame, pal: Palette): string {
   o += outline(arcOf(mapped(Th, grow(THIGH, W / 2)), 11, 15), pal, W); // the kneecap's lower edge
   o += muscle(closed(mapped(Th, belly(HAMS_RUN, HAMS_IN, -1, 0.007 * pal.lv('hamstrings')))), pal.m('hamstrings'), pal);
   o += muscle(closed(mapped(Th, belly(QUADS_RUN, QUADS_IN, 1, 0.011 * pal.lv('quads')))), pal.m('quads'), pal);
-  o += crease(lines(Th, THIGH_GROOVE));
+  o += crease(lines(Th, S.thighGroove));
   o += muscle(closed(g.medius) + closed(g.maximus), pal.m('glutes'), pal);
   return o;
 }
@@ -566,9 +724,9 @@ interface ArmShape {
   fore: Vec[];
   hand: Vec[];
 }
-function armShape(s: Side, arm: Required<Arm>): ArmShape {
-  const Ua = sideFrame(s.shoulder, s.elbow, 0.186, arm.upper);
-  const Fa = sideFrame(s.elbow, s.wrist, 0.146, arm.fore);
+function armShape(s: Side, arm: Required<Arm>, S: Shape): ArmShape {
+  const Ua = sideFrame(s.shoulder, s.elbow, 0.186, arm.upper, S.warp.upperArm);
+  const Fa = sideFrame(s.elbow, s.wrist, 0.146, arm.fore, S.warp.forearm);
   const flex = elbowFlex(Ua, Fa);
   const prof = upperArmProfile(flex);
   let H: Frame;
@@ -578,10 +736,10 @@ function armShape(s: Side, arm: Required<Arm>): ArmShape {
     let toPalm = V(u.y, -u.x);
     const side = dot(toPalm, sub(s.elbow, s.wrist));
     if (Math.abs(side) < 1e-4 ? dot(toPalm, Fa.f) < 0 : side > 0) toPalm = mul(toPalm, -1);
-    H = flatFrame(s.wrist, u, toPalm, 1);
+    H = flatFrame(s.wrist, u, toPalm, 1, S.warp.flatHand);
   } else {
     const u = unit(sub(s.hand, s.wrist), Fa.u);
-    H = flatFrame(s.wrist, u, V(u.y, -u.x), 1);
+    H = flatFrame(s.wrist, u, V(u.y, -u.x), 1, S.warp.fist);
   }
   return { Ua, Fa, H, flex, prof, upper: mapped(Ua, prof), fore: mapped(Fa, FOREARM), hand: mapped(H, arm.flat ? FLAT_HAND : FIST) };
 }
@@ -663,32 +821,42 @@ function covered(T: TrunkFrame, s: Side, samples: readonly P2[]): number {
   return hidden / samples.length;
 }
 
-function sideHead(fig: BodyFigure, pal: Palette): string {
+function sideHead(fig: BodyFigure, pal: Palette, S: Shape): string {
   const Hf = headFrame(fig);
+  const ear = path(closed(mapped(Hf, S.ear)), `fill="${pal.skin}" stroke="${pal.line}" stroke-width="${num(W * 0.7)}"`);
   return (
-    solid(closed(mapped(Hf, HEAD)), pal) +
-    path(closed(mapped(Hf, HAIR)), 'fill="var(--fig-hair)"') +
-    path(closed(mapped(Hf, EAR)), `fill="${pal.skin}" stroke="${pal.line}" stroke-width="${num(W * 0.7)}"`) +
-    path(closed(mapped(Hf, EYE)) + closed(mapped(Hf, BROW)), 'fill="var(--fig-face)"')
+    solid(closed(mapped(Hf, S.head)), pal) +
+    (S.earUnder ? ear : '') +
+    path(closed(mapped(Hf, S.hair)), `fill="${S.hairFill}"`) +
+    (S.earUnder ? '' : ear) +
+    path(closed(mapped(Hf, S.eye)) + closed(mapped(Hf, S.brow)), 'fill="var(--fig-face)"')
   );
 }
+/** Hair that lies past the outline of the head or neck: drawn behind them with its own outline. */
+const hairMass = (d: string, S: Shape, pal: Palette, fade = 1) =>
+  path(d, `fill="${S.hairFill}" stroke="${pal.line}" stroke-width="${num(2 * W)}" stroke-linejoin="round" paint-order="stroke"${fade < 1 ? ` opacity="${num(fade)}"` : ''}`);
 
-function sideTrunk(fig: BodyFigure, T: TrunkFrame, pal: Palette): string {
+function sideTrunk(fig: BodyFigure, T: TrunkFrame, pal: Palette, S: Shape): string {
   const Hf = headFrame(fig);
-  const neck = [T.p(0.265, 0.02), T.p(0.29, 0.034), Hf.p(0.028, -0.066), Hf.p(0.018, -0.04), Hf.p(-0.02, -0.03), Hf.p(-0.034, -0.042), T.p(0.33, -0.036), T.p(0.3, -0.04)];
+  const neck = [...mapped(T, S.neck.front), ...mapped(Hf, S.neck.head), ...mapped(T, S.neck.back)];
   const ch = pal.lv('chest');
-  const prof = trunkProfile(ch);
-  let o = solid(union([mapped(T, prof), neck]), pal);
+  const prof = trunkProfile(S, ch);
+  // Hair tied back lies behind the neck: painted first, so the neck and the trunk cover all but what shows past them.
+  let o = S.tail ? hairMass(closed(mapped(Hf, S.tail)), S, pal) : '';
+  if (S.strands) o += path(S.strands.map((l) => open(mapped(Hf, l))).join(''), 'fill="none" stroke="var(--fig-face)" stroke-opacity=".5" stroke-width=".0022" stroke-linecap="round"');
+  if (S.tie) o += split(open(mapped(Hf, S.tie)), pal, 0.0042);
+  o += solid(union([mapped(T, prof), neck]), pal);
   // Back: erectors, scapular back, the lat wing, and the upper trapezius running up the back of the neck.
-  const trapezius = [Hf.p(-0.031, -0.04), T.p(0.334, -0.031), T.p(0.322, -0.043), T.p(0.304, -0.03), T.p(0.298, -0.014), T.p(0.305, 0.0), Hf.p(-0.012, -0.05)];
-  o += muscle(closed(mapped(T, ERECTORS)) + closed(mapped(T, UPPER_BACK)) + closed(mapped(T, LAT)) + closed(trapezius), pal.m('back'), pal);
+  const trapezius = [Hf.p(S.trap.start[0], S.trap.start[1]), ...mapped(T, S.trap.trunk), Hf.p(S.trap.end[0], S.trap.end[1])];
+  o += muscle(closed(mapped(T, S.erectors)) + closed(mapped(T, S.upperBack)) + closed(mapped(T, S.lat)) + closed(trapezius), pal.m('back'), pal);
   // Core: the external oblique on the flank, the rectus along the front with its tendinous lines.
   const core = pal.lv('core');
-  o += muscle(closed(mapped(T, obliqueAt(core))) + closed(mapped(T, belly(RECTUS_RUN, RECTUS_IN, 1, 0.009 * core))), pal.m('core'), pal);
-  o += split(RECTUS_LINES.map(([t0, t1, d1]) => open(mapped(T, [[t0, 0.04], [t1, 0.051], [t1 - 0.001, d1]]))).join(''), pal, 0.0042);
+  o += muscle(closed(mapped(T, obliqueAt(S, core))) + closed(mapped(T, belly(S.rectusRun, S.rectusIn, 1, 0.009 * core))), pal.m('core'), pal);
+  o += split(S.rectusSplits.map((l) => open(mapped(T, l))).join(''), pal, 0.0042);
   // Chest: the pectoral's lower border drops a little as it works.
-  o += muscle(closed(mapped(T, [...runOf(prof, 6, 11), ...PEC_IN.map(([t, d], i): P2 => (i >= 4 ? [t - 0.012 * ch, d - 0.004 * ch] : [t, d]))])), pal.m('chest'), pal);
-  return o + sideHead(fig, pal);
+  const pecIn = S.pecIn.map(([t, d], i): P2 => (i >= S.pecDropFrom ? [t - 0.012 * ch, d - 0.004 * ch] : [t, d]));
+  o += muscle(closed(mapped(T, [...runOf(prof, S.pecRun[0], S.pecRun[1]), ...pecIn])), pal.m('chest'), pal);
+  return o + sideHead(fig, pal, S);
 }
 
 /**
@@ -701,12 +869,12 @@ function sideTrunk(fig: BodyFigure, T: TrunkFrame, pal: Palette): string {
  * work (the triceps in an overhead extension) is painted back over the face,
  * fading in as it becomes the hardest-working muscle.
  */
-function faceOverArm(fig: BodyFigure, s: Side, A: ArmShape, pal: Palette, armPal: Palette): string {
+function faceOverArm(fig: BodyFigure, s: Side, A: ArmShape, pal: Palette, armPal: Palette, S: Shape): string {
   const near = Math.min(distToSegment(fig.head, s.shoulder, s.elbow), distToSegment(fig.head, s.elbow, s.wrist), distToSegment(fig.head, s.wrist, s.hand));
   const raised = dot(sub(s.elbow, s.shoulder), dir(fig.pose.torso + fig.pose.bend)) > 0.02;
   if (near > 0.085 || !raised) return '';
   const Hf = headFrame(fig);
-  let o = solid(closed(mapped(Hf, FACE)), pal) + path(closed(mapped(Hf, EYE)) + closed(mapped(Hf, BROW)), 'fill="var(--fig-face)"');
+  let o = solid(closed(mapped(Hf, S.face)), pal) + path(closed(mapped(Hf, S.eye)) + closed(mapped(Hf, S.brow)), 'fill="var(--fig-face)"');
   const hardest = Math.max(...MUSCLE_GROUPS.map((g) => pal.lv(g)));
   const seen = 1 - 2 * endOnOf(A);
   for (const g of ['triceps', 'biceps'] as const) {
@@ -718,7 +886,7 @@ function faceOverArm(fig: BodyFigure, s: Side, A: ArmShape, pal: Palette, armPal
 
 const samePoint = (p: Vec, q: Vec) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y) < 2e-4;
 
-function drawSide(fig: BodyFigure, c: BodyContext): BodyLayers {
+function drawSide(fig: BodyFigure, c: BodyContext, S: Shape): BodyLayers {
   const { pose, a, b } = fig;
   const nearPal = palette(c, limbLevels(c, 'a'), false);
   const farPal = palette(c, limbLevels(c, 'b'), true);
@@ -729,14 +897,14 @@ function drawSide(fig: BodyFigure, c: BodyContext): BodyLayers {
   const armHidden = (['shoulder', 'elbow', 'wrist', 'hand'] as const).every((k) => samePoint(a[k], b[k])) && pose.arm.flat === pose.arm2.flat;
   // When the near arm covers most of the chest or of a working back, that muscle's tendon is drawn onto the arm.
   // A back that only steadies (a good morning's, at most 0.5) keeps its fold off the arm.
-  const pecTail = smooth((covered(T, a, PEC_SAMPLES) - 0.3) / 0.4) * smooth(trunkPal.lv('chest') / 0.3);
-  const backTail = smooth((covered(T, a, BACK_SAMPLES) - 0.3) / 0.4) * smooth((trunkPal.lv('back') - 0.5) / 0.25);
-  const nearArm = armShape(a, pose.arm);
+  const pecTail = smooth((covered(T, a, S.pecSamples) - 0.3) / 0.4) * smooth(trunkPal.lv('chest') / 0.3);
+  const backTail = smooth((covered(T, a, S.backSamples) - 0.3) / 0.4) * smooth((trunkPal.lv('back') - 0.5) / 0.25);
+  const nearArm = armShape(a, pose.arm, S);
   return {
-    far: (armHidden ? '' : sideArm(armShape(b, pose.arm2), pose.arm2, farPal)) + (legHidden ? '' : sideLeg(b, pose.leg2, T, farPal)),
-    core: sideTrunk(fig, T, trunkPal),
-    nearLeg: sideLeg(a, pose.leg, T, nearPal),
-    nearArm: sideArm(nearArm, pose.arm, nearPal, pecTail, backTail) + faceOverArm(fig, a, nearArm, trunkPal, nearPal),
+    far: (armHidden ? '' : sideArm(armShape(b, pose.arm2, S), pose.arm2, farPal)) + (legHidden ? '' : sideLeg(b, pose.leg2, T, farPal, S)),
+    core: sideTrunk(fig, T, trunkPal, S),
+    nearLeg: sideLeg(a, pose.leg, T, nearPal, S),
+    nearArm: sideArm(nearArm, pose.arm, nearPal, pecTail, backTail) + faceOverArm(fig, a, nearArm, trunkPal, nearPal, S),
   };
 }
 
@@ -852,14 +1020,14 @@ interface FrontTrunk {
 }
 
 /** A front-view limb segment: d > 0 is the outside of the body (`outer` = ±1 picks the side). */
-const frontFrame = (o: Vec, tip: Vec, nominal: number, deg: number, outer: number) => boneFrame(o, tip, nominal, deg, (u) => mul(rot90(u), outer));
+const frontFrame = (o: Vec, tip: Vec, nominal: number, deg: number, outer: number, w?: Warp) => boneFrame(o, tip, nominal, deg, (u) => mul(rot90(u), outer), w);
 
-function frontLeg(s: Side, leg: Leg, outer: number, pal: Palette): string {
-  const Th = frontFrame(s.hip, s.knee, 0.245, leg.thigh, outer);
-  const Sh = frontFrame(s.knee, s.ankle, 0.246, leg.shin, outer);
+function frontLeg(s: Side, leg: Leg, outer: number, pal: Palette, S: Shape): string {
+  const Th = frontFrame(s.hip, s.knee, 0.245, leg.thigh, outer, S.warp.thighF);
+  const Sh = frontFrame(s.knee, s.ankle, 0.246, leg.shin, outer, S.warp.shinF);
   const thigh = mapped(Th, THIGH_F);
   const shin = mapped(Sh, SHIN_F);
-  const foot = mapped(flatFrame(s.ankle, Sh.u, Sh.f, 1), footF(clamp(dot(sub(s.toe, s.heel), Sh.f), -0.06, 0.06)));
+  const foot = mapped(flatFrame(s.ankle, Sh.u, Sh.f, 1, S.warp.footF), footF(clamp(dot(sub(s.toe, s.heel), Sh.f), -0.06, 0.06)));
   let o = outline(arcOf(thigh, 0, 19) + closed(shin) + closed(foot), pal);
   o += skin(union([shin, foot]), pal);
   o += muscle(closed(mapped(Sh, CALF_FI)) + closed(mapped(Sh, CALF_FO)), pal.m('calves'), pal);
@@ -869,20 +1037,20 @@ function frontLeg(s: Side, leg: Leg, outer: number, pal: Palette): string {
 }
 
 /** One arm; `side` is -1 for a (image left when upright), +1 for b. */
-function frontArm(s: Side, arm: Required<Arm>, side: -1 | 1, outer: number, pal: Palette, TF: FrontTrunk): string {
-  const Ua = frontFrame(s.shoulder, s.elbow, 0.186, arm.upper, outer);
-  const Fa = frontFrame(s.elbow, s.wrist, 0.146, arm.fore, outer);
+function frontArm(s: Side, arm: Required<Arm>, side: -1 | 1, outer: number, pal: Palette, TF: FrontTrunk, S: Shape): string {
+  const Ua = frontFrame(s.shoulder, s.elbow, 0.186, arm.upper, outer, S.warp.upperArmF);
+  const Fa = frontFrame(s.elbow, s.wrist, 0.146, arm.fore, outer, S.warp.forearmF);
   const upper = mapped(Ua, UARM_F);
   const fore = mapped(Fa, FOREARM_F);
   const hu = unit(sub(s.hand, s.wrist), Fa.u);
-  const fist = mapped(flatFrame(s.wrist, hu, mul(Fa.f, 0.8), 1), FIST); // seen from the front a fist is narrower
+  const fist = mapped(flatFrame(s.wrist, hu, mul(Fa.f, 0.8), 1, S.warp.fist), FIST); // seen from the front a fist is narrower
   let o = '';
   // Front fold of the armpit: once the arm is lifted away from the side (chest view only), the pectoral's tendon
   // is seen running from the chest into the arm.
   const lift = Math.atan2(dot(Ua.u, mul(TF.side, side)), dot(Ua.u, mul(TF.u, -1))) / RAD;
   if (lift > 25 && TF.k >= 0.7) {
-    const A0 = TF.p(0.262, 0.096 * side);
-    const A1 = TF.p(0.208, 0.094 * side);
+    const A0 = TF.p(S.foldF[0][0], S.foldF[0][1] * side);
+    const A1 = TF.p(S.foldF[1][0], S.foldF[1][1] * side);
     const A2 = Ua.p(0.075, -0.022);
     const fold = [A0, Ua.p(0.01, -0.02), A2, lerpV(A2, A1, 0.5), A1];
     o += outline(open([A2, lerpV(A2, A1, 0.5), A1]), pal) + muscle(closed(fold), pal.m('chest'), pal);
@@ -895,40 +1063,52 @@ function frontArm(s: Side, arm: Required<Arm>, side: -1 | 1, outer: number, pal:
   return o + solid(closed(fist), pal);
 }
 
-/** The trunk with the neck and head: a chest view, or the back seen from above when the trunk tips toward the camera. */
-function frontTrunk(fig: BodyFigure, TF: FrontTrunk, back: boolean, pal: Palette): string {
+/**
+ * The trunk with the neck and head: a chest view, or the back seen from above
+ * when the trunk tips toward the camera. While the two crossfade, the hair
+ * only the bowed view shows (its parting, the knot) is drawn at `fade`, so
+ * none of it shows through the chest view's face.
+ */
+function frontTrunk(fig: BodyFigure, TF: FrontTrunk, back: boolean, pal: Palette, S: Shape, fade = 1): string {
   const Hf = headFrame(fig);
-  const half = back ? TRUNK_BH : TRUNK_FH;
+  const half = back ? S.trunkBH : S.trunkFH;
   const body = mapped(TF, [...half, ...mirror(half).reverse().slice(0, -1)]);
   const pair = (list: readonly P2[]) => union([mapped(TF, list), mapped(TF, mirror(list))]);
   const whole = (list: readonly P2[]) => closed(mapped(TF, [...list, ...mirror(list).reverse().slice(1, -1)]));
-  const head = solid(closed(mapped(Hf, HEAD_F)), pal);
-  const ears = path(closed(mapped(Hf, EAR_F)) + closed(mapped(Hf, mirrorFace(EAR_F))), `fill="${pal.skin}" stroke="${pal.line}" stroke-width="${num(W * 0.7)}"`);
+  const head = solid(closed(mapped(Hf, S.headF)), pal);
+  const ears = path(closed(mapped(Hf, S.earF)) + closed(mapped(Hf, mirrorFace(S.earF))), `fill="${pal.skin}" stroke="${pal.line}" stroke-width="${num(W * 0.7)}"`);
+  const hair = (list: readonly P2[], part?: P2[], partFade = 1) =>
+    (S.earUnder ? ears : '') +
+    path(closed(mapped(Hf, list)), `fill="${S.hairFill}"`) +
+    (part ? path(open(mapped(Hf, part)), `fill="none" stroke="${pal.skin}" stroke-width="${num(0.0025)}" stroke-linecap="round"${partFade < 1 ? ` opacity="${num(partFade)}"` : ''}`) : '') +
+    (S.earUnder ? '' : ears);
   if (back) {
     return (
       solid(closed(body), pal) +
-      muscle(pair(LAT_B) + whole(TRAP_B) + pair(ERECTOR_B), pal.m('back'), pal) +
+      muscle(pair(S.latB) + whole(S.trapB) + pair(S.erectorB), pal.m('back'), pal) +
       split(`M${coords([TF.p(0.16, 0)])}L${coords([TF.p(0.33, 0)])}`, pal, 0.004) +
+      (S.knotTop ? hairMass(closed(mapped(Hf, S.knotTop)), S, pal, fade) : '') +
       head +
-      path(closed(mapped(Hf, HAIR_TOP)), 'fill="var(--fig-hair)"') +
-      ears +
-      path(FACE_BOWED.map((f) => closed(mapped(Hf, f)) + closed(mapped(Hf, mirrorFace(f)))).join(''), 'fill="var(--fig-face)"')
+      hair(S.hairTop, S.partTop, fade) +
+      path(S.faceBowed.map((f) => closed(mapped(Hf, f)) + closed(mapped(Hf, mirrorFace(f)))).join(''), 'fill="var(--fig-face)"')
     );
   }
-  const neck = [TF.p(0.27, 0.03), TF.p(0.3, 0.034), Hf.p(0.035, -0.03), Hf.p(0.031, -0.05), Hf.p(-0.031, -0.05), Hf.p(-0.035, -0.03), TF.p(0.3, -0.034), TF.p(0.27, -0.03)];
-  let o = solid(union([body, neck]), pal);
-  o += muscle(pair(TRAP_F) + pair(LAT_F), pal.m('back'), pal);
-  o += muscle(pair(OBLIQUE_F) + whole(RECTUS_FH), pal.m('core'), pal);
-  let abs = `M${coords([TF.p(0.188, 0)])}L${coords([TF.p(-0.004, 0)])}`;
-  for (const t of RECTUS_F_LINES) abs += open([TF.p(t + 0.004, -0.044), TF.p(t - 0.006, -0.022), TF.p(t, 0)]) + open([TF.p(t, 0), TF.p(t - 0.006, 0.022), TF.p(t + 0.004, 0.044)]);
+  const N = S.neckF;
+  const neck = [...mapped(TF, N.trunk), ...mapped(Hf, N.head), ...mapped(Hf, mirrorFace(N.head).reverse()), ...mapped(TF, mirror(N.trunk).reverse())];
+  let o = S.hairBackF ? hairMass(closed(mapped(Hf, S.hairBackF)), S, pal) : '';
+  o += solid(union([body, neck]), pal);
+  o += muscle(pair(S.trapF) + pair(S.latF), pal.m('back'), pal);
+  o += muscle(pair(S.obliqueF) + whole(S.rectusFH), pal.m('core'), pal);
+  let abs = `M${coords([TF.p(S.lineaF[0], 0)])}L${coords([TF.p(S.lineaF[1], 0)])}`;
+  for (const t of S.rectusFLines) abs += open([TF.p(t + 0.004, -0.044), TF.p(t - 0.006, -0.022), TF.p(t, 0)]) + open([TF.p(t, 0), TF.p(t - 0.006, 0.022), TF.p(t + 0.004, 0.044)]);
   o += split(abs, pal, 0.004);
-  o += muscle(pair(PEC_F), pal.m('chest'), pal);
-  o += head + path(closed(mapped(Hf, HAIR_F)), 'fill="var(--fig-hair)"') + ears;
-  const features = FACE_PAIR.map((f) => closed(mapped(Hf, f)) + closed(mapped(Hf, mirrorFace(f)))).join('') + FACE_MID.map((f) => closed(mapped(Hf, f))).join('');
+  o += muscle(pair(S.pecF), pal.m('chest'), pal);
+  o += head + hair(S.hairF, S.partF);
+  const features = S.facePair.map((f) => closed(mapped(Hf, f)) + closed(mapped(Hf, mirrorFace(f)))).join('') + S.faceMid.map((f) => closed(mapped(Hf, f))).join('');
   return o + path(features, 'fill="var(--fig-face)"');
 }
 
-function drawFront(fig: BodyFigure, c: BodyContext): BodyLayers {
+function drawFront(fig: BodyFigure, c: BodyContext, S: Shape): BodyLayers {
   const { pose, a, b } = fig;
   const Hm = mid(a.hip, b.hip);
   const Sm = mid(a.shoulder, b.shoulder);
@@ -944,17 +1124,328 @@ function drawFront(fig: BodyFigure, c: BodyContext): BodyLayers {
   const palA = palette(c, limbLevels(c, 'a'), false);
   const palB = palette(c, limbLevels(c, 'b'), false);
   const trunkPal = palette(c, c.level, false);
-  const legs = frontLeg(b, pose.leg2, -hand, palB) + frontLeg(a, pose.leg, hand, palA);
-  const arms = frontArm(b, pose.arm2, 1, -hand, palB, TF) + frontArm(a, pose.arm, -1, hand, palA, TF);
+  const legs = frontLeg(b, pose.leg2, -hand, palB, S) + frontLeg(a, pose.leg, hand, palA, S);
+  const arms = frontArm(b, pose.arm2, 1, -hand, palB, TF, S) + frontArm(a, pose.arm, -1, hand, palA, TF, S);
   // Tipped toward the camera the trunk turns from a chest view (k >= 0.8) into the back seen from above (k <= 0.6),
   // crossfading in between; the hips are then behind the trunk, so the legs go behind it.
   const chest = smooth((k - 0.6) / 0.2);
-  if (chest >= 1) return { far: '', core: frontTrunk(fig, TF, false, trunkPal), nearLeg: legs, nearArm: arms };
-  let core = frontTrunk(fig, TF, true, trunkPal);
-  if (chest > 0) core += `<g opacity="${num(chest)}">${frontTrunk(fig, TF, false, trunkPal)}</g>`;
+  if (chest >= 1) return { far: '', core: frontTrunk(fig, TF, false, trunkPal, S), nearLeg: legs, nearArm: arms };
+  let core = frontTrunk(fig, TF, true, trunkPal, S, (1 - chest) ** 2);
+  if (chest > 0) core += `<g opacity="${num(chest)}">${frontTrunk(fig, TF, false, trunkPal, S)}</g>`;
   return { far: legs, core, nearLeg: '', nearArm: arms };
 }
 
+/* =========================================================================
+   SHAPE SETS
+   ========================================================================= */
+const GLUTE: GluteShape = { sacrum: [0.063, -0.058], contour: [[0.048, -0.062], [0.078, -0.054]], shelf: 0, q: [0.072, 0.08, -0.0462], fold: 72, apex: [0.0805, 0.004, 0.018], handles: [0.4, 0.4] };
+const MALE: Shape = {
+  warp: {},
+  toeJoint: 0.0175,
+  thighGroove: THIGH_GROOVE,
+  glute: GLUTE,
+  trunk: TRUNK,
+  chestSwell: CHEST_SWELL,
+  chestFrom: 6,
+  pecRun: [6, 11],
+  pecIn: PEC_IN,
+  pecDropFrom: 4,
+  pecSamples: PEC_SAMPLES,
+  backSamples: BACK_SAMPLES,
+  rectusRun: RECTUS_RUN,
+  rectusIn: RECTUS_IN,
+  rectusSplits: RECTUS_LINES.map(([t0, t1, d1]): P2[] => [[t0, 0.04], [t1, 0.051], [t1 - 0.001, d1]]),
+  oblique: OBLIQUE,
+  obliqueSwell: OBLIQUE_SWELL,
+  lat: LAT,
+  erectors: ERECTORS,
+  upperBack: UPPER_BACK,
+  neck: { front: [[0.265, 0.02], [0.29, 0.034]], head: [[0.028, -0.066], [0.018, -0.04], [-0.02, -0.03], [-0.034, -0.042]], back: [[0.33, -0.036], [0.3, -0.04]] },
+  trap: { start: [-0.031, -0.04], trunk: [[0.334, -0.031], [0.322, -0.043], [0.304, -0.03], [0.298, -0.014], [0.305, 0.0]], end: [-0.012, -0.05] },
+  head: HEAD,
+  hair: HAIR,
+  hairFill: 'var(--fig-hair)',
+  face: FACE,
+  ear: EAR,
+  eye: EYE,
+  brow: BROW,
+  trunkFH: TRUNK_FH,
+  trunkBH: TRUNK_BH,
+  pecF: PEC_F,
+  rectusFH: RECTUS_FH,
+  lineaF: [0.188, -0.004],
+  rectusFLines: RECTUS_F_LINES,
+  obliqueF: OBLIQUE_F,
+  latF: LAT_F,
+  trapF: TRAP_F,
+  trapB: TRAP_B,
+  latB: LAT_B,
+  erectorB: ERECTOR_B,
+  foldF: [[0.262, 0.096], [0.208, 0.094]],
+  neckF: { trunk: [[0.27, 0.03], [0.3, 0.034]], head: [[0.035, -0.03], [0.031, -0.05]] },
+  headF: HEAD_F,
+  hairF: HAIR_F,
+  hairTop: HAIR_TOP,
+  faceBowed: FACE_BOWED,
+  earF: EAR_F,
+  facePair: FACE_PAIR,
+  faceMid: FACE_MID,
+};
+
+/* ---------------- her shapes ----------------
+   The same skeleton and the same resting surfaces as his: her back contour,
+   her lower belly, the glutes' reach from the hip, the thighs' and shins'
+   extents, the backs of the arms, the palms, soles and the back and top of the
+   head match his. She differs in between: a bust within his chest depth, its
+   fullest point lower, a straight slope above it and its underside curving
+   back to the ribs; a narrower waist; rounder glutes with a higher shelf;
+   thighs full at the hip; a slimmer neck with a lower trapezius line, slimmer
+   fronts of the arms and calves; smaller hands and feet; a softer face; hair
+   swept over the tops of the ears and tied back in a low ponytail that fills
+   the hollow behind the neck (seen from the front, the hair shows past the
+   head at the temples and behind the jaw), in a hair colour of her own. Her
+   muscles have fewer definition lines but light as much as his. */
+
+/** A piecewise-linear factor along a bone: [t, factor] stops, held flat past the ends. */
+function ramp(stops: readonly P2[]): (t: number) => number {
+  return (t) => {
+    if (t <= stops[0][0]) return stops[0][1];
+    for (let i = 1; i < stops.length; i++) {
+      if (t <= stops[i][0]) {
+        const [t0, k0] = stops[i - 1];
+        const [t1, k1] = stops[i];
+        return k0 + ((k1 - k0) * (t - t0)) / (t1 - t0);
+      }
+    }
+    return stops[stops.length - 1][1];
+  };
+}
+/** Scales a limb across the bone: one factor ramp for the d >= 0 side, one for the other; `cap` shortens what lies above the joint (t < 0). */
+function slim(pos: readonly P2[], neg: readonly P2[], cap = 1): Warp {
+  const kp = ramp(pos);
+  const kn = ramp(neg);
+  return (t, d) => [t < 0 ? t * cap : t, d * (d >= 0 ? kp(t) : kn(t))];
+}
+/** Scales a hand about the point it holds or presses with. */
+const handScale = (t0: number, k: number, kd = k, palm = false): Warp => (t, d) => [t0 + (t - t0) * k, palm && d > 0 ? d : d * kd];
+
+// Side-view trunk: his lower belly (lying face down on a pad it rests where his does), a waist a little flatter than
+// his up to the fold under the bust (6), then the bust: a broad front (7-8) whose fullest point is lower than his,
+// and above it a straight slope up to the collarbone (9-12), all within his chest. Fitted to the tilts at which a push-up's bottom, a bench pad or a lying leg curl
+// meets it, so lying on the chest it rests where he does, never deeper. The neck base (16-17) is lower and slimmer;
+// the back (18-27) and the seat are his, so she lies on benches and floors where he does.
+const TRUNK_W: P2[] = [
+  [-0.05, 0.028], [-0.02, 0.043], [0.02, 0.0485], [0.062, 0.0532], [0.102, 0.0555], [0.14, 0.059], // 0-5 belly and waist
+  [0.161, 0.0582], [0.189, 0.0753], [0.2065, 0.0806], [0.231, 0.0786], [0.2435, 0.0725], [0.2655, 0.0585], [0.288, 0.043], [0.296, 0.032], // 6-13 bust, chest
+  [0.31, 0.012], [0.322, -0.012], [0.324, -0.027], // 14-16 neck base
+  [0.314, -0.043], [0.296, -0.0595], [0.268, -0.0685], [0.238, -0.0725], [0.205, -0.071], [0.172, -0.0645], [0.14, -0.057], // 17-23
+  [0.108, -0.0515], [0.078, -0.054], [0.048, -0.062], [0.015, -0.067], // 24-27 back
+  [-0.02, -0.06], [-0.045, -0.035], [-0.058, -0.005], // 28-30 seat
+];
+// The chest group covers the pectoral and the bust over it: from the fold under the bust up to the collarbone, its
+// inner edge running down to the armpit (a little deeper than his, as her bust's upper slope is less full than his
+// chest) and round under the bust.
+const PEC_IN_W: P2[] = [[0.293, 0.031], [0.288, 0.016], [0.276, 0.003], [0.256, -0.005], [0.234, -0.002], [0.212, 0.01], [0.193, 0.028], [0.178, 0.044], [0.168, 0.054]];
+// The external oblique as his, up under the bust fold, with a smooth upper edge.
+const OBLIQUE_W: P2[] = [
+  [0.166, 0.0375], [0.183, 0.032], [0.191, 0.023], [0.187, 0.0155], [0.173, 0.011],
+  [0.148, 0.004], [0.124, -0.005], [0.106, -0.014], [0.098, -0.019],
+  [0.094, -0.006], [0.096, 0.008], [0.09, 0.02], [0.078, 0.0285],
+  [0.1, 0.0315], [0.125, 0.0335], [0.145, 0.0345], [0.157, 0.036],
+];
+// Head: his skull (the back and top rest on benches and floors), a rounder forehead, a softer brow, a smaller nose
+// tipped up a little, fuller lips, a smaller chin and a softer jaw.
+const HEAD_W: P2[] = [
+  [-0.036, -0.036], [-0.056, -0.018], [-0.063, 0.012], [-0.055, 0.039], [-0.032, 0.0575], [-0.002, 0.0625], [0.027, 0.0565],
+  [0.0465, 0.0405], [0.0515, 0.019], [0.0495, 0.0075], [0.0555, -0.005], [0.0635, -0.0155], [0.0515, -0.0205], [0.0562, -0.0282],
+  [0.0488, -0.0342], [0.0515, -0.0402], [0.0455, -0.0472], [0.048, -0.0555], [0.036, -0.0635], [0.012, -0.057], [-0.011, -0.045],
+  [-0.016, -0.033],
+];
+// Hair drawn back from a rounded hairline at the temple, over the tops of the ears, to the nape.
+const HAIR_W: P2[] = [
+  [0.038, 0.0465], [0.027, 0.0565], [-0.002, 0.0625], [-0.032, 0.0575], [-0.055, 0.039], [-0.063, 0.012], [-0.056, -0.018], [-0.044, -0.031],
+  [-0.036, -0.026], [-0.03, -0.014], [-0.027, -0.003], [-0.02, 0.004], [-0.008, 0.0065], [0.004, 0.0055], [0.012, 0.0065], [0.017, 0.013],
+  [0.0205, 0.026], [0.027, 0.0365], [0.033, 0.0435],
+];
+// The ponytail: tied at the nape and filling the hollow behind the neck, its back edge never past the line from the back
+// of the skull to the upper back, so lying on a bench or the floor it rests where the head does.
+const TAIL_W: P2[] = [
+  [-0.052, 0.0], [-0.059, -0.014], [-0.0605, -0.03], [-0.0605, -0.048], [-0.0598, -0.066], [-0.0575, -0.083], [-0.052, -0.098], [-0.044, -0.108],
+  [-0.036, -0.1], [-0.029, -0.084], [-0.026, -0.064], [-0.027, -0.046], [-0.032, -0.03], [-0.04, -0.014],
+];
+const FACE_W: P2[] = [
+  [0.03, 0.046], [0.0465, 0.0405], [0.0515, 0.019], [0.0495, 0.0075], [0.0555, -0.005], [0.0635, -0.0155], [0.0515, -0.0205], [0.0562, -0.0282],
+  [0.0488, -0.0342], [0.0515, -0.0402], [0.0455, -0.0472], [0.048, -0.0555], [0.036, -0.0635], [0.012, -0.057], [0.0, -0.048], [0.004, -0.02], [0.012, 0.012], [0.018, 0.036],
+];
+/** The eye with a flick of lashes at its front; a finer, arched brow. */
+const EYE_W: P2[] = [[0.0295, 0.0095], [0.0362, 0.0128], [0.0425, 0.0108], [0.0462, 0.0128], [0.0432, 0.0088], [0.0365, 0.006]];
+const BROW_W: P2[] = [[0.026, 0.0215], [0.036, 0.0255], [0.0465, 0.0225], [0.046, 0.0205], [0.036, 0.0235], [0.027, 0.0195]];
+
+// Front view: a narrower ribcage and waist, the hips flaring from the iliac crest (no wider than his at the outer
+// hip, which rests on the floor lying on the side), slimmer shoulders and neck.
+const TRUNK_FH_W: P2[] = [
+  [-0.013, 0.0], [-0.022, 0.011], [-0.034, 0.024], [-0.024, 0.048], [0.0, 0.08], [0.022, 0.0945], [0.045, 0.095],
+  [0.07, 0.086], [0.095, 0.073], [0.12, 0.0675], [0.15, 0.072], [0.18, 0.0795], [0.21, 0.085], [0.235, 0.088],
+  [0.256, 0.089], [0.276, 0.088], [0.294, 0.082], [0.309, 0.068], [0.321, 0.053], [0.33, 0.041], [0.338, 0.028],
+];
+// Seen from above: a narrower back, a small waist and rounder hips.
+const TRUNK_BH_W: P2[] = [
+  [-0.02, 0.0], [-0.03, 0.014], [-0.034, 0.036], [-0.022, 0.06], [0.0, 0.079], [0.028, 0.088], [0.058, 0.082],
+  [0.095, 0.068], [0.13, 0.07], [0.165, 0.078], [0.2, 0.085], [0.232, 0.089], [0.258, 0.09],
+  [0.278, 0.088], [0.296, 0.081], [0.316, 0.069], [0.335, 0.052], [0.351, 0.035], [0.363, 0.018], [0.37, 0.0],
+];
+// The chest group as two rounded shapes over the bust, close at the sternum: a straight top along the collarbone,
+// narrowing into the armpit, and below it a full round bowl whose lowest point is near its middle, curving up to the
+// sternum on the inside, so the pair reads as a bust.
+const PEC_F_W: P2[] = [
+  [0.282, 0.009], [0.289, 0.03], [0.287, 0.052], [0.274, 0.07], [0.255, 0.082], [0.232, 0.0875], [0.208, 0.0875], [0.189, 0.0815],
+  [0.175, 0.068], [0.167, 0.049], [0.17, 0.03], [0.181, 0.017], [0.199, 0.01], [0.232, 0.0085], [0.262, 0.0085],
+];
+// The abdominals below the bust: the rectus rising to a point between the two bowls, the obliques under their outer
+// curves; as wide as her waist allows.
+const RECTUS_FH_W: P2[] = [[0.192, 0.0], [0.185, 0.009], [0.173, 0.02], [0.163, 0.032], [0.155, 0.046], [0.11, 0.048], [0.07, 0.0465], [0.035, 0.04], [0.01, 0.027], [-0.012, 0.0]];
+const OBLIQUE_F_W: P2[] = [
+  [0.158, 0.054], [0.17, 0.0655], [0.181, 0.0765], [0.15, 0.069], [0.12, 0.065], [0.098, 0.068], [0.075, 0.0775], [0.055, 0.0815],
+  [0.038, 0.0745], [0.024, 0.064], [0.014, 0.0535], [0.034, 0.0555], [0.07, 0.0545], [0.11, 0.054], [0.142, 0.0545],
+];
+const HEAD_F_W: P2[] = [
+  [0.0, 0.0615], [0.03, 0.057], [0.046, 0.04], [0.05, 0.015], [0.047, -0.008], [0.041, -0.03], [0.03, -0.049], [0.016, -0.06], [0.0, -0.064],
+  [-0.016, -0.06], [-0.03, -0.049], [-0.041, -0.03], [-0.047, -0.008], [-0.05, 0.015], [-0.046, 0.04], [-0.03, 0.057],
+];
+/** A symmetric outline from its image-right half: from the top of the midline down that side to the bottom of the midline. */
+const both = (half: readonly P2[]): P2[] => [...half, ...mirrorFace(half).reverse().slice(1, -1)];
+/** A symmetric band round the face from its image-right half: the outer edge from the top of the midline, then the inner edge back to it. */
+const band = (outer: readonly P2[], inner: readonly P2[]): P2[] => [...outer, ...inner, ...mirrorFace(inner).reverse().slice(1), ...mirrorFace(outer).reverse().slice(0, -1)];
+// Hair framing the face: parted in the middle and drawn back from a rounded hairline, filling the temples and over the
+// tops of the ears. Behind the head, the hair seen past it: fuller at the temples, over the ears and going back behind
+// the jaw to the nape on both sides of the neck.
+const HAIR_F_W: P2[] = band(
+  [[0.0, 0.0615], [0.03, 0.057], [0.046, 0.04], [0.0525, 0.021], [0.0585, 0.0075]],
+  [[0.0575, -0.0005], [0.051, 0.0015], [0.0458, 0.0045], [0.0432, 0.0155], [0.0375, 0.0295], [0.0255, 0.039], [0.012, 0.0428], [0.0, 0.0418]],
+);
+const HAIR_BACK_F_W: P2[] = both([
+  [0.0, 0.0635], [0.032, 0.0592], [0.0508, 0.0418], [0.0565, 0.021], [0.0618, 0.007], [0.0612, -0.007], [0.056, -0.022], [0.0485, -0.037],
+  [0.0415, -0.051], [0.0345, -0.064], [0.022, -0.074], [0.0, -0.078],
+]);
+// A bowed head seen from the front and above: the crown of hair parted down the middle and over the tops of the ears,
+// and past it the knot of hair tied back at the top and the hair over the ears.
+const HAIR_TOP_W: P2[] = both([
+  [0.0, 0.0615], [0.03, 0.057], [0.046, 0.04], [0.052, 0.021], [0.0565, 0.0075], [0.0555, -0.001], [0.051, -0.006], [0.048, -0.014],
+  [0.04, -0.03], [0.02, -0.04], [0.0, -0.043],
+]);
+const KNOT_TOP_W: P2[] = both([
+  [0.0, 0.0775], [0.0115, 0.0762], [0.0172, 0.0698], [0.0192, 0.0615], [0.033, 0.0592], [0.0505, 0.0415], [0.0545, 0.0215], [0.0585, 0.008],
+  [0.0578, -0.004], [0.05, -0.012], [0.03, -0.004], [0.0, 0.0],
+]);
+// Eyes with a flick of lashes at the outer corner, finer arched brows; a small nose; lips with a bow and a fuller lower lip.
+const FACE_PAIR_W: P2[][] = [
+  [[0.012, 0.0072], [0.019, 0.0102], [0.026, 0.0082], [0.0288, 0.0099], [0.0263, 0.006], [0.019, 0.0045]],
+  [[0.011, 0.018], [0.02, 0.0222], [0.03, 0.0195], [0.0295, 0.0178], [0.02, 0.0204], [0.0115, 0.0164]],
+];
+const FACE_MID_W: P2[][] = [
+  [[-0.003, -0.016], [0.0, -0.0182], [0.003, -0.016], [0.0, -0.0148]],
+  [[-0.0105, -0.0338], [-0.0042, -0.0321], [0.0, -0.0328], [0.0042, -0.0321], [0.0105, -0.0338], [0.005, -0.0365], [-0.005, -0.0365]],
+];
+
+const FEMALE: Shape = {
+  warp: {
+    // Thighs full at the front of the hip. Below it a thigh rests all along (its front on a pad or under a lap pad,
+    // its back on a seat, the knee kneeling), so there the outline is his; her fuller buttock is the glute's own.
+    thigh: slim([[-0.03, 1.06], [0.0, 1.05], [0.04, 1.0]], [[0, 1]]),
+    // A slimmer calf belly; the shin's front, the Achilles and the heel (pads, rollers, kneeling) as his.
+    shin: slim([[0.17, 1], [0.21, 0.95]], [[-0.03, 1], [0.0, 0.975], [0.062, 0.945], [0.098, 0.945], [0.14, 0.97], [0.17, 1]]),
+    // A lower instep and shorter toes; the sole, the heel and the Achilles above it (rollers press there) as his.
+    foot: (t, d) => [t, d > 0.008 ? 0.008 + (d - 0.008) * (1 - 0.07 * smooth((t - 0.012) / 0.03)) : d],
+    toes: (t, d) => [t * 0.92, d > 0.008 ? 0.008 + (d - 0.008) * 0.93 : d],
+    // Arms slimmer on the front only: their backs rest on the floor (a plank's forearms, the arms beside a bridge, the
+    // elbows of a floor press), so they are his, as is the tip of the wrist (on the floor at a push-up's bottom); the
+    // deltoid cap within a few per cent of his.
+    upperArm: slim([[0.0, 0.96], [0.05, 0.955], [0.1, 0.95], [0.19, 0.95], [0.22, 0.97]], [[0.0, 1]], 0.96),
+    forearm: slim([[0.03, 0.97], [0.09, 0.94], [0.13, 0.93], [0.15, 0.97], [0.158, 1]], [[0.0, 1]]),
+    fist: handScale(0.035, 0.92),
+    flatHand: handScale(0.03, 0.93, 0.9, true),
+    // Front view: the outer hip fills out above the joint, up into the flare of the trunk; below it the outer side
+    // of the leg (lying on the side, the bottom leg rests on it) is his; the inner thighs meet at the top.
+    thighF: slim(
+      [[-0.06, 1.3], [-0.035, 1.15], [-0.012, 1.0]],
+      [[-0.03, 1.15], [-0.008, 1.2], [0.025, 1.149], [0.055, 1.14], [0.095, 1.069], [0.145, 1.0], [0.19, 0.9625], [0.25, 1]],
+    ),
+    shinF: slim([[0.0, 1]], [[0.0, 0.97], [0.048, 0.95], [0.2, 0.93]]),
+    // A narrower foot; its outer edge (a side plank rests on it) is his.
+    footF: (t, d) => [t, d < 0 ? d * 0.86 : d],
+    // Front view: a slightly smaller deltoid cap and a slimmer outer arm; the inner side (lying on the side, the arm
+    // under the head rests on it) as his.
+    upperArmF: slim([[0.0, 0.95], [0.05, 0.94], [0.1, 0.93]], [[0.0, 1]], 0.95),
+    forearmF: slim([[0.03, 0.97], [0.1, 0.93]], [[0.0, 1]]),
+  },
+  toeJoint: 0.0165,
+  thighGroove: [],
+  // Rounder, with a higher shelf where it leaves the back and a deeper fold; his once the hip bends (seats, benches).
+  glute: { ...GLUTE, shelf: 18, fold: 82, apex: [0.0795, 0.004, 0.014], handles: [0.5, 0.45], relax: { at: 0.2, to: GLUTE } },
+  trunk: TRUNK_W,
+  chestSwell: [0.006, 0.01, 0.012, 0.008, 0.004],
+  chestFrom: 7,
+  pecRun: [6, 12],
+  pecIn: PEC_IN_W,
+  pecDropFrom: 4,
+  // Judged on the same points as his, so the near arm carries her chest's tendon when it would carry his.
+  pecSamples: PEC_SAMPLES,
+  backSamples: BACK_SAMPLES,
+  // The rectus as wide as his behind her flatter front, running up under the bust.
+  rectusRun: [...runOf(TRUNK_W, 1, 6), [0.168, 0.0505]],
+  rectusIn: [[0.172, 0.048], [0.163, 0.0445], [0.152, 0.0428], [0.14, 0.0415], [0.1, 0.0395], [0.06, 0.0375], [0.02, 0.0335], [-0.008, 0.0302], [-0.02, 0.035]],
+  rectusSplits: [[[0.13, 0.038], [0.125, 0.047], [0.124, 0.0535]], [[0.098, 0.036], [0.094, 0.045], [0.093, 0.0515]]],
+  oblique: OBLIQUE_W,
+  // Working, it spreads back toward the lat a little further than his, as her rectus fills more of the band in front.
+  obliqueSwell: OBLIQUE_W.map((_, i) => (i >= 4 && i <= 9 ? -0.008 : i >= 12 || i === 0 ? 0.003 : 0)),
+  lat: [
+    [0.264, -0.008], [0.246, 0.003], [0.222, 0.005], [0.198, 0.006], [0.172, 0.006], [0.145, -0.003], [0.122, -0.011], [0.104, -0.02], [0.09, -0.028],
+    [0.096, -0.034], [0.12, -0.033], [0.145, -0.038], [0.172, -0.048], ...runOf(TRUNK_W, 21, 21), [0.224, -0.064], [0.244, -0.053], [0.258, -0.034],
+  ],
+  erectors: [...runOf(TRUNK_W, 22, 26), [0.05, -0.044], [0.078, -0.039], [0.11, -0.038], [0.14, -0.043], [0.163, -0.053]],
+  upperBack: [...runOf(TRUNK_W, 17, 21), [0.21, -0.064], [0.232, -0.058], [0.252, -0.043], [0.272, -0.029], [0.296, -0.024], [0.316, -0.022]],
+  neck: { front: [[0.265, 0.02], [0.29, 0.029]], head: [[0.021, -0.065], [0.014, -0.04], [-0.02, -0.031], [-0.028, -0.046]], back: [[0.326, -0.028], [0.3, -0.034]] },
+  trap: { start: [-0.025, -0.046], trunk: [[0.328, -0.0245], [0.316, -0.036], [0.303, -0.027], [0.299, -0.014], [0.305, -0.002]], end: [-0.011, -0.05] },
+  head: HEAD_W,
+  hair: HAIR_W,
+  hairFill: 'var(--fig-hair-her)',
+  earUnder: true,
+  tail: TAIL_W,
+  tie: [[-0.06, -0.031], [-0.049, -0.035], [-0.037, -0.039]],
+  strands: [[[-0.057, -0.046], [-0.0555, -0.066], [-0.052, -0.086]], [[-0.049, -0.046], [-0.0475, -0.066], [-0.044, -0.086]]],
+  face: FACE_W,
+  ear: EAR,
+  eye: EYE_W,
+  brow: BROW_W,
+  trunkFH: TRUNK_FH_W,
+  trunkBH: TRUNK_BH_W,
+  pecF: PEC_F_W,
+  rectusFH: RECTUS_FH_W,
+  // Fewer definition lines than his: two tendinous lines, and the linea alba fading out below the navel.
+  lineaF: [0.186, 0.05],
+  rectusFLines: [0.14, 0.104],
+  obliqueF: OBLIQUE_F_W,
+  latF: [[0.25, 0.086], [0.23, 0.0845], [0.21, 0.0815], [0.19, 0.0775], [0.205, 0.077], [0.228, 0.08]],
+  trapF: [...runOf(TRUNK_FH_W, 20, 16), [0.283, 0.072], [0.291, 0.06], [0.3, 0.048], [0.311, 0.038], [0.323, 0.029], [0.332, 0.022]],
+  trapB: [...runOf(TRUNK_BH_W, 18, 14), [0.295, 0.072], [0.281, 0.061], [0.262, 0.051], [0.238, 0.04], [0.21, 0.029], [0.182, 0.017], [0.16, 0.007], [0.15, 0.0]],
+  latB: [...runOf(TRUNK_BH_W, 12, 6), [0.056, 0.07], [0.076, 0.057], [0.1, 0.051], [0.13, 0.053], [0.162, 0.06], [0.195, 0.071], [0.225, 0.081]],
+  erectorB: ERECTOR_B,
+  foldF: [[0.262, 0.086], [0.208, 0.083]],
+  neckF: { trunk: [[0.27, 0.0255], [0.3, 0.0272]], head: [[0.029, -0.03], [0.0255, -0.048]] },
+  headF: HEAD_F_W,
+  hairF: HAIR_F_W,
+  hairBackF: HAIR_BACK_F_W,
+  hairTop: HAIR_TOP_W,
+  partF: [[0.0, 0.0425], [0.0003, 0.052], [0.0008, 0.0605]],
+  partTop: [[0.0, -0.036], [0.0005, 0.01], [0.001, 0.05]],
+  knotTop: KNOT_TOP_W,
+  faceBowed: FACE_BOWED,
+  earF: EAR_F,
+  facePair: FACE_PAIR_W,
+  faceMid: FACE_MID_W,
+};
+
 export function drawBody(fig: BodyFigure, c: BodyContext): BodyLayers {
-  return fig.view === 'front' ? drawFront(fig, c) : drawSide(fig, c);
+  const S = c.body === 'female' ? FEMALE : MALE;
+  return fig.view === 'front' ? drawFront(fig, c, S) : drawSide(fig, c, S);
 }
