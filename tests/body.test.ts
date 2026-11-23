@@ -404,6 +404,28 @@ describe.each(BODIES)('the front view (%s)', (body) => {
     }
   });
 
+  it('stacks the legs lying on the side: the top leg rests on the bottom one at the knee and the ankle', () => {
+    // At rest the two legs' visible outlines meet where the top knee and ankle lie on the bottom ones: from -0.001
+    // (pressed in by a hair) to the outline's width; in between they press flat instead of passing through each other.
+    for (const id of ['side-plank', 'side-lying-hip-abduction']) {
+      const e = EXERCISES.find((x) => x.id === id)!;
+      const fig = figureAt(e.demo, 0);
+      const level = levelsAt(engagementFor(e), { phase: 'out', s: 0, u: 0, action: 'lifting' });
+      const nearLeg = drawBody(fig, ctx({ level, working: e.demo.working, otherSide: e.demo.otherSide, body })).nearLeg;
+      // Each leg's own outline, the bottom leg's first.
+      const legs = [...nearLeg.matchAll(/<path d="([^"]+)" fill="none" stroke="[^"]+" stroke-width="\.012"/g)].map((m) => drawnPoints(`<path d="${m[1]}"`));
+      expect(legs).toHaveLength(2);
+      const [bottom, top] = legs;
+      for (const joint of ['knee', 'ankle'] as const) {
+        const c = lerpV(fig.a[joint], fig.b[joint], 0.5);
+        const near = bottom.filter((q) => dist(q, c) < 0.06);
+        const gap = Math.min(...top.filter((p) => dist(p, c) < 0.03).map((p) => Math.min(...near.map((q) => dist(p, q))))) - 2 * OUTLINE;
+        expect(gap, `${id}: the ${joint}`).toBeGreaterThanOrEqual(-0.001);
+        expect(gap, `${id}: the ${joint}`).toBeLessThanOrEqual(OUTLINE);
+      }
+    }
+  });
+
   it('keeps the lying compositions: the top palm on the hip, the head on the pillow arm', () => {
     const closest = (a: Pt[], b: Pt[]) => Math.min(...a.map((p) => Math.min(...b.map((q) => Math.hypot(p.x - q.x, p.y - q.y)))));
     for (const id of ['side-plank', 'side-lying-hip-abduction']) {
@@ -489,6 +511,64 @@ describe('the front view, his and hers', () => {
     // Her hair tied back shows past her head and neck (drawn behind them with its own outline); he has none.
     expect(draw(fig, {}, 'female').core).toMatch(/fill="var\(--fig-hair-her\)" stroke=/);
     expect(draw(fig, {}, 'male').core).not.toMatch(/fill="var\(--fig-hair\)" stroke=/);
+  });
+
+  it('keeps her armpit high when she raises her arms: under the arm she is narrower than him at every height', () => {
+    // The front fold of the armpit runs in under her bust, and her bust stays inside the chest's outline, so her chest
+    // wall runs down to her waist from just under the arm (whose lower line is at about 0.76 of height at the top).
+    const e = EXERCISES.find((x) => x.id === 'lateral-raise')!;
+    const fig = figureAt(e.demo, 1);
+    const floor = floorOf(e.demo)!;
+    const cx = (fig.a.hip.x + fig.b.hip.x) / 2;
+    // Each drawn path as a polyline; the width at a height is where the outermost of them crosses it.
+    const drawn = (body: BodyKind) => [...all(draw(fig, {}, body)).matchAll(/<path d="([^"]+)"/g)].map((m) => drawnPoints(`<path d="${m[1]}"`));
+    const widthAt = (paths: Pt[][], h: number) => {
+      const y = floor - h;
+      let w = 0;
+      for (const p of paths) {
+        for (let i = 1; i < p.length; i++) {
+          const [a, b] = [p[i - 1], p[i]];
+          if ((a.y - y) * (b.y - y) <= 0 && a.y !== b.y) w = Math.max(w, 2 * Math.abs(a.x + ((b.x - a.x) * (y - a.y)) / (b.y - a.y) - cx));
+        }
+      }
+      return w;
+    };
+    const him = drawn('male');
+    const her = drawn('female');
+    for (let h = 0.64; h <= 0.7501; h += 0.005) expect(widthAt(her, h), `at ${h.toFixed(3)} of height`).toBeLessThan(widthAt(him, h));
+  });
+
+  it('edges her hair with a single line: over her head it covers the skull’s own outline, and her ears stand clear of it', () => {
+    // Facing the camera and bowed toward a camera above: wherever the hair over the head lies on the skull above the
+    // ears, it reaches past the skull's outline (which would otherwise show as a second ring inside the hair's own).
+    const inside = (poly: Pt[], p: Pt) => {
+      let c = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        if (poly[i].y > p.y !== poly[j].y > p.y && p.x < ((poly[j].x - poly[i].x) * (p.y - poly[i].y)) / (poly[j].y - poly[i].y) + poly[i].x) c = !c;
+      }
+      return c;
+    };
+    for (const [torsoScale, above] of [[1, 0.016], [-0.42, -0.004]] as const) {
+      const fig = posed('front', { torsoScale });
+      const core = draw(fig, {}, 'female').core;
+      const skull = drawnPoints(`<path d="${core.match(/<path d="([^"]+)" fill="var\(--fig-skin\)" stroke="var\(--fig-edge\)" stroke-width="\.012"/)![1]}"`);
+      const hair = drawnPoints(`<path d="${core.match(/<path d="([^"]+)" fill="var\(--fig-hair-her\)"\/>/)![1]}"`);
+      // The head is upright in both poses (its frame's y up the picture): above the ears is above `above` from its centre.
+      const covered = skull.filter((p) => fig.head.y - p.y > above && inside(hair, p));
+      expect(covered.length, `${torsoScale}`).toBeGreaterThan(20);
+      for (const p of covered) {
+        const out = lerpV(fig.head, p, 1 + (OUTLINE + 0.0002) / dist(p, fig.head));
+        expect(inside(hair, out), `${torsoScale}: the skull's outline at ${p.x.toFixed(3)}, ${p.y.toFixed(3)}`).toBe(true);
+      }
+    }
+    // Facing the camera, half way down the ears: each ear reaches further out than the hair behind the head, outline
+    // included, so the ears show below the hair drawn back over their tops.
+    const fig = posed('front');
+    const core = draw(fig, {}, 'female').core;
+    const ears = drawnPoints(`<path d="${core.match(/<path d="([^"]+)" fill="var\(--fig-skin\)" stroke="var\(--fig-edge\)" stroke-width="\.004"/)![1]}"`);
+    const hair = drawnPoints([...core.matchAll(/<path d="([^"]+)" fill="var\(--fig-hair-her\)"/g)].map((m) => `<path d="${m[1]}"`).join(''));
+    const band = (pts: Pt[], side: number) => pts.filter((p) => Math.abs(p.y - fig.head.y - 0.003) < 0.004 && (p.x - fig.head.x) * side > 0).map((p) => Math.abs(p.x - fig.head.x));
+    for (const side of [-1, 1]) expect(Math.max(...band(ears, side)), `side ${side}`).toBeGreaterThan(Math.max(...band(hair, side)) + OUTLINE);
   });
 
   it('lets her ponytail fall toward the floor when she lies on her side, never over her top shoulder', () => {

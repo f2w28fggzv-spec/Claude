@@ -272,8 +272,20 @@ export function sideLyingAbduction(): Demo {
   /** Straight leg from `hip` toward the feet (image left), its ankle at height y. */
   const toward = (hip: Vec, y: number) => 270 - deg(Math.asin((y - hip.y) / legLen));
   const bottomLeg = toward(hipBottom, floor - ANKLE_SIDE);
-  // Top leg at rest: its ankle on the bottom ankle.
-  const rest = toward(hipTop, floor - 3 * ANKLE_SIDE);
+  // The top leg at rest lies on the bottom one, its knee on the bottom knee and its ankle on the bottom ankle (their
+  // inner sides touching, see FRONT_SKIN): the thigh closes in from the hip to the knee and the shin runs on along the
+  // bottom shin. It lifts as one piece about the hip.
+  const down = dir(bottomLeg);
+  const apart = sub(hipTop, hipBottom);
+  /** Across the bottom leg toward the top one. */
+  const n = mul(dir(bottomLeg + 90), Math.sign(dir(bottomLeg + 90).x * apart.x + dir(bottomLeg + 90).y * apart.y));
+  /** A segment `length` long that closes in on the bottom leg's line from `from` to `to` across it. */
+  const closing = (from: number, to: number, length: number) => {
+    const k = Math.asin((from - to) / length);
+    return angleOf(sub(mul(down, Math.cos(k)), mul(n, Math.sin(k))));
+  };
+  const restThigh = closing(n.x * apart.x + n.y * apart.y, 2 * FRONT_SKIN.knee, L.thigh);
+  const restShin = closing(2 * FRONT_SKIN.knee, 2 * FRONT_SKIN.ankle, L.shin);
   // The pillow arm: the upper arm slopes from the shoulder to the elbow, whose forearm's inner side rests on the floor;
   // the forearm slopes on to the wrist (it thins), and the palm lies on the floor bent a little at the wrist.
   const elbowY = floor - FRONT_SKIN.forearm;
@@ -296,11 +308,10 @@ export function sideLyingAbduction(): Demo {
     view: 'front',
     floor: FLOOR,
     pose: (s) => {
-      const lift = rest + 40 * s;
       return {
         torso,
         head,
-        leg: { thigh: lift, shin: lift, foot: 0 },
+        leg: { thigh: restThigh + 40 * s, shin: restShin + 40 * s, foot: 0 },
         leg2: { thigh: bottomLeg, shin: bottomLeg, foot: 0 },
         arm: topArm,
         arm2: { upper: pillow, fore, hand, flat: true },
