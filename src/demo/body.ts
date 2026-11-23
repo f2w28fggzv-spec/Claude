@@ -1422,7 +1422,8 @@ function drawFront(fig: BodyFigure, c: BodyContext, S: Shape): BodyLayers {
 /**
  * Bone to skin in the front view, where the lying front-view patterns rest a body on the floor (or the head on the
  * arm): a part placed this far from the surface touches it with its outline, the middle of the drawn line between on
- * the surface and the line's half-width (W) off it, for both bodies (the rest tests and tools/demo-sheets measure it).
+ * the surface and the line's half-width (W) off it, for both bodies (tests/body.test.ts measures it; npm run demo:contact
+ * checks side views only).
  * A fist rests by BODY.hand, as in the side view.
  */
 export const FRONT_SKIN = {

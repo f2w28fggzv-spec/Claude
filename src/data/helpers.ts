@@ -87,10 +87,10 @@ export const PLACEMENTS = {
   frontAbove: {
     view: 'front',
     phoneHeight: 'head',
-    distanceM: [1.5, 2],
+    distanceM: [1.5, 1.75],
     orientation: 'landscape',
     tiltDown: true,
-    notes: 'Turn the phone sideways and prop it up at about head height or higher (on a rack, a shelf or a tripod), tilted down toward you, so when you hinge forward it looks down on your back and shoulders. With your arms out to the sides your hands should stay in view.',
+    notes: 'Turn the phone sideways and prop it up at about head height or higher (on a rack, a shelf or a tripod), tilted down toward you, and measure the distance from your feet. Hinge until your back is nearly level, so the phone looks down on your back and shoulders. With your arms out to the sides your hands should stay in view.',
   },
   frontFloor: {
     view: 'front',

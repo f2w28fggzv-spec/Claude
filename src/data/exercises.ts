@@ -1200,7 +1200,7 @@ const DRAFT_EXERCISES: Exercise[] = [
   ex({
     id: 'rear-delt-fly',
     name: 'Bent-over rear delt fly',
-    summary: 'Hinged forward, raise the dumbbells out to the sides.',
+    summary: 'Hinge until your back is nearly level, then raise the dumbbells out to the sides.',
     primary: ['shoulders'],
     secondary: ['back'],
     equipment: ['dumbbell'],
