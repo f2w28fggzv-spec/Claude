@@ -187,7 +187,8 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
             else out.mid += cable;
             out.mid += seg(ropeStart, c, 0.02, STEEL) + circle(c, 0.019, `fill="${STEEL}"`);
           } else {
-            const line = seg(p.from, c, p.kind === 'band' ? 0.012 : 0.007, LINE, p.kind === 'band' ? 'stroke-dasharray="0.02 0.016"' : '');
+            // A cable is a thin line; a band a flat elastic strip (a solid band with a light core).
+            const line = p.kind === 'band' ? seg(p.from, c, 0.016, LINE) + seg(p.from, c, 0.006, FILL) : seg(p.from, c, 0.007, LINE);
             if (behind) out.behind += line;
             else out.mid += line;
           }

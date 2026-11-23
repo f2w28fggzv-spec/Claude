@@ -517,7 +517,7 @@ export const ENGAGEMENT: Record<string, Engagement> = {
     muscles: [
       { group: 'back', role: 'main', peak: 1, note: 'pulls the elbows down and the shoulder blades down and back' },
       { group: 'biceps', role: 'assist', peak: 0.65, profile: [0.1, 1, 0.7], note: 'bend the elbows' },
-      { group: 'core', role: 'stabilize', peak: 0.35, note: 'keeps the body still, no swinging' },
+      { group: 'core', role: 'stabilize', peak: 0.3, note: 'keeps the body still, no swinging' },
     ],
     why: 'In a dead hang the straight arms are in line with the bar\'s pull, so the shoulder joints and shoulder-blade muscles hold the body while the elbow flexors are nearly idle; once the pull starts the lats and mid-back lift the whole body, and they are shortest and weakest at the top, so getting the chin over the bar is the hardest part. The elbow flexors carry most where the forearms slant most, around mid-pull; with the wider overhand grip the forearms come closer to vertical at the top.',
   },
