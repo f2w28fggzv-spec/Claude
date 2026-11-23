@@ -78,12 +78,22 @@ function headOnFloor(shoulder: Vec, floor: number): number {
 }
 
 /**
+ * How far the drawn front of the body (outline included) lies from the trunk
+ * and thigh lines where a load in the hip crease touches it: in a deep crease
+ * (hip angle 90°) it rests on the lower belly and the upper thigh, once the
+ * hips are straight (180°) on the front of the pelvis over the hip joint, which
+ * is thinner. Measured on the drawn figure.
+ */
+const CREASE_DEEP = 0.0617;
+const CREASE_STRAIGHT = 0.0505;
+
+/**
  * Where a bar or a dumbbell handle of radius `r` rests in the hip crease:
  * on the bisector of the hip angle, touching the front of the hips and thighs.
  */
 function inCrease(hip: Vec, torso: number, thigh: number, r: number): Vec {
   const angle = (((thigh - torso) % 360) + 360) % 360;
-  const skin = (BODY.torsoFront + BODY.thighFront) / 2;
+  const skin = lerp(CREASE_STRAIGHT, CREASE_DEEP, (180 - angle) / 90);
   return along(hip, torso + angle / 2, (skin + r) / Math.sin(rad(angle / 2)));
 }
 
@@ -415,9 +425,10 @@ function machineCalfRaise(): Demo {
   const shoulderX = ball.x; // pads over the balls of the feet
   const column = ball.x + 0.26;
   // The carriage, from the shoulder joints: the shoulder pad on top of the shoulder (over the side of the
-  // neck), and an arm from the pad's lower front edge, under the chin, through the handles to the column.
-  const PAD = { along: 0.05, back: 0.018, thick: 0.04, long: 0.11 };
-  const armY = -(PAD.along - PAD.thick / 2);
+  // neck), and an arm out of the lower half of the pad's front face, just under the chin, through the
+  // handles to the column.
+  const PAD = { along: 0.045, back: 0.018, thick: 0.042, long: 0.11 };
+  const armY = -(PAD.along - PAD.thick / 2 + 0.008);
   const handle: Vec = { x: 0.125, y: armY };
   const pose = (s: number): DemoPose => {
     const foot = lerp(low, high, s);

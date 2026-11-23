@@ -647,14 +647,17 @@ export function hackSquat(): Demo {
   // carriage that rides the rails; the shoulder pads on top of the carriage reach forward over the
   // shoulders, a handle at their front end in each fist.
   const behind = dir(torso - 90);
+  // Behind the trunk line: the back pad, the carriage and the rails, edge to edge; the shoulder pad
+  // reaches from the carriage to just ahead of the shoulder.
   const PAD = BODY.torsoBack + 0.022;
   const CARRIAGE = PAD + 0.035;
   const RAIL = CARRIAGE + 0.032;
+  const AHEAD = 0.037;
   const sled: Prop[] = [
     { kind: 'attached', at: 'hip', from: add(mul(behind, PAD), mul(up, 0.04)), to: add(mul(behind, PAD), mul(up, L.torso + 0.06)), width: 0.04, pad: true },
     { kind: 'attached', at: 'hip', from: mul(behind, CARRIAGE), to: add(mul(behind, CARRIAGE), mul(up, L.torso + 0.07)), width: 0.03 },
-    { kind: 'pad', at: 'shoulder', frame: 'trunk', offset: { x: 0.05, y: -(CARRIAGE - 0.037) / 2 }, block: { along: 0.04, across: CARRIAGE + 0.037 - 0.015 } },
-    { kind: 'attached', at: 'shoulder', from: add(mul(up, 0.03), mul(front, 0.037)), to: grip, width: 0.018 },
+    { kind: 'pad', at: 'shoulder', frame: 'trunk', offset: { x: 0.05, y: (AHEAD - CARRIAGE) / 2 }, block: { along: 0.04, across: AHEAD + CARRIAGE } },
+    { kind: 'attached', at: 'shoulder', from: add(mul(up, 0.03), mul(front, AHEAD - 0.008)), to: grip, width: 0.018 },
   ];
   // One machine: a base frame on the floor holds the platform (propped at its front) and the rails,
   // which rise from the floor behind the heels past the top of the sled's travel to a post at the back.
