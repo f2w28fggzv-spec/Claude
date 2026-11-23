@@ -32,9 +32,14 @@ export interface ResolvedPose {
 export interface BodyFigure extends Figure {
   pose: ResolvedPose;
 }
+/** Which body to draw: the profile's body drawing. Both share the skeleton and the thickness (BODY). */
+export type BodyKind = 'male' | 'female';
+
 export interface BodyContext {
   /** Muscle levels; for a one-sided exercise these are the working side's. */
   level: Levels;
+  /** Which body (default male). */
+  body?: BodyKind;
   /**
    * One-sided exercise: the side whose limbs work (`a` or `b`, see
    * Demo.working). The other side's arm and leg use `restingSide(level)`;

@@ -80,7 +80,7 @@ function Routes({ path, query }: ReturnType<typeof useRoute>) {
     case 'exercise':
       return <ExerciseDetail id={id ?? ''} />;
     case 'dev':
-      if (id === 'demos') return <DevDemos still={query.has('still')} ids={query.get('ids')?.split(',').filter(Boolean)} />;
+      if (id === 'demos') return <DevDemos still={query.has('still')} ids={query.get('ids')?.split(',').filter(Boolean)} body={query.get('body') === 'female' ? 'female' : undefined} />;
       if (id === 'anatomy') return <DevAnatomy />;
       if (id === 'calibrate') return <DevCalibrate exerciseId={query.get('exercise') ?? undefined} />;
       return <Home />;

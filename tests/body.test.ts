@@ -37,10 +37,10 @@ function areaOf(markup: string, level: number): number {
 }
 
 describe('demo figure', () => {
-  it.each(EXERCISES.map((e) => [e.id, e] as const))('%s: well-formed at every point of the rep', (_, e) => {
+  it.each(EXERCISES.flatMap((e) => (['male', 'female'] as const).map((b) => [e.id, b, e] as const)))('%s (%s): well-formed at every point of the rep', (_, body, e) => {
     for (let k = 0; k <= 4; k++) {
       const fig = figureAt(e.demo, k / 4);
-      const layers = drawBody(fig, ctx({ working: e.demo.working }));
+      const layers = drawBody(fig, ctx({ working: e.demo.working, body }));
       const markup = all(layers);
       expect(markup).not.toMatch(/NaN|undefined|Infinity/);
       // Light enough to repaint every animation frame on a phone.
@@ -50,7 +50,7 @@ describe('demo figure', () => {
       expect(layers.nearArm).not.toBe('');
       if (e.demo.view === 'side') expect(layers.nearLeg).not.toBe('');
       // Same pose, same picture.
-      expect(all(drawBody(fig, ctx({ working: e.demo.working })))).toBe(markup);
+      expect(all(drawBody(fig, ctx({ working: e.demo.working, body })))).toBe(markup);
     }
   });
 

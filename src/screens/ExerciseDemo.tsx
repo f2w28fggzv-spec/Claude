@@ -4,6 +4,7 @@ import { MUSCLE_LABELS, type Exercise } from '../data/types';
 import { ROLE_LABEL, engageColour, levelsAt, momentAt, peakLevels, type Engagement, type Levels, type Moment, type MuscleRole, type MuscleUse } from '../demo/engagement';
 import { demoBounds, frameMarkup, viewBoxOf } from '../demo/render';
 import { timeline } from '../demo/timeline';
+import { figureOf, loadProfile } from '../profile';
 
 function reducedMotion(): boolean {
   try {
@@ -81,6 +82,8 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
   const muscles = useMemo(() => legendOrder(spec), [spec]);
   const still = useMemo(reducedMotion, []);
   const uid = useMemo(() => `demo${++instances}`, []);
+  // The profile's body drawing, as for the muscle icons and the body map.
+  const body = useMemo(() => figureOf(loadProfile()), []);
   const [playing, setPlaying] = useState(true);
   const svg = useRef<SVGSVGElement>(null);
   const bars = useRef<(HTMLElement | null)[]>([]);
@@ -106,7 +109,7 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
     const key = `${m.s.toFixed(4)}|${back}|${colours.join()}`;
     if (key !== painted.current) {
       painted.current = key;
-      el.innerHTML = frameMarkup(demo, m.s, levels, box, uid, back);
+      el.innerHTML = frameMarkup(demo, m.s, levels, box, { id: uid, back, body });
       muscles.forEach((u, i) => {
         const bar = bars.current[i];
         if (!bar) return;
@@ -176,7 +179,7 @@ export function ExerciseDemo({ exercise, compact = false }: { exercise: Exercise
       <figure class={`demo ${compact ? 'compact' : ''}`} aria-label={`${exercise.name}: demo, ${view}. Muscles working: ${words}.`}>
         <div class="demo-pair">
           {shots.map((shot, k) => (
-            <svg viewBox={viewBox} role="img" aria-label={shot.label} dangerouslySetInnerHTML={{ __html: frameMarkup(demo, shot.s, shot.levels, box, `${uid}-${k}`) }} />
+            <svg viewBox={viewBox} role="img" aria-label={shot.label} dangerouslySetInnerHTML={{ __html: frameMarkup(demo, shot.s, shot.levels, box, { id: `${uid}-${k}`, body }) }} />
           ))}
         </div>
         {!compact && <MuscleLegend muscles={muscles} levels={peakLevels(spec)} />}

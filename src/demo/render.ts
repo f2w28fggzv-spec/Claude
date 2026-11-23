@@ -1,7 +1,7 @@
 // One frame of an exercise demo as SVG markup: floor, equipment and the
 // figure, layered by depth. Pure strings (no DOM), so the app can paint a
 // frame with one innerHTML and the sheet tool can render demos in Node.
-import { BODY, drawBody, type BodyFigure, type ResolvedPose } from './body';
+import { BODY, drawBody, type BodyFigure, type BodyKind, type ResolvedPose } from './body';
 import { engageColour, type Levels } from './engagement';
 import { drawEquipment, propExtent } from './equipment';
 import { L, solve, type DemoPose, type Vec } from './figure';
@@ -75,15 +75,22 @@ function floorMarks(box: FrameBox, floor: number, spacing: number, moved: number
   return out;
 }
 
-/**
- * SVG content for one frame (no <svg> wrapper).
- * @param id unique per drawn figure on the page (prefix for any <defs> ids)
- */
-export function frameMarkup(demo: Demo, s: number, levels: Levels, box: FrameBox, id = 'demo', back = false): string {
+export interface FrameOptions {
+  /** Unique per drawn figure on the page: prefix for any <defs> ids. */
+  id?: string;
+  /** On the way back from the turnaround (see Demo.back). */
+  back?: boolean;
+  /** Which body to draw (the profile's body drawing; default male). */
+  body?: BodyKind;
+}
+
+/** SVG content for one frame (no <svg> wrapper). */
+export function frameMarkup(demo: Demo, s: number, levels: Levels, box: FrameBox, o: FrameOptions = {}): string {
+  const { id = 'demo', back = false } = o;
   const fig = figureAt(demo, s, back);
   const floor = floorOf(demo);
   const eq = drawEquipment(demo.props ?? [], fig, floor);
-  const body = drawBody(fig, { level: levels, heat: engageColour, id, working: demo.working, otherSide: demo.otherSide });
+  const body = drawBody(fig, { level: levels, heat: engageColour, id, working: demo.working, otherSide: demo.otherSide, body: o.body });
   const ground =
     floor === null
       ? ''

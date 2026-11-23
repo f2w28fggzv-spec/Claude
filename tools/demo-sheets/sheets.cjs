@@ -10,6 +10,7 @@
 //          --themes a,b   light, dark or both (default: light)
 //          --out DIR      output folder (default: ./demo-sheets-out)
 //          --height PX    height of each frame (default 300)
+//          --body KIND    male (default) or female figure
 //          --per N        exercises per image (default 1); with N > 1 the
 //                         images are sheet-01.<theme>.png, sheet-02... in order
 // Writes one PNG per exercise and theme: <id>.<theme>.png (or sheets, see --per).
@@ -36,7 +37,7 @@ try {
   execFileSync('npx', ['vitest', 'run', '--config', 'tools/demo-sheets/vitest.config.ts'], {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, DEMO_OUT: json, DEMO_IDS: opt('ids', ''), DEMO_FRAMES: opt('frames', '5') },
+    env: { ...process.env, DEMO_OUT: json, DEMO_IDS: opt('ids', ''), DEMO_FRAMES: opt('frames', '5'), DEMO_BODY: opt('body', 'male') },
   });
 } catch (e) {
   console.error('Exporting frames failed:\n' + (e.stdout || '') + (e.stderr || ''));
