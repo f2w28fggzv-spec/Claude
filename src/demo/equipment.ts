@@ -212,6 +212,11 @@ export function drawEquipment(props: readonly Prop[], f: Figure, floor: number |
           // In a segment's frame the offset turns with it: x along the segment, y toward its +90° side.
           const deg = p.frame ? segmentDeg(f.a, p.frame) : 0;
           const at = p.frame ? add(along(c, deg, o.x), along({ x: 0, y: 0 }, deg + 90, o.y)) : { x: c.x + o.x, y: c.y + o.y };
+          if (p.lever && p.frame) {
+            // The machine's lever: a steel arm from a hub on the joint the segment turns about, out to the pad.
+            const hub = { shin: f.a.knee, thigh: f.a.hip, forearm: f.a.elbow, trunk: f.a.hip }[p.frame];
+            out.front += seg(hub, at, 0.016, STEEL) + circle(hub, 0.017, `fill="${STEEL}"`) + circle(hub, 0.007, `fill="${FILL}"`);
+          }
           if (p.block) {
             const { along: h, across: w } = p.block;
             out.front += `<g transform="translate(${n(at.x)} ${n(at.y)}) rotate(${n(deg)})"><rect x="${n(-w / 2)}" y="${n(-h / 2)}" width="${n(w)}" height="${n(h)}" rx="${n(Math.min(w, h) * 0.4)}" fill="${PAD}"/></g>`;

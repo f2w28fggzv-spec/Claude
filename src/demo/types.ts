@@ -55,8 +55,10 @@ export type Prop =
    * `frame` in that segment's own frame (x along it from the joint above, y
    * toward its +90° side: the back of a hanging limb, the front of the trunk),
    * so the pad turns with it (leg curl, leg extension, hack squat shoulders).
+   * `lever`: the machine's arm from the joint at the top of that segment (the
+   * knee for a shin pad), on which the pad turns.
    */
-  | { kind: 'pad'; at: Attach; offset?: Vec; frame?: 'shin' | 'thigh' | 'forearm' | 'trunk'; block?: { along: number; across: number } }
+  | { kind: 'pad'; at: Attach; offset?: Vec; frame?: 'shin' | 'thigh' | 'forearm' | 'trunk'; block?: { along: number; across: number }; lever?: boolean }
   /** A line that moves with a joint (machine plates, handles); `pad` draws it as a padded surface behind the body. */
   | { kind: 'attached'; at: Attach; from: Vec; to: Vec; width?: number; pad?: boolean }
   | { kind: 'line'; from: Vec; to: Vec; width?: number };

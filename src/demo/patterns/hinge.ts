@@ -347,7 +347,7 @@ export function lyingLegCurl(): Demo {
       { kind: 'line', from: { x: top[2].x, y: handle.y }, to: handle, width: 0.016 },
       { kind: 'bar', at: handle },
       // Roller on the back of the lower calves, just above the heels; it turns with the shin.
-      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: -0.04, y: SKIN.calfLow + ROLLER } },
+      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: -0.04, y: SKIN.calfLow + ROLLER }, lever: true },
     ],
   };
 }
@@ -383,7 +383,7 @@ export function seatedLegCurl(): Demo {
       { kind: 'bar', at: handle },
       { kind: 'pad', at: 'knee', offset: sub(thighPad, add(knee, { x: 0, y: -0.06 })) },
       // Roller on the back of the lower calves, just above the heels, turning with the shin.
-      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: -0.04, y: SKIN.calfLow + ROLLER } },
+      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: -0.04, y: SKIN.calfLow + ROLLER }, lever: true },
     ],
   };
 }
