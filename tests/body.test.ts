@@ -117,15 +117,17 @@ describe('the working muscle stays in view', () => {
     expect(shows(draw(press, { chest: 0 }).nearArm, 'chest', 0)).toBe(false);
   });
 
-  it('never hides a working triceps under the face, and leaves a face beside a raised arm alone', () => {
+  it('never hides a working triceps under the face, and keeps the face over a raised arm by the head', () => {
     // Overhead extension: the upper arm crosses the side of the face with the triceps toward it.
     const extension = draw(posed('side', { torso: 3, head: 3, arm: { upper: 11, fore: -50 } }), { triceps: 0.95 }).nearArm;
     const face = extension.lastIndexOf('var(--fig-face)');
     expect(shows(extension, 'triceps', 0.95)).toBe(true);
     expect(face < 0 || extension.lastIndexOf(fill(0.95)) > face).toBe(true);
-    // Hanging: the profile shows past the arm, as in a real side view. Arm across the face: the face is drawn over it.
-    expect(draw(posed('side', { arm: { upper: 0, fore: 0 } })).nearArm).not.toContain('var(--fig-face)');
+    // While the arm is raised by the head the face is drawn over it (hanging, arm across the face), so it never pops mid-rep;
+    // an arm down by the side leaves the face alone.
+    expect(draw(posed('side', { arm: { upper: 0, fore: 0 } })).nearArm).toContain('var(--fig-face)');
     expect(draw(posed('side', { arm: { upper: 28, fore: -25 } })).nearArm).toContain('var(--fig-face)');
+    expect(draw(posed('side', { arm: { upper: 180, fore: 180 } })).nearArm).not.toContain('var(--fig-face)');
   });
 
   it('draws an arm pointing at the camera as a clean limb seen end-on', () => {

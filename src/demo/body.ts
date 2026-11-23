@@ -119,34 +119,6 @@ const distToSegment = (p: Vec, a: Vec, b: Vec) => {
   const t = clamp(dot(sub(p, a), ab) / Math.max(dot(ab, ab), 1e-9), 0, 1);
   return len(sub(p, add(a, mul(ab, t))));
 };
-/** Whether p lies inside the polygon (even-odd rule). */
-function inside(p: Vec, poly: readonly Vec[]): boolean {
-  let c = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i];
-    const b = poly[j];
-    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) c = !c;
-  }
-  return c;
-}
-/** Points on the closed curve drawn from a control polygon: each edge's midpoint and the curve's point at each corner. */
-function onCurve(p: readonly Vec[]): Vec[] {
-  const n = p.length;
-  const out: Vec[] = [];
-  for (let i = 0; i < n; i++) {
-    const a = p[(i + n - 1) % n];
-    const b = p[(i + 1) % n];
-    out.push(V((a.x + 6 * p[i].x + b.x) / 8, (a.y + 6 * p[i].y + b.y) / 8), mid(p[i], b));
-  }
-  return out;
-}
-/** Whether drawn outlines (control polygons) cover p, their outline stroke included. */
-function covers(shape: readonly (readonly Vec[])[], p: Vec): boolean {
-  return shape.some((poly) => {
-    const c = onCurve(poly);
-    return inside(p, c) || c.some((q, i) => distToSegment(p, q, c[(i + 1) % c.length]) < W);
-  });
-}
 const cubic = (a: Vec, b: Vec, c: Vec, d: Vec, t: number) => {
   const u = 1 - t;
   const [w0, w1, w2, w3] = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
@@ -608,7 +580,6 @@ function armShape(s: Side, arm: Required<Arm>): ArmShape {
   }
   return { Ua, Fa, H, flex, prof, upper: mapped(Ua, prof), fore: mapped(Fa, FOREARM), hand: mapped(H, arm.flat ? FLAT_HAND : FIST) };
 }
-const outlineOf = (A: ArmShape) => [A.upper, A.fore, A.hand];
 /** How far an upper arm has turned to point at the camera: 0 along the picture, 1 seen end-on. */
 const endOnOf = (A: ArmShape) => 1 - smooth((A.Ua.k - 0.15) / 0.2);
 /**
@@ -671,14 +642,20 @@ function sideArm(A: ArmShape, arm: Required<Arm>, pal: Palette, pecTail = 0, bac
   return o + fist;
 }
 
-/** Share of a trunk region (its sample points) hidden behind the near arm. */
+/** How far either side of the arm's edge a sample point eases from shown to hidden, so coverage changes smoothly. */
+const COVER_EDGE = 0.012;
+
+/** Share of a trunk region (its sample points) hidden behind the near arm, easing across the arm's edge so it never jumps between frames. */
 function covered(T: TrunkFrame, s: Side, samples: readonly P2[]): number {
   const parts: [Vec, Vec, number][] = [[s.shoulder, s.elbow, 0.036], [s.elbow, s.wrist, 0.026], [s.wrist, s.hand, 0.026]];
-  const hidden = samples.filter(([t, d]) => {
+  let hidden = 0;
+  for (const [t, d] of samples) {
     const q = T.p(t, d);
-    return parts.some(([a, b, r]) => distToSegment(q, a, b) < r);
-  });
-  return hidden.length / samples.length;
+    // How deep inside the nearest arm part the point lies (negative outside it).
+    const depth = Math.max(...parts.map(([a, b, r]) => r - distToSegment(q, a, b)));
+    hidden += smooth((depth + COVER_EDGE) / (2 * COVER_EDGE));
+  }
+  return hidden / samples.length;
 }
 
 function sideHead(fig: BodyFigure, pal: Palette): string {
@@ -709,30 +686,28 @@ function sideTrunk(fig: BodyFigure, T: TrunkFrame, pal: Palette): string {
   return o + sideHead(fig, pal);
 }
 
-/** Points just inside the face's profile: forehead, brow, nose, upper lip, chin. */
-const PROFILE_PTS: P2[] = [[0.039, 0.038], [0.046, 0.018], [0.06, -0.015], [0.048, -0.029], [0.044, -0.056]];
-
 /**
  * The near arm is nearer the camera than the head, so it is painted over it.
- * Raised beside the ear (overhead press at lockout, hanging) it still leaves
- * the face's profile in view, as a real side view does. When it crosses in
- * front of the face and hides most of the profile, the face is drawn again
- * over it, as if the head were just through the arms, so the figure never
- * reads as headless; an arm muscle the face would cover that is doing the
- * main work at that moment (the triceps in an overhead extension) is painted
- * back over the face.
+ * While it is raised beside the head the face is drawn again over it, as if
+ * the head were just through the arms, so the figure never reads as
+ * headless; that switches only as the arm comes up past the shoulder or
+ * moves away from the head, where the arm is clear of the face, so it never
+ * pops mid-press. An arm muscle the face would cover that is doing the main
+ * work (the triceps in an overhead extension) is painted back over the face,
+ * fading in as it becomes the hardest-working muscle.
  */
 function faceOverArm(fig: BodyFigure, s: Side, A: ArmShape, pal: Palette, armPal: Palette): string {
   const near = Math.min(distToSegment(fig.head, s.shoulder, s.elbow), distToSegment(fig.head, s.elbow, s.wrist), distToSegment(fig.head, s.wrist, s.hand));
   const raised = dot(sub(s.elbow, s.shoulder), dir(fig.pose.torso + fig.pose.bend)) > 0.02;
   if (near > 0.085 || !raised) return '';
   const Hf = headFrame(fig);
-  const arm = outlineOf(A);
-  if (PROFILE_PTS.filter(([x, y]) => !covers(arm, Hf.p(x, y))).length >= 3) return '';
   let o = solid(closed(mapped(Hf, FACE)), pal) + path(closed(mapped(Hf, EYE)) + closed(mapped(Hf, BROW)), 'fill="var(--fig-face)"');
   const hardest = Math.max(...MUSCLE_GROUPS.map((g) => pal.lv(g)));
   const seen = 1 - 2 * endOnOf(A);
-  for (const g of ['triceps', 'biceps'] as const) if (seen > 0 && armPal.lv(g) > 0.05 && armPal.lv(g) >= hardest - 0.05) o += armMuscle(A, g, armPal, seen);
+  for (const g of ['triceps', 'biceps'] as const) {
+    const show = seen * smooth((armPal.lv(g) - hardest + 0.1) / 0.1);
+    if (show > 0.01 && armPal.lv(g) > 0.05) o += armMuscle(A, g, armPal, show);
+  }
   return o;
 }
 
@@ -748,8 +723,9 @@ function drawSide(fig: BodyFigure, c: BodyContext): BodyLayers {
   const legHidden = (['hip', 'knee', 'ankle', 'heel', 'ball', 'toe'] as const).every((k) => samePoint(a[k], b[k]));
   const armHidden = (['shoulder', 'elbow', 'wrist', 'hand'] as const).every((k) => samePoint(a[k], b[k])) && pose.arm.flat === pose.arm2.flat;
   // When the near arm covers most of the chest or of a working back, that muscle's tendon is drawn onto the arm.
-  const pecTail = smooth((covered(T, a, PEC_SAMPLES) - 0.35) / 0.3) * smooth(trunkPal.lv('chest') / 0.3);
-  const backTail = smooth((covered(T, a, BACK_SAMPLES) - 0.35) / 0.3) * smooth(trunkPal.lv('back') / 0.3);
+  // A back that only steadies (a good morning's, at most 0.5) keeps its fold off the arm.
+  const pecTail = smooth((covered(T, a, PEC_SAMPLES) - 0.3) / 0.4) * smooth(trunkPal.lv('chest') / 0.3);
+  const backTail = smooth((covered(T, a, BACK_SAMPLES) - 0.3) / 0.4) * smooth((trunkPal.lv('back') - 0.5) / 0.25);
   const nearArm = armShape(a, pose.arm);
   return {
     far: (armHidden ? '' : sideArm(armShape(b, pose.arm2), pose.arm2, farPal)) + (legHidden ? '' : sideLeg(b, pose.leg2, T, farPal)),
