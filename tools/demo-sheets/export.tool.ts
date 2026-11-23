@@ -27,11 +27,23 @@ it('export demo frames', () => {
       aspect: box.w / box.h,
       firstPhase: e.tracking.kind === 'reps' ? e.tracking.firstPhase : 'hold',
       muscles: spec.muscles.map((m) => ({ group: m.group, role: m.role, peak: m.peak })),
-      frames: steps.map((s) => ({
-        s,
-        // Levels as when lifting through (or holding at) this position.
-        svg: frameMarkup(e.demo, s, hold ? peakLevels(spec) : levelsAt(spec, { phase: 'out', s, u: s, action: 'lifting' }), box, `${e.id}-${Math.round(s * 100)}`),
-      })),
+      frames: [
+        ...steps.map((s) => ({
+          s: String(s),
+          // Levels as when lifting through (or holding at) this position.
+          svg: frameMarkup(e.demo, s, hold ? peakLevels(spec) : levelsAt(spec, { phase: 'out', s, u: s, action: 'lifting' }), box, `${e.id}-${Math.round(s * 100)}`),
+        })),
+        // A demo with its own way back (Demo.back) also shows that path, from the turnaround back to the start.
+        ...(e.demo.back
+          ? steps
+              .slice(1, -1)
+              .reverse()
+              .map((s) => ({
+                s: `back ${s}`,
+                svg: frameMarkup(e.demo, s, levelsAt(spec, { phase: 'back', s, u: 1 - s, action: 'lifting' }), box, `${e.id}-b${Math.round(s * 100)}`, true),
+              }))
+          : []),
+      ],
     };
   });
   writeFileSync(process.env.DEMO_OUT!, JSON.stringify(out));
