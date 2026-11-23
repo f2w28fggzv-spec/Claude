@@ -690,15 +690,23 @@ export function legExtension(): Demo {
   const [b0, b1] = restingPad(pose, add(along(O, torso, 0.44), behind), add(along(O, torso, 0.02), behind), /hand|forearm/);
   const seatY = BODY.thighBack + PAD_HALF;
   const [s0, s1] = restingPad(pose, { x: -0.06, y: seatY }, { x: 0.165, y: seatY }, /hand|forearm/);
+  // The machine's lever pivots on an axle in line with the knee, mounted on the seat's front, and
+  // swings with the shin: an arm down the side of the leg from the pivot hub, and an axle across to the
+  // roller on the front of the shins just above the ankles.
+  const knee = solve('side', pose(0)).a.knee;
+  const roller = { x: -0.04, y: -(BODY.shinFront + 0.037) };
   return {
     view: 'side',
     floor: 0.33,
     pose,
     props: [
+      { kind: 'line', from: knee, to: { x: s1.x, y: s1.y + 0.03 }, width: 0.02 },
       { kind: 'bench', points: [b0, crossing(b0, b1, s0, s1), s1], legs: true },
       { kind: 'bar', at: SEAT_HANDLE },
-      // Roller on the front of the shins just above the ankles, turning with them.
-      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: -0.04, y: -(BODY.shinFront + 0.037) } },
+      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: (roller.x - L.shin) / 2, y: 0 }, block: { along: L.shin + roller.x, across: 0.016 } },
+      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: -L.shin, y: 0 }, block: { along: 0.034, across: 0.034 } },
+      { kind: 'pad', at: 'ankle', frame: 'shin', offset: { x: roller.x, y: roller.y / 2 }, block: { along: 0.016, across: -roller.y } },
+      { kind: 'pad', at: 'ankle', frame: 'shin', offset: roller },
     ],
   };
 }
