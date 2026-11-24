@@ -7,7 +7,7 @@ import { Logo } from '../ui/Logo';
 import { Icon } from './icons';
 import { Screen } from './Layout';
 
-const UPDATED = '12 November 2026';
+const UPDATED = '24 November 2026';
 
 /** First-launch screen. Continuing accepts the terms and privacy policy. */
 export function Welcome({ onDone }: { onDone: () => void }) {
@@ -60,8 +60,9 @@ export function TermsScreen() {
 
         <h2>1. What the app does</h2>
         <p>
-          fitee builds training plans, lets you log workouts, and gives automated technique feedback from your phone’s camera. It runs in your web browser.
-          There is no account and no server: your data stays on your device (see the Privacy policy).
+          fitee builds training plans, lets you log workouts, and gives automated technique feedback from your phone’s camera. It runs in your web browser, or
+          from your home screen if you add it there, and keeps a copy of its own files on your device so it works without a connection. There is no account
+          and no server: your data stays on your device (see the Privacy policy).
         </p>
 
         <h2>2. Not medical advice</h2>
@@ -92,7 +93,8 @@ export function TermsScreen() {
         <p>
           Your plans, log, profile and any videos you choose to save are stored only in this browser on this device. You are responsible for backing them up
           (Settings → Back up my data). Clearing your browser’s site data, using private browsing, or deleting the app’s data removes them, and they can’t be
-          recovered by anyone else, because no one else has a copy. Backups don’t include saved videos or replays.
+          recovered by anyone else, because no one else has a copy. On iPhone and iPad, an app added to the home screen keeps its own data, apart from
+          Safari, and deleting it from the home screen deletes that data. Backups don’t include saved videos or replays.
         </p>
 
         <h2>7. Ownership and licences</h2>
@@ -138,6 +140,12 @@ export function PrivacyScreen() {
           <li>Videos of your sets, only if you tap “Save video” after a technique check.</li>
           <li>Calibration recordings, if you use the hidden calibration screen (numbers only).</li>
         </ul>
+        <p>
+          The app also keeps a copy of its own files and of the pose-detection model in this browser’s cache on your device (Cache Storage), so it opens and
+          works without a connection. This copy holds no data about you: it is the same for everyone who uses the app. The app itself is saved the first time
+          you open it. The pose model (about 24 MB) is saved the first time you use a technique check or the camera test, when you tap “Save for offline use”
+          in Settings, or by itself when you open the app from your home screen while online (not when your phone’s data saver is on).
+        </p>
         <p>None of this is sent to the developers or any third party. We can’t see it, and we can’t recover it for you.</p>
 
         <h2>2. The camera</h2>
@@ -149,16 +157,25 @@ export function PrivacyScreen() {
 
         <h2>3. Network requests</h2>
         <p>
-          The app’s files (including the pose model and the font) are downloaded from the website that hosts it, GitHub Pages. GitHub may log technical information, such
-          as your IP address, when your browser downloads them; see GitHub’s privacy statement. After that, the app blocks requests to any other server. There
-          are no analytics, no advertising, no tracking cookies and no third-party scripts.
+          The app’s files (including the pose model and the font) are downloaded from the website that hosts it, GitHub Pages. GitHub may log technical
+          information, such as your IP address, when your browser downloads them; see GitHub’s privacy statement. When you’re online, your browser also checks
+          that website for a newer version of the app, and downloads only the files that changed. Apart from that, the app blocks requests to any other
+          server, in three ways: in its own code, with a content security policy, and in the service worker that keeps its offline copy. There are no
+          analytics, no advertising, no tracking cookies and no third-party scripts.
         </p>
 
         <h2>4. Your choices and control</h2>
         <ul>
           <li>Every profile field is optional.</li>
           <li>Delete a workout, a saved video or a replay at any time from where it is shown.</li>
-          <li>Settings → Delete all my data removes everything the app stored on this device.</li>
+          <li>
+            Settings → Delete all my data removes everything the app stored about you on this device. It leaves the offline copy of the app, which holds none
+            of your data.
+          </li>
+          <li>
+            To remove the offline copy too, clear this site’s data in your browser’s settings, or on iPhone and iPad delete the app from your home screen. Both
+            also delete your data in that browser or app, so back it up first.
+          </li>
           <li>Backups you export are files on your device; you decide where they go.</li>
         </ul>
 

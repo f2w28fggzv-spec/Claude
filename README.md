@@ -24,6 +24,43 @@ npm test         # run tests
 
 The camera only works over HTTPS, so plain `http://<ip>` will not work.
 
+## Install on your phone
+
+Open https://f2w28fggzv-spec.github.io/Claude/ and add it to your home screen:
+
+- **iPhone or iPad (Safari):** tap *Share*, then *Add to Home Screen*. The
+  home-screen app keeps its own data, apart from Safari: to bring your plans
+  and log, use *Settings → Back up my data* in Safari, then *Restore from a
+  backup* in the app.
+- **Android (Chrome):** *Settings → Install and offline → Install fitee*, or
+  the browser menu's *Install app* / *Add to Home screen*.
+
+It then opens like an app, on its own, without the browser bars.
+
+## Offline use
+
+A service worker (`src/offline/`, written into the build as `sw.js`) keeps a
+copy of the app in the browser's cache, so it opens and every screen works
+with no signal. Technique checks also need the pose model (about 24 MB): the
+installed app saves it by itself on its first launch online; in a browser tab
+it's saved the first time you use a technique check, or with *Settings →
+Install and offline → Save for offline use*. Settings shows what is saved.
+
+Nothing leaves the device: the service worker only loads this site's own files
+and refuses every request to another origin (on top of `src/privacy.ts` and the
+page's Content Security Policy). The offline copy holds none of your data.
+New versions download in the background (only the files that changed) and
+apply the next time you open the app, or with *Update now* in Settings.
+
+Check it end to end (Chromium via Playwright, fake camera):
+
+```sh
+npm run offline:check -- --work /tmp/offline-check --port 4180
+```
+
+The service worker is only registered in production builds, so `npm run dev`
+always serves fresh files.
+
 ## Deploy (GitHub Pages)
 
 `.github/workflows/deploy.yml` builds and deploys on every push to `main`

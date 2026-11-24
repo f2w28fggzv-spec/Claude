@@ -134,6 +134,9 @@ const ICONS = {
   minus: <path d="M5 12h14" />,
   flip: <path d="M4.5 10.5A7.5 7.5 0 0 1 18 7l1.5 1.5M19.5 4v4.5H15M19.5 13.5A7.5 7.5 0 0 1 6 17l-1.5-1.5M4.5 20v-4.5H9" />,
   edit: <path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" />,
+  /** The iPhone Share button: a tray with an arrow out of it. */
+  share: <path d="M12 3.5v11M8 7.5l4-4 4 4M8.5 10.5H6v10h12v-10h-2.5" />,
+  download: <path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" />,
 } satisfies Record<string, Shape>;
 
 export type IconName = keyof typeof ICONS;

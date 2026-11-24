@@ -17,10 +17,14 @@
     ],
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src",
     "vite.config.ts"
+  ],
+  "exclude": [
+    "src/offline/sw.ts"
   ]
 }

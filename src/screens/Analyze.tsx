@@ -450,9 +450,20 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
               <small>Sharper, if someone films you</small>
             </button>
           </div>
-          <button type="button" class="big" disabled={!cam.ready} onClick={startCamera}>
-            <Icon name="camera" size={22} /> {cam.ready ? 'Start camera' : 'Loading…'}
-          </button>
+          {cam.modelError ? (
+            <>
+              <p class="note" role="status">
+                {cam.modelError}
+              </p>
+              <button type="button" class="big" onClick={cam.retryModel}>
+                Try again
+              </button>
+            </>
+          ) : (
+            <button type="button" class="big" disabled={!cam.ready} onClick={startCamera}>
+              <Icon name="camera" size={22} /> {cam.ready ? 'Start camera' : 'Loading…'}
+            </button>
+          )}
           <button type="button" class="link center" disabled={!cam.ready} onClick={pickFile}>
             <Icon name="video" size={18} /> Use a video instead
           </button>

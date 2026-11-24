@@ -1170,3 +1170,13 @@ svg.anatomy { display: block; }
 .day-sheet .day-summary { margin: 4px 0 6px; }
 .day-sheet .card { background: var(--sunken); box-shadow: none; }
 .day-sheet .log-past { margin: 14px 0 0; }
+
+/* Settings → Install and offline: status rows with their button below the words. */
+.rows li.status-row { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 2px; min-height: 56px; }
+.status-row .row-main strong { display: inline-flex; align-items: center; gap: 6px; }
+.status-row .row-main strong svg.icon { color: var(--good-text); }
+.status-row .row-main small svg.icon { display: inline-block; vertical-align: -3px; color: var(--text); }
+.status-row .small-btn { align-self: flex-start; gap: 6px; }
+.status-row .small-btn svg.icon { color: inherit; }
+.status-row progress { margin: 0; }
+.status-rows + .muted { margin: 10px 2px 0; }

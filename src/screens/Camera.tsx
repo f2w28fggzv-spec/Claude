@@ -31,10 +31,21 @@ export function Camera({ exerciseId }: { exerciseId?: string }) {
       )}
       {!exercise && !cam.running && <p class="muted">Checks that pose tracking works on this phone. Nothing is recorded.</p>}
       <CameraStage cam={cam} />
+      {cam.modelError && !cam.running && (
+        <p class="note" role="status">
+          {cam.modelError}
+        </p>
+      )}
       {!cam.running ? (
-        <button type="button" disabled={!cam.ready} onClick={() => cam.start()}>
-          {cam.ready ? 'Start camera' : 'Loading pose model…'}
-        </button>
+        cam.modelError ? (
+          <button type="button" onClick={cam.retryModel}>
+            Try again
+          </button>
+        ) : (
+          <button type="button" disabled={!cam.ready} onClick={() => cam.start()}>
+            {cam.ready ? 'Start camera' : 'Loading pose model…'}
+          </button>
+        )
       ) : (
         <div class="controls">
           <button type="button" class="secondary" onClick={cam.flip}>
