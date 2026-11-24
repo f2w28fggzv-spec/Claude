@@ -8,11 +8,15 @@ import {
   installHint,
   LAUNCH_WINDOW_MS,
   looksLikeNetworkError,
+  mayAutoSave,
   modelErrorMessage,
+  NO_ROOM_RETRY_MS,
   offlineView,
   POSE_NEEDS_CONNECTION,
   POSE_NOT_SAVED,
   poseSaved,
+  poseToSave,
+  variantNotSaved,
   type OfflineFacts,
 } from '../src/offline/state';
 import type { WorkerStatus } from '../src/offline/worker';
@@ -50,6 +54,7 @@ describe('install hint', () => {
 
 const status = (saved: string[], appSaved = 3): WorkerStatus => ({
   version: 'v1',
+  noRoom: false,
   app: { files: 3, saved: appSaved, bytes: 900_000 },
   pose: [
     { url: 'mediapipe/models/pose_landmarker_full.task', size: 9_398_198, saved: false },
@@ -64,21 +69,40 @@ const SIMD_FULL = ['pose_landmarker_full.task', 'vision_wasm_internal.js', 'visi
 const NOSIMD_FULL = ['pose_landmarker_full.task', 'vision_wasm_nosimd_internal.js', 'vision_wasm_nosimd_internal.wasm'];
 
 describe('offline state', () => {
-  const view = (o: Partial<OfflineFacts>) => offlineView({ simd: true, saveFailed: false, online: true, ...o });
+  const view = (o: Partial<OfflineFacts>) => offlineView({ worker: 'active', simd: true, saveFailed: false, noRoom: false, online: true, ...o });
 
   it('is off without a service worker, saying why', () => {
     expect(view({ off: 'unsupported' })).toEqual({ kind: 'off', reason: 'unsupported' });
     expect(view({ off: 'dev', status: status(SIMD_FULL) })).toEqual({ kind: 'off', reason: 'dev' });
   });
-  it('is saving the app until every file of it is saved', () => {
-    expect(view({})).toEqual({ kind: 'saving-app' });
+  it('is saving the app while the first version installs, until every file of it is saved', () => {
+    expect(view({ worker: 'installing' })).toEqual({ kind: 'saving-app' });
     expect(view({ status: status([], 2) })).toEqual({ kind: 'saving-app' });
   });
-  it('has the app but not the pose model, with its size', () => {
-    expect(view({ status: status(['vision_wasm_internal.js']) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, failed: false, online: true });
-    expect(view({ status: status([]), simd: false, saveFailed: true, online: false })).toEqual({ kind: 'app-only', poseBytes: 22_647_530, failed: true, online: false });
+  it('is only checking, not saving, while a running service worker hasn’t answered yet', () => {
+    expect(view({})).toEqual({ kind: 'checking' });
+    expect(view({ worker: 'unknown' })).toEqual({ kind: 'checking' });
+  });
+  it('says so when saving the app failed, instead of saving forever', () => {
+    expect(view({ worker: 'failed' })).toEqual({ kind: 'app-failed', online: true });
+    expect(view({ worker: 'failed', online: false })).toEqual({ kind: 'app-failed', online: false });
+  });
+  it('has the app but not the pose model, with what saving it downloads', () => {
+    expect(view({ status: status([]) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, failed: false, noRoom: false, online: true });
+    expect(view({ status: status(['vision_wasm_internal.js']) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980 - 334_128, failed: false, noRoom: false, online: true });
+    expect(view({ status: status([]), simd: false, saveFailed: true, online: false })).toEqual({
+      kind: 'app-only',
+      poseBytes: 22_647_530,
+      failed: true,
+      noRoom: false,
+      online: false,
+    });
     // The no-SIMD runtime doesn't help a SIMD browser, and the lite model isn't the default.
     expect(view({ status: status([...NOSIMD_FULL, 'lite.task']) }).kind).toBe('app-only');
+    expect(poseToSave(status(['full.task']), true).map((p) => p.url)).toEqual(['mediapipe/wasm/vision_wasm_internal.js', 'mediapipe/wasm/vision_wasm_internal.wasm']);
+  });
+  it('says when there was no room on the phone for the pose model', () => {
+    expect(view({ status: status([]), noRoom: true })).toMatchObject({ kind: 'app-only', noRoom: true });
   });
   it('shows progress while saving the pose model', () => {
     expect(view({ status: status([]), saving: { done: 5e6, total: 24e6 } })).toEqual({ kind: 'saving-pose', done: 5e6, total: 24e6 });
@@ -109,7 +133,17 @@ describe('pose model message', () => {
     expect(msg({})).toBe(POSE_NOT_SAVED);
     expect(msg({ error: new TypeError('Load failed') })).toBe(POSE_NOT_SAVED); // Safari
     expect(msg({ error: new Event('error') })).toBe(POSE_NOT_SAVED); // the runtime's script didn't load
-    expect(POSE_NOT_SAVED).toBe('The pose model isn’t saved on this phone yet. Connect to the internet once, then technique checks work offline.');
+    // Closing the app stops a save, so it says to keep it open.
+    expect(POSE_NOT_SAVED).toBe(
+      'The pose model isn’t saved on this phone yet. Connect to the internet and keep fitee open while it loads; after that, technique checks work offline.',
+    );
+  });
+  it('points to the saved model where people choose one (the camera test)', () => {
+    expect(msg({ online: false, choice: { variant: 'lite', saved: 'full' } })).toBe(variantNotSaved('lite', 'full'));
+    expect(variantNotSaved('lite', 'full')).toBe(
+      'The Lite model isn’t saved on this phone, but the Full one is: choose Full, or connect to the internet to load Lite.',
+    );
+    expect(msg({ online: false, choice: { variant: 'lite', saved: 'full' }, offlineAvailable: false })).toBe(POSE_NEEDS_CONNECTION);
   });
   it('does not promise offline use where this browser can’t keep it', () => {
     expect(msg({ online: false, offlineAvailable: false })).toBe(POSE_NEEDS_CONNECTION);
@@ -123,6 +157,27 @@ describe('pose model message', () => {
     expect(looksLikeNetworkError(new TypeError('NetworkError when attempting to fetch resource.'))).toBe(true);
     expect(looksLikeNetworkError(new Error('Aborted(both async and sync fetching of the wasm failed)'))).toBe(true);
     expect(looksLikeNetworkError(new TypeError('x is undefined'))).toBe(false);
+  });
+});
+
+describe('when an installed app saves the pose model by itself', () => {
+  const NOW = Date.UTC(2026, 10, 24);
+  const may = (o: Partial<Parameters<typeof mayAutoSave>[0]>) =>
+    mayAutoSave({ standalone: true, online: true, saveData: false, termsAccepted: true, now: NOW, ...o });
+
+  it('only from the home screen, online, once the terms that describe it are accepted', () => {
+    expect(may({})).toBe(true);
+    expect(may({ standalone: false })).toBe(false);
+    expect(may({ online: false })).toBe(false);
+    expect(may({ termsAccepted: false })).toBe(false);
+  });
+  it('not where the browser reports Data Saver', () => {
+    expect(may({ saveData: true })).toBe(false);
+  });
+  it('not again for a week after a save found no room, so a full phone doesn’t download it at every launch', () => {
+    expect(may({ noRoomAt: NOW - 60_000 })).toBe(false);
+    expect(may({ noRoomAt: NOW - NO_ROOM_RETRY_MS + 1 })).toBe(false);
+    expect(may({ noRoomAt: NOW - NO_ROOM_RETRY_MS })).toBe(true);
   });
 });
 

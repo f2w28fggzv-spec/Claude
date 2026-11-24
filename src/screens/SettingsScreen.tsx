@@ -72,7 +72,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <Screen title="Settings" back={from} tab={TAB_OF[from]}>
+    <Screen title="Settings" back={from} tab={TAB_OF[from]} noSaveNote>
       <h2 class="field">Weight unit</h2>
       <div class="segmented-2">
         {(['kg', 'lb'] as const).map((u) => (

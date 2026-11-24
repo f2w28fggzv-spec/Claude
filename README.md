@@ -28,10 +28,13 @@ The camera only works over HTTPS, so plain `http://<ip>` will not work.
 
 Open https://f2w28fggzv-spec.github.io/Claude/ and add it to your home screen:
 
-- **iPhone or iPad (Safari):** tap *Share*, then *Add to Home Screen*. The
-  home-screen app keeps its own data, apart from Safari: to bring your plans
-  and log, use *Settings → Back up my data* in Safari, then *Restore from a
-  backup* in the app.
+- **iPhone or iPad (Safari):** tap *Share*, then *Add to Home Screen*, then
+  open it once while you're online and leave it open until it has saved the
+  pose model (about 24 MB; it shows how far it has got, and *Settings* says
+  *Ready to use offline*): the home-screen app has its own storage, apart
+  from Safari, so it saves itself (and the pose model) on that first launch.
+  To bring your plans and log, use *Settings → Back up my data* in Safari,
+  then *Restore from a backup* in the app.
 - **Android (Chrome):** *Settings → Install and offline → Install fitee*, or
   the browser menu's *Install app* / *Add to Home screen*.
 
@@ -42,15 +45,30 @@ It then opens like an app, on its own, without the browser bars.
 A service worker (`src/offline/`, written into the build as `sw.js`) keeps a
 copy of the app in the browser's cache, so it opens and every screen works
 with no signal. Technique checks also need the pose model (about 24 MB): the
-installed app saves it by itself on its first launch online; in a browser tab
-it's saved the first time you use a technique check, or with *Settings →
-Install and offline → Save for offline use*. Settings shows what is saved.
+installed app saves it by itself on its first launch online, once the terms
+are accepted (not where the browser reports Data Saver; iPhones don't report
+Low Data Mode to websites); in a browser tab it's saved the first time you
+use a technique check, or with *Settings → Install and offline → Save for
+offline use*. While it saves, every screen says so (keep the app open until
+it's done). Settings shows what is saved, and says so if there's no room on
+the phone for it.
 
-Nothing leaves the device: the service worker only loads this site's own files
-and refuses every request to another origin (on top of `src/privacy.ts` and the
-page's Content Security Policy). The offline copy holds none of your data.
-New versions download in the background (only the files that changed) and
-apply the next time you open the app, or with *Update now* in Settings.
+Nothing leaves the device: the service worker only loads this site's own files,
+never follows a redirect, and refuses every request to another origin (on top
+of `src/privacy.ts` and the page's Content Security Policy). The offline copy
+holds none of your data. Before downloading a file it looks in the browser's
+own HTTP cache, keeping a copy only if its SHA-256 matches the build's list,
+and it downloads each file once however many requests ask for it. New versions
+download in the background (only the files that changed; each pose file has a
+cache of its own, so a new model doesn't copy the rest) and apply the next time
+you open the app, or with *Update now* in Settings. A version that fails to
+download leaves the current one working; the browser tries again later. If the
+very first save fails, Settings says so and offers *Try again*.
+
+Keep `sw.js` at its URL: a 404 or a redirect there leaves installed phones on
+their old version. To retire offline use (or before moving the app to another
+address), deploy a `sw.js` that deletes the `fitee-*` caches and unregisters
+itself, with no fetch handler.
 
 Check it end to end (Chromium via Playwright, fake camera):
 

@@ -37,7 +37,8 @@ export function cameraErrorMessage(err: unknown): string {
 
 export function usePoseCamera(
   onFrame?: (f: LiveFrame) => void,
-  opts: { initialFacing?: Facing; onFacingChange?: (f: Facing) => void } = {},
+  /** `choosable`: the page offers both models (the camera test), so a failed one can point to the other. */
+  opts: { initialFacing?: Facing; onFacingChange?: (f: Facing) => void; choosable?: boolean } = {},
 ) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,12 +68,15 @@ export function usePoseCamera(
     let cancelled = false;
     setReady(false);
     setModelError('');
+    setStats(null); // the readout names the model; a new one fills it in
     loadModel(variant)
       .then(() => !cancelled && setReady(true))
       .catch((err: unknown) => {
         if (cancelled) return;
         console.warn('Pose model failed to load', err);
-        setModelError(modelErrorMessage({ online: navigator.onLine, saved: poseFilesSaved(variant), offlineAvailable: offlineAvailable(), error: err }));
+        const other: ModelVariant = variant === 'full' ? 'lite' : 'full';
+        const choice = opts.choosable && poseFilesSaved(other) ? { variant, saved: other } : undefined;
+        setModelError(modelErrorMessage({ online: navigator.onLine, saved: poseFilesSaved(variant), offlineAvailable: offlineAvailable(), error: err, choice }));
       });
     return () => {
       cancelled = true;

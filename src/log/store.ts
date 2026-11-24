@@ -128,13 +128,19 @@ export function saveCustomExercise(c: CustomExercise): boolean {
 
 /** Every key this app stores, for backup / restore / delete-all. */
 export const ALL_KEYS_PREFIX = 'formcheck.v1.';
+/**
+ * Keys about this phone rather than the user's data (e.g. that the pose model
+ * didn't fit on it): deleted with everything else, never backed up or restored.
+ */
+export const DEVICE_KEYS_PREFIX = `${ALL_KEYS_PREFIX}device.`;
+const backedUp = (k: string) => k.startsWith(ALL_KEYS_PREFIX) && !k.startsWith(DEVICE_KEYS_PREFIX);
 
 export function exportAll(): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k?.startsWith(ALL_KEYS_PREFIX)) out[k] = JSON.parse(localStorage.getItem(k) ?? 'null');
+      if (k && backedUp(k)) out[k] = JSON.parse(localStorage.getItem(k) ?? 'null');
     }
   } catch {
     // Storage blocked: nothing to export.
@@ -151,7 +157,7 @@ export function importAll(backup: unknown): number {
   customCache = null;
   resetProfileCache();
   for (const [k, v] of Object.entries(b.data)) {
-    if (k.startsWith(ALL_KEYS_PREFIX) && write(k, v)) n++;
+    if (backedUp(k) && write(k, v)) n++;
   }
   return n;
 }

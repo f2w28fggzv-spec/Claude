@@ -10,12 +10,15 @@ import { CameraStage, ModelPicker } from './CameraStage';
 export function Camera({ exerciseId }: { exerciseId?: string }) {
   const exercise = exerciseId ? getExercise(exerciseId) : undefined;
   const [debug, setDebug] = useState('');
-  const cam = usePoseCamera(({ frame }: LiveFrame) => {
-    const lines: string[] = [];
-    if (!frame.lm) lines.push('No person detected');
-    else for (const [name, i] of Object.entries(LM)) lines.push(`${name.padEnd(14)} y=${frame.lm[i][1].toFixed(3)}  vis=${frame.lm[i][3].toFixed(2)}`);
-    setDebug(lines.join('\n'));
-  });
+  const cam = usePoseCamera(
+    ({ frame }: LiveFrame) => {
+      const lines: string[] = [];
+      if (!frame.lm) lines.push('No person detected');
+      else for (const [name, i] of Object.entries(LM)) lines.push(`${name.padEnd(14)} y=${frame.lm[i][1].toFixed(3)}  vis=${frame.lm[i][3].toFixed(2)}`);
+      setDebug(lines.join('\n'));
+    },
+    { choosable: true },
+  );
 
   return (
     <Screen title={exercise ? exercise.name : 'Camera test'} back={exercise ? `exercise/${exercise.id}` : ''}>
@@ -31,7 +34,8 @@ export function Camera({ exerciseId }: { exerciseId?: string }) {
       )}
       {!exercise && !cam.running && <p class="muted">Checks that pose tracking works on this phone. Nothing is recorded.</p>}
       <CameraStage cam={cam} />
-      {cam.modelError && !cam.running && (
+      {/* Also while the camera runs: a model chosen then may fail to load. */}
+      {cam.modelError && (
         <p class="note" role="status">
           {cam.modelError}
         </p>
@@ -58,7 +62,7 @@ export function Camera({ exerciseId }: { exerciseId?: string }) {
       )}
       <ModelPicker cam={cam} />
       {cam.error && <p class="error">{cam.error}</p>}
-      {cam.running && (
+      {cam.running && !cam.modelError && (
         <pre class="debug">
           {cam.stats &&
             `${cam.stats.variant} model · ${cam.stats.delegate} · ${cam.stats.width}x${cam.stats.height}\n${cam.stats.fps.toFixed(0)} fps · ${cam.stats.inferMs.toFixed(0)} ms/frame\n`}

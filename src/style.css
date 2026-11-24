@@ -1180,3 +1180,12 @@ svg.anatomy { display: block; }
 .status-row .small-btn svg.icon { color: inherit; }
 .status-row progress { margin: 0; }
 .status-rows + .muted { margin: 10px 2px 0; }
+
+/* "Saving for offline use": on every screen but Settings while the pose model saves (closing fitee stops it). */
+.save-note {
+  display: flex; flex-direction: column; gap: 8px; margin: 16px 0 18px; padding: 12px 14px; border-radius: 16px;
+  background: var(--card); box-shadow: var(--shadow); color: var(--muted); font-size: 0.9rem; line-height: 1.35;
+  animation: rise-in 300ms var(--ease) both;
+}
+.save-note strong { color: var(--text); margin-right: 2px; }
+.save-note progress { margin: 0; height: 8px; }

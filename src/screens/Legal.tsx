@@ -94,7 +94,7 @@ export function TermsScreen() {
           Your plans, log, profile and any videos you choose to save are stored only in this browser on this device. You are responsible for backing them up
           (Settings → Back up my data). Clearing your browser’s site data, using private browsing, or deleting the app’s data removes them, and they can’t be
           recovered by anyone else, because no one else has a copy. On iPhone and iPad, an app added to the home screen keeps its own data, apart from
-          Safari, and deleting it from the home screen deletes that data. Backups don’t include saved videos or replays.
+          the browser you added it from, and deleting it from the home screen deletes that data. Backups don’t include saved videos or replays.
         </p>
 
         <h2>7. Ownership and licences</h2>
@@ -144,7 +144,9 @@ export function PrivacyScreen() {
           The app also keeps a copy of its own files and of the pose-detection model in this browser’s cache on your device (Cache Storage), so it opens and
           works without a connection. This copy holds no data about you: it is the same for everyone who uses the app. The app itself is saved the first time
           you open it. The pose model (about 24 MB) is saved the first time you use a technique check or the camera test, when you tap “Save for offline use”
-          in Settings, or by itself when you open the app from your home screen while online (not when your phone’s data saver is on).
+          in Settings, or by itself when you open the app from your home screen while online, once you’ve accepted this policy. It isn’t downloaded by itself
+          when your browser reports that data saver is on (Chrome on Android reports it; iPhones and iPads don’t report Low Data Mode to websites, so they
+          download it either way), or for a week after it didn’t fit on your device.
         </p>
         <p>None of this is sent to the developers or any third party. We can’t see it, and we can’t recover it for you.</p>
 

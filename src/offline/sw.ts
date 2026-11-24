@@ -6,9 +6,11 @@
 //
 // It never sends anything anywhere: the only requests it makes are for this
 // site's own files (to install a version, and to save pose files as they're
-// used), and it answers every request to another origin with a network
-// error, a third layer after src/privacy.ts and the page's CSP. No
-// analytics, logging or beacons.
+// used; it looks in the browser's HTTP cache first, which never touches the
+// network), it never follows a redirect (which could lead to another site),
+// and it answers every request to another origin with a network error, a
+// third layer after src/privacy.ts and the page's CSP. No analytics, logging
+// or beacons.
 import type { PrecacheManifest } from './manifest';
 import { activate, install, respond, routeRequest, status, type ToWorker, type WorkerEnv } from './worker';
 
@@ -18,16 +20,25 @@ declare const __FITEE_PRECACHE__: PrecacheManifest;
 const worker = self as unknown as ServiceWorkerGlobalScope;
 const manifest = __FITEE_PRECACHE__;
 const base = new URL('./', worker.location.href).href;
-const pending = new Map<string, Promise<boolean>>();
+const saving: WorkerEnv['saving'] = new Map();
+const state: WorkerEnv['state'] = { noRoom: new Set() };
 
-/** The only way this worker loads anything: this site's own files. */
-function ownFetch(url: string, init: RequestInit): Promise<Response> {
+/** The only way this worker loads anything: this site's own files, never through a redirect. */
+async function ownFetch(url: string, init: RequestInit): Promise<Response> {
   const target = new URL(url, base);
-  if (target.origin !== worker.location.origin) return Promise.reject(new TypeError('fitee only loads its own files.'));
-  return fetch(target.href, init);
+  if (target.origin !== worker.location.origin) throw new TypeError('fitee only loads its own files.');
+  const res = await fetch(target.href, { ...init, redirect: 'error' });
+  if (res.redirected || (res.url && new URL(res.url).origin !== worker.location.origin)) throw new TypeError('fitee only loads its own files.');
+  return res;
 }
 
-const env = (waitUntil: (p: Promise<unknown>) => void): WorkerEnv => ({ manifest, base, caches: worker.caches, fetch: ownFetch, waitUntil, pending });
+/** How much more this site may store, by the browser's estimate (undefined when it can't tell). */
+async function room(): Promise<number | undefined> {
+  const estimate = await worker.navigator.storage?.estimate?.();
+  return estimate?.quota !== undefined && estimate.usage !== undefined ? estimate.quota - estimate.usage : undefined;
+}
+
+const env = (waitUntil: (p: Promise<unknown>) => void): WorkerEnv => ({ manifest, base, caches: worker.caches, fetch: ownFetch, waitUntil, saving, room, state });
 
 worker.addEventListener('install', (event) => {
   // A new version waits until the app is next opened, or "Update now".
@@ -50,6 +61,7 @@ worker.addEventListener('fetch', (event) => {
 worker.addEventListener('message', (event) => {
   const msg = event.data as ToWorker | null;
   if (msg?.type === 'skip-waiting') void worker.skipWaiting();
+  else if (msg?.type === 'claim') event.waitUntil(worker.clients.claim());
   else if (msg?.type === 'status') {
     const port = event.ports[0];
     event.waitUntil(status(env((p) => event.waitUntil(p))).then((s) => port?.postMessage(s)));

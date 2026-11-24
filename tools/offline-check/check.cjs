@@ -7,26 +7,42 @@
 //   npm run offline:check -- --work DIR --port 4180
 //
 // It builds the app into a temporary folder (--work to choose it), makes
-// three "deploys" of it that differ only in a marker in index.html, and
-// serves them under http://localhost:<port>/Claude/ (localhost is a secure
-// context, so the service worker registers). Then it checks:
+// four "deploys" of it that differ only in a marker in index.html and one
+// whose lite pose model changed too, and serves them under
+// http://localhost:<port>/Claude/ (localhost is a secure context, so the
+// service worker registers). Then it checks:
 //   1. the manifest has no installability errors, and maskable icons keep
-//      the logo inside the safe zone;
-//   2. a first visit in a tab saves the app but not the pose files;
+//      the logo inside the safe zone; Chrome's own install banner isn't
+//      suppressed (the "Install fitee" button in Settings is offered too);
+//   2. a first visit in a tab saves the app but not the pose files, and the
+//      service worker itself refuses a request to another origin (checked
+//      with the page's CSP bypassed, against a control without the worker),
+//      and doesn't follow a redirect to another origin;
 //   3. offline (context.setOffline, and the server dropping every
 //      connection), reloaded: every tab, an exercise page with its animated
 //      demo, and Settings open; a technique check says plainly that the pose
 //      model isn't saved;
-//   4. "Save for offline use" in Settings saves the pose files;
-//   5. an installed app (iOS's navigator.standalone) saves them by itself on
-//      its first launch, and then a technique check's camera starts offline
-//      (fake camera) with the model from the cache;
+//   4. "Save for offline use" in Settings saves the pose files, with pose
+//      files sent slowly and a technique check opened meanwhile: each file is
+//      downloaded once, and the check's screen says the save is running;
+//   5. an installed app (iOS's navigator.standalone) downloads nothing while
+//      the terms aren't accepted, then saves the pose files by itself and
+//      says so on the Train tab; then a technique check's camera starts
+//      offline (fake camera) with the model from the cache, and the camera
+//      test's Lite model (not saved) points to the Full one;
 //   6. the standalone layout keeps clear of the status bar and home indicator;
 //   7. updates: B installs, is offered, applies on "Update now", deletes the
 //      old caches and downloads neither unchanged app files nor pose files;
 //      C waits during a technique check and applies at the next cold open; D
-//      applies by itself right after the app opens on a safe screen;
-//   8. no request leaves localhost at any point.
+//      applies by itself right after the app opens on a safe screen; E
+//      fails half-way (a file missing on the server): the current version
+//      keeps working, offline too, and a later check installs E, downloading
+//      only what it hadn't saved; P (a new lite model) waits while the pose
+//      files are saved, and they're still saved once it applies;
+//   8. a first install that fails says so in Settings, and Try again saves
+//      the app; with no room on the phone (a small quota), Settings says so
+//      and the next launch doesn't download the pose model again;
+//   9. no request leaves localhost at any point.
 // It prints PASS/FAIL lines and the bytes each scenario downloads, and writes
 // report.json and screenshots (Settings at 390 px, light and dark) to the
 // work folder. Exits 1 if any check fails.
@@ -51,8 +67,15 @@ const ORIGIN = `http://localhost:${PORT}`;
 const BASE = `${ORIGIN}/Claude/`;
 const SHOTS = path.join(WORK, 'shots');
 const PHONE = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true };
-const NOT_SAVED = 'The pose model isn’t saved on this phone yet. Connect to the internet once, then technique checks work offline.';
+const NOT_SAVED =
+  'The pose model isn’t saved on this phone yet. Connect to the internet and keep fitee open while it loads; after that, technique checks work offline.';
+/** The app may apply a new version by itself this soon after it opens (src/offline/state.ts). */
+const LAUNCH_WINDOW_MS = 15_000;
 const DEFAULT_POSE = ['mediapipe/models/pose_landmarker_full.task', 'mediapipe/wasm/vision_wasm_internal.js', 'mediapipe/wasm/vision_wasm_internal.wasm'];
+const LITE = 'mediapipe/models/pose_landmarker_lite.task';
+/** Pose files at about this many bytes a second where a scenario needs time (a phone's connection). */
+const PHONE_SPEED = 4_000_000;
+const slowPose = (e) => (e.path.includes('/mediapipe/') ? PHONE_SPEED : 0);
 
 const results = [];
 const report = { work: WORK, checks: results, bytes: {}, sizes: {}, notes: [] };
@@ -63,16 +86,21 @@ function check(name, ok, detail = '') {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const mb = (n) => `${(n / 1e6).toFixed(2)} MB`;
 
-/** Builds the app, then three deploys that differ only in a marker in index.html. */
+/**
+ * Builds the app, then four deploys that differ only in a marker in
+ * index.html, and one (p) whose lite pose model changed too, as when CI
+ * fetches a newer model.
+ */
 function buildAll() {
   const builds = { a: path.join(WORK, 'build-a') };
   execFileSync('npx', ['vite', 'build', '--outDir', builds.a, '--emptyOutDir', '--logLevel', 'warn'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] });
-  for (const marker of ['b', 'c', 'd']) {
+  for (const marker of ['b', 'c', 'd', 'e', 'p']) {
     const dir = path.join(WORK, `build-${marker}`);
     fs.rmSync(dir, { recursive: true, force: true });
     fs.cpSync(builds.a, dir, { recursive: true });
     const index = path.join(dir, 'index.html');
     fs.writeFileSync(index, fs.readFileSync(index, 'utf8').replace('<head>', `<head>\n    <meta name="fitee-build" content="${marker}" />`));
+    if (marker === 'p') fs.appendFileSync(path.join(dir, LITE), Buffer.from([0]));
     execFileSync(process.execPath, ['scripts/offline-build.ts', dir], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] });
     builds[marker] = dir;
   }
@@ -166,6 +194,23 @@ function offlineOnly(server, phase) {
   );
 }
 
+/** Waits for page transitions and other finite animations to finish (at most 2 s). */
+const settled = (page) =>
+  page
+    .evaluate(() =>
+      Promise.race([
+        Promise.all(
+          document
+            .getAnimations()
+            .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+            .map((a) => a.finished.catch(() => {})),
+        ),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]),
+    )
+    .then(() => sleep(150))
+    .catch(() => {});
+
 /** Phone-sized screenshots, light and dark, scrolled to `focus` (default: the Settings section). */
 async function screenshot(page, name, focus = 'h2.field:text("Install and offline")') {
   fs.mkdirSync(SHOTS, { recursive: true });
@@ -176,7 +221,7 @@ async function screenshot(page, name, focus = 'h2.field:text("Install and offlin
     .catch(() => {});
   for (const scheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme: scheme });
-    await sleep(200);
+    await settled(page);
     await page.screenshot({ path: path.join(SHOTS, `${name}.${scheme}.png`) });
   }
   await page.emulateMedia({ colorScheme: 'light' });
@@ -289,6 +334,84 @@ async function main() {
     // reaching navigator.onLine after a reload: detach before going offline.
     await cdp.detach();
 
+    // ── 2b. The service worker's own guard against other origins ─────────
+    // privacy.ts covers fetch, XHR and beacons, and the CSP everything else.
+    // With the CSP bypassed, an image from another origin (a second local
+    // server) is stopped only by the service worker. Control: the same page
+    // without its service worker, where the image does load.
+    server.setPhase('probe');
+    const probe = createServer({ port: PORT + 1 });
+    probe.setRoot(builds.a);
+    await probe.listen();
+    const PROBE = `http://localhost:${PORT + 1}/Claude/icon-192.png`;
+    const loadImage = (page, src) =>
+      page.evaluate(
+        (u) =>
+          new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve('loaded');
+            img.onerror = () => resolve('error');
+            img.src = u;
+            setTimeout(() => resolve('timeout'), 10000);
+          }),
+        src,
+      );
+    try {
+      const bare = await browser.newContext({ ...PHONE, bypassCSP: true, serviceWorkers: 'block' });
+      const bp = await bare.newPage();
+      await bp.goto(BASE);
+      const without = await loadImage(bp, `${PROBE}?without-worker`);
+      await bare.close();
+      const guarded = await browser.newContext({ ...PHONE, bypassCSP: true });
+      const gp = await guarded.newPage();
+      await gp.goto(BASE);
+      const ready = await until(() => gp.evaluate(() => !!navigator.serviceWorker.controller), 30000);
+      const withWorker = ready ? await loadImage(gp, `${PROBE}?with-worker`) : 'no service worker';
+      await guarded.close();
+      const reached = probe.log.map((e) => e.query);
+      check(
+        'the service worker answers a request to another origin with a network error (page CSP bypassed for this check)',
+        without === 'loaded' && withWorker === 'error' && reached.includes('?without-worker') && !reached.includes('?with-worker'),
+        `without the worker the image ${without}; with it: ${withWorker}; requests that reached the other origin: ${reached.join(', ') || 'none'}`,
+      );
+      report.probe = { without, withWorker, reached };
+
+      // A redirect to another origin (GitHub Pages sends one for every file once
+      // a site moves to a custom domain, with Access-Control-Allow-Origin: *):
+      // the worker's download must stop there, not follow it.
+      server.setPhase('redirect');
+      const before = probe.log.length;
+      server.setRedirect((e) => (e.path === `/Claude/${LITE}` && e.query.startsWith('?v=') ? `http://localhost:${PORT + 1}${e.path}${e.query}` : null));
+      const fetched = await p.evaluate((u) => fetch(u).then((r) => `HTTP ${r.status}`, (err) => `failed (${err.name})`), LITE);
+      await sleep(500);
+      server.setRedirect(null);
+      const followed = probe.log.slice(before).map((e) => e.path);
+      const liteSaved = (await swStatus(p))?.pose.find((x) => x.url === LITE)?.saved;
+      check(
+        'the service worker doesn’t follow a redirect to another origin (nothing reaches it, nothing is kept)',
+        fetched.startsWith('failed') && followed.length === 0 && liteSaved === false && server.requests('redirect').some((e) => e.status === 302),
+        `the page's fetch ${fetched}; requests that reached the other origin: ${followed.join(', ') || 'none'}; lite model saved: ${liteSaved}`,
+      );
+    } finally {
+      await probe.close();
+    }
+
+    // Chrome's own install banner isn't suppressed; the button in Settings is offered as well.
+    const pp = await tab.newPage();
+    await pp.goto(`${BASE}#/settings`);
+    await until(() => pp.evaluate(() => !!navigator.serviceWorker.controller), 10000);
+    const prevented = await pp.evaluate(() => {
+      const e = new Event('beforeinstallprompt', { cancelable: true });
+      e.prompt = async () => {};
+      e.userChoice = Promise.resolve({ outcome: 'dismissed' });
+      window.dispatchEvent(e);
+      return e.defaultPrevented;
+    });
+    const installButton = await until(() => pp.locator('li[data-install="prompt"] button').isVisible(), 5000);
+    check('Chrome’s install banner isn’t suppressed, and Settings offers “Install fitee” too', !prevented && installButton, `beforeinstallprompt prevented: ${prevented}`);
+    await screenshot(pp, 'settings-install-prompt');
+    await pp.close();
+
     // ── 3. Offline in the tab ──────────────────────────────────────────────
     server.setPhase('tab-offline');
     await tab.setOffline(true);
@@ -319,16 +442,23 @@ async function main() {
     }, 8000);
     check('offline, an exercise page plays its animated demo', frames, frames ? `frame markup ${frames[0]} → ${frames[1]} chars` : '');
     const screens = [];
-    for (const hash of ['#/groups', '#/build', '#/profile', '#/routine/new', '#/edit/new?date=2026-11-20', '#/library', '#/terms', '#/privacy', '#/camera']) {
+    for (const [hash, title] of [
+      ['#/groups', 'What do you want to train?'],
+      ['#/build', 'How do you train?'],
+      ['#/profile', 'Profile'],
+      ['#/routine/new', 'New routine'],
+      ['#/edit/new?date=2026-11-20', 'Past workout'],
+      ['#/library', 'Exercises'],
+      ['#/terms', 'Terms of service'],
+      ['#/privacy', 'Privacy policy'],
+      ['#/camera', 'Camera test'],
+    ]) {
       await go(p, hash);
-      const h1 = await until(async () => {
-        const t = (await p.locator('main h1').first().textContent())?.trim();
-        return t && (await p.evaluate(() => location.hash)) === hash ? t : null;
-      }, 5000);
-      screens.push(`${hash} “${h1 ?? '—'}”`);
-      if (!h1) break;
+      // The page's own title, not the one before it fading out.
+      const ok = await until(async () => (await p.locator('main h1').allTextContents()).some((t) => t.trim() === title), 5000);
+      screens.push(`${hash} ${ok ? '✓' : `✗ (no “${title}”)`}`);
     }
-    check('offline, the other screens open too', screens.every((x) => !x.endsWith('“—”')), screens.join(', '));
+    check('offline, the other screens open too', screens.every((x) => x.endsWith('✓')), screens.join(', '));
     const font = await p.evaluate(() => document.fonts.check('16px "Bricolage Grotesque Variable"'));
     check('offline, the app’s own font is there', font);
     await go(p, '#/settings');
@@ -347,19 +477,40 @@ async function main() {
     // ── 4. "Save for offline use" in Settings ──────────────────────────────
     server.setDown(false);
     await tab.setOffline(false);
-    server.setPhase('tab-save-button');
+    server.setPhase('tab-hard-reload');
     await go(p, '#/settings');
+    // A hard reload loads the page past the service worker; saving must still go through it.
+    const hard = await tab.newCDPSession(p);
+    await hard.send('Page.reload', { ignoreCache: true });
+    await hard.detach();
+    await p.waitForLoadState('load');
+    const pastWorker = await p.evaluate(() => !navigator.serviceWorker.controller);
+    server.setPhase('tab-save-button');
+    // At a phone's speed, with a technique check opened while it saves: the
+    // check waits for the files on their way instead of downloading them again,
+    // and its screen says the save is running (closing fitee would stop it).
+    server.setSlow(slowPose);
     const saveButton = p.locator('li[data-offline="app-only"] button');
     await until(() => saveButton.isEnabled(), 10000);
     await saveButton.click();
+    await until(() => p.locator('li[data-offline="saving-pose"]').isVisible(), 10000);
+    await screenshot(p, 'settings-saving-pose');
+    await sleep(1000);
+    await go(p, '#/analyze/back-squat');
+    const noteOnCheck = await until(() => p.locator('.save-note').textContent(), 5000);
+    await screenshot(p, 'save-note-on-check', 'main');
+    const checkReady = await until(() => p.getByRole('button', { name: 'Start camera' }).isEnabled(), 90000, 500);
+    await go(p, '#/settings');
     const ready = await until(() => p.locator('li[data-offline="ready"]').isVisible(), 90000);
+    server.setSlow(null);
     const c2 = await cacheSummary(p);
     const saved = server.requests('tab-save-button').filter((e) => e.path.includes('/mediapipe/'));
     check(
-      '“Save for offline use” saves the SIMD runtime and the full model, each downloaded once',
-      ready && JSON.stringify(poseIn(c2).sort()) === JSON.stringify(DEFAULT_POSE) && saved.length === 3 && saved.every((e) => e.query.startsWith('?v=')),
-      `${saved.map((e) => e.path.split('/').pop()).join(', ')}; ${mb(bytesIn(server, 'tab-save-button'))}`,
+      '“Save for offline use” saves the SIMD runtime and the full model, each downloaded once, with a technique check opened meanwhile (after a hard reload)',
+      ready && checkReady && JSON.stringify(poseIn(c2).sort()) === JSON.stringify(DEFAULT_POSE) && saved.length === 3 && saved.every((e) => e.query.startsWith('?v=')),
+      `${saved.map((e) => e.path.split('/').pop()).join(', ')}; ${mb(bytesIn(server, 'tab-save-button'))}; page outside the service worker before saving: ${pastWorker}; check ready: ${!!checkReady}`,
     );
+    check('while it saves, other screens say so (“Keep fitee open”)', /Saving for offline use.*Keep fitee open/.test(noteOnCheck ?? ''), (noteOnCheck ?? 'no note').replace(/\s+/g, ' ').trim());
     report.bytes.saveButton = bytesIn(server, 'tab-save-button');
     await screenshot(p, 'settings-ready-tab');
 
@@ -396,17 +547,26 @@ async function main() {
     track(inst, 'installed');
     let q = await inst.newPage();
     watchErrors(q, 'installed');
+    // At a phone's speed, so the note on the Train tab can be seen.
+    server.setSlow(slowPose);
     await q.goto(BASE);
+    // The terms (which describe the download) come first: nothing is downloaded while they show.
+    await until(() => q.evaluate(() => !!navigator.serviceWorker.controller), 30000);
+    await sleep(4000);
+    const beforeTerms = server.requests('installed-first-launch').filter((e) => e.path.includes('/mediapipe/')).length;
     await q.getByRole('button', { name: 'Skip for now' }).click();
+    const noteOnTrain = await until(() => q.locator('.save-note').textContent(), 10000);
+    await screenshot(q, 'save-note-on-train', 'main');
     const st2 = await until(async () => {
       const s = await swStatus(q);
       return s && DEFAULT_POSE.every((u) => s.pose.find((x) => x.url === u)?.saved) ? s : null;
     }, 90000);
+    server.setSlow(null);
     const launch = server.requests('installed-first-launch');
     check(
-      'installed, the first launch saves the pose model by itself',
-      st2 && launch.filter((e) => e.path.includes('/mediapipe/')).length === 3,
-      `${launch.length} requests, ${mb(bytesIn(server, 'installed-first-launch'))}`,
+      'installed, nothing is downloaded while the terms show; then the first launch saves the pose model by itself, saying so on the Train tab',
+      beforeTerms === 0 && st2 && launch.filter((e) => e.path.includes('/mediapipe/')).length === 3 && /Keep fitee open/.test(noteOnTrain ?? ''),
+      `pose requests before the terms were accepted: ${beforeTerms}; ${launch.length} requests, ${mb(bytesIn(server, 'installed-first-launch'))}; note: ${(noteOnTrain ?? 'none').replace(/\s+/g, ' ').trim()}`,
     );
     report.bytes.firstLaunchInstalled = bytesIn(server, 'installed-first-launch');
     const persistCalls = await until(() => q.evaluate(() => window.__persistCalls ?? 0), 10000);
@@ -484,11 +644,26 @@ async function main() {
     await q.getByRole('button', { name: 'Cancel' }).click();
     await go(q, '#/camera');
     await q.getByRole('button', { name: 'Start camera' }).click();
-    const debug = await until(async () => {
-      const t = await q.locator('pre.debug').textContent();
-      return /model ·/.test(t ?? '') ? t.split('\n').slice(0, 2).join(' · ') : null;
-    }, 30000);
+    const readout = (variant) =>
+      until(async () => {
+        const t = await q.locator('pre.debug').textContent();
+        return new RegExp(`${variant} model ·`).test(t ?? '') ? t.split('\n').slice(0, 2).join(' · ') : null;
+      }, 30000);
+    const debug = await readout('full');
     check('offline, the camera test tracks with the saved model', debug, debug ?? '');
+    // The Lite model isn't saved: choosing it says so while the camera runs, and Full can be chosen again.
+    const picker = q.locator('label.inline select');
+    await picker.selectOption('lite');
+    const liteNote = await until(() => q.locator('p.note').textContent(), 30000);
+    const pickerFree = await until(() => picker.isEnabled(), 5000);
+    await q.screenshot({ path: path.join(SHOTS, 'camera-offline-lite.png') });
+    await picker.selectOption('full');
+    const back = await readout('full');
+    check(
+      'offline, the camera test’s Lite model (not saved) says to choose Full, and Full tracks again',
+      /Lite model isn’t saved on this phone, but the Full one is/.test(liteNote ?? '') && pickerFree && back,
+      `${(liteNote ?? 'no note').trim()} · then: ${back ?? 'no tracking'}`,
+    );
     await q.getByRole('button', { name: 'Stop' }).click();
     offlineOnly(server, 'installed-offline');
 
@@ -497,14 +672,21 @@ async function main() {
     await inst.setOffline(false);
     const before = await cacheSummary(q);
     const versionA = (await swStatus(q))?.version;
+    server.setPhase('update-b-wait');
+    await go(q, '#/settings');
+    // The browser's own update check can run as soon as the connection is
+    // back (it couldn't while offline). Made explicit here, so it always
+    // happens before B is deployed: then it finds nothing new.
+    await q.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r?.update())).catch(() => {});
+    // Past the launch window before B is deployed, so the update waits to be
+    // offered. (Deploying it first let that check find B inside the window,
+    // where the app rightly applies it by itself.)
+    await sleep(Math.max(0, LAUNCH_WINDOW_MS + 1000 - (Date.now() - lastLaunch)));
     server.setRoot(builds.b);
     server.setPhase('update-b');
-    await go(q, '#/settings');
-    // Past the launch window, so the update waits to be offered.
-    await sleep(Math.max(0, 16000 - (Date.now() - lastLaunch)));
     await q.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r?.update()));
     const offered = await until(() => q.locator('li[data-update="ready"]').isVisible(), 60000);
-    check('a new version installs in the background and is offered in Settings', offered && (await marker(q)) === 'a');
+    check('a new version installs in the background and is offered in Settings', offered && (await marker(q)) === 'a', `running ${await marker(q)}`);
     await screenshot(q, 'settings-update-ready');
     const updateB = server.requests('update-b');
     check(
@@ -513,7 +695,10 @@ async function main() {
       `${listOf(server, 'update-b').join(', ')}; ${mb(bytesIn(server, 'update-b'))}`,
     );
     report.bytes.updateUnchangedPose = bytesIn(server, 'update-b');
-    await Promise.all([q.waitForEvent('load', { timeout: 30000 }), q.locator('li[data-update="ready"] button').click()]);
+    // A missing row is a failed check, not a crash: the later scenarios still run.
+    await Promise.all([q.waitForEvent('load', { timeout: 30000 }), q.locator('li[data-update="ready"] button').click({ timeout: 10000 })]).catch((err) =>
+      report.notes.push(`“Update now” couldn’t be pressed: ${err.message.split('\n')[0]}`),
+    );
     const mB = await marker(q);
     const after = await cacheSummary(q);
     check('“Update now” applies it', mB === 'b', `now running ${mB}`);
@@ -557,9 +742,177 @@ async function main() {
     await q.goto(`${BASE}#/log`);
     const mD = await until(async () => ((await marker(q)) === 'd' ? 'd' : null), 30000, 500);
     check('a new version found just after opening, on the Log tab, applies by itself', mD === 'd', `now running ${mD ?? (await marker(q))}`);
+
+    // ── Update E fails half-way, then installs at a later check ──
+    // A file of E is missing on the server (as if mid-deploy): the install
+    // fails, D keeps working (offline too) and nothing is offered. A later
+    // update check, with the file there, installs E and downloads only what
+    // the failed attempt hadn't saved.
+    server.setRoot(builds.e);
+    server.setFail((e) => e.path === '/Claude/index.html' && e.query.startsWith('?v='));
+    server.setPhase('update-e-fails');
+    const tryUpdate = () =>
+      q.evaluate(async () => {
+        const reg = await navigator.serviceWorker.getRegistration();
+        await reg.update();
+        const w = reg.installing;
+        if (!w) return reg.waiting ? 'installed' : 'no update found';
+        return new Promise((resolve) => {
+          const done = () => ['redundant', 'installed', 'activating', 'activated'].includes(w.state) && resolve(w.state);
+          w.addEventListener('statechange', done);
+          done();
+        });
+      });
+    const failed = await tryUpdate().catch((err) => `error: ${err.message}`);
+    await go(q, '#/settings');
+    await sleep(500);
+    const offeredAfterFail = await q.locator('li[data-update="ready"]').count();
+    const failRequests = listOf(server, 'update-e-fails');
+    server.setPhase('update-e-offline');
+    await inst.setOffline(true);
+    server.setDown(true);
+    await q.reload();
+    const stillWorks = await until(() => q.locator('nav.tabs').isVisible(), 15000);
+    const mFail = await marker(q);
+    check(
+      'an update that fails half-way leaves the current version working, offline too, and offers nothing',
+      failed === 'redundant' && offeredAfterFail === 0 && stillWorks && mFail === 'd',
+      `install ${failed}; requests ${failRequests.join(', ')}; offline afterwards: running ${mFail}`,
+    );
+    server.setDown(false);
+    await inst.setOffline(false);
+    server.setFail(null);
+    server.setPhase('update-e-retry');
+    await go(q, '#/settings');
+    // The page may apply it by itself (just reopened, on a safe screen) and reload mid-evaluate.
+    const retried = await tryUpdate().catch(() => 'installed (the page reloaded into it)');
+    const mE = await until(
+      async () => {
+        if ((await marker(q)) === 'e') return 'e';
+        const button = q.locator('li[data-update="ready"] button');
+        if ((await button.isVisible()) && (await button.isEnabled())) await button.click({ timeout: 2000 });
+        return null;
+      },
+      45000,
+      500,
+    );
+    const retry = server.requests('update-e-retry');
+    check(
+      '…and a later update check installs it, downloading only what the failed attempt hadn’t saved',
+      mE === 'e' && retry.every((e) => e.path.endsWith('/sw.js') || e.path.endsWith('/index.html')),
+      `install ${retried}; ${listOf(server, 'update-e-retry').join(', ')}; now running ${mE ?? (await marker(q))}`,
+    );
     await inst.close();
 
-    // ── 8. Nothing left the device ────────────────────────────────────────
+    // ── Update P changes the lite model; the pose files saved while it waits stay saved ──
+    // Each pose file has its own cache, named by its hash: files saved by the
+    // running version while P waits are P's files too (only the lite model changed).
+    server.setRoot(builds.e);
+    server.setPhase('update-p-first-visit');
+    const pc = await browser.newContext(PHONE);
+    await pc.grantPermissions(['camera'], { origin: ORIGIN });
+    track(pc, 'pose-change');
+    let r = await pc.newPage();
+    watchErrors(r, 'pose-change');
+    await r.goto(BASE);
+    const rOpened = Date.now();
+    await r.getByRole('button', { name: 'Skip for now' }).click();
+    await until(async () => {
+      const s = await swStatus(r);
+      return s && s.app.saved === s.app.files;
+    }, 30000);
+    await go(r, '#/settings');
+    await sleep(Math.max(0, LAUNCH_WINDOW_MS + 1000 - (Date.now() - rOpened)));
+    server.setRoot(builds.p);
+    server.setPhase('update-p');
+    await r.evaluate(() => navigator.serviceWorker.getRegistration().then((reg) => reg?.update()));
+    const pWaits = await until(() => r.locator('li[data-update="ready"]').isVisible(), 60000);
+    await r.locator('li[data-offline="app-only"] button').click();
+    const pSaved = await until(() => r.locator('li[data-offline="ready"]').isVisible(), 90000);
+    await r.close();
+    await sleep(500);
+    r = await pc.newPage();
+    watchErrors(r, 'pose-change');
+    await r.goto(`${BASE}#/settings`);
+    const mP = await marker(r);
+    server.setPhase('update-p-offline');
+    await pc.setOffline(true);
+    server.setDown(true);
+    const pReady = await until(() => r.locator('li[data-offline="ready"]').isVisible(), 15000);
+    await go(r, '#/analyze/back-squat');
+    const pCheck = await until(() => r.getByRole('button', { name: 'Start camera' }).isEnabled(), 60000, 500);
+    server.setDown(false);
+    check(
+      'pose files saved while an update with a new lite model waits are still saved once it applies (offline technique check)',
+      pWaits && pSaved && mP === 'p' && pReady && pCheck,
+      `offered ${!!pWaits}; saved while it waited ${!!pSaved}; now running ${mP}; offline: Settings ready ${!!pReady}, check ready ${!!pCheck}; caches ${Object.keys(await cacheSummary(r)).join(', ')}`,
+    );
+    await pc.close();
+
+    // ── 8a. A first install that fails says so, and Try again saves the app ──
+    server.setRoot(builds.e);
+    server.setPhase('first-install-fails');
+    server.setFail((e) => e.path === '/Claude/icon-512.png' && e.query.startsWith('?v='));
+    const fc = await browser.newContext(PHONE);
+    track(fc, 'first-install-fails');
+    const f = await fc.newPage();
+    watchErrors(f, 'first-install-fails');
+    await f.goto(BASE);
+    await f.getByRole('button', { name: 'Skip for now' }).click();
+    await go(f, '#/settings');
+    const failedRow = await until(() => f.locator('li[data-offline="app-failed"]').isVisible(), 30000);
+    await screenshot(f, 'settings-app-failed');
+    server.setFail(null);
+    server.setPhase('first-install-retry');
+    await f.locator('li[data-offline="app-failed"] button').click().catch(() => {});
+    const recovered = await until(() => f.locator('li[data-offline="app-only"]').isVisible(), 30000);
+    const reinstalled = listOf(server, 'first-install-retry');
+    check(
+      'a first install that fails says so in Settings (not “Saving the app…” for good), and Try again saves the app',
+      failedRow && recovered && reinstalled.every((x) => x === 'sw.js' || x.startsWith('icon-512.png?v=')),
+      `failed: ${!!failedRow}; after Try again: ${!!recovered}; requests ${reinstalled.join(', ')}`,
+    );
+    await fc.close();
+
+    // ── 8b. No room on the phone ──────────────────────────────────────────
+    // A small quota (CDP) makes Cache Storage refuse the pose files. The
+    // browser's estimate doesn't see this override, so it's the worker's
+    // refused save that has to tell: Settings says there's no room (not
+    // "check your connection"), and the next launch doesn't download again.
+    server.setPhase('no-room-launch-1');
+    const nc = await browser.newContext(PHONE);
+    await nc.addInitScript(() => Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true, configurable: true }));
+    track(nc, 'no-room');
+    const n = await nc.newPage();
+    watchErrors(n, 'no-room');
+    const ncdp = await nc.newCDPSession(n);
+    await ncdp.send('Storage.overrideQuotaForOrigin', { origin: ORIGIN, quotaSize: 8_000_000 });
+    await n.goto(BASE);
+    await n.getByRole('button', { name: 'Skip for now' }).click();
+    await go(n, '#/settings');
+    const noRoomText = await until(async () => {
+      const t = (await n.locator('li[data-offline="app-only"]').textContent().catch(() => '')) ?? '';
+      return /isn’t room/.test(t) ? t.replace(/\s+/g, ' ').trim() : null;
+    }, 90000);
+    await screenshot(n, 'settings-no-room');
+    server.setPhase('no-room-launch-2');
+    await n.reload();
+    await sleep(6000);
+    await go(n, '#/settings');
+    const secondText = await until(async () => {
+      const t = (await n.locator('li[data-offline="app-only"]').textContent().catch(() => '')) ?? '';
+      return /isn’t room/.test(t) ? t : null;
+    }, 10000);
+    const secondPose = server.requests('no-room-launch-2').filter((e) => e.path.includes('/mediapipe/'));
+    check(
+      'with no room for the pose model, Settings says so, and the next launch doesn’t download it again',
+      noRoomText && secondText && secondPose.length === 0,
+      `${noRoomText ?? 'no message'}; launch 1 ${mb(bytesIn(server, 'no-room-launch-1'))}, launch 2 pose requests: ${secondPose.length}`,
+    );
+    await ncdp.detach().catch(() => {});
+    await nc.close();
+
+    // ── 9. Nothing left the device ────────────────────────────────────────
     const outside = requests.filter((r) => !r.url.startsWith(`${ORIGIN}/`) && !/^(data|blob):/.test(r.url));
     check(
       'no request left localhost at any point (pages and the service worker)',

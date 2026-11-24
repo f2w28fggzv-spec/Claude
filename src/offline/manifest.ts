@@ -111,12 +111,20 @@ export function buildManifest(files: readonly { url: string; hash: string; size:
 }
 
 /**
- * Cache names, one per group, each named by the hash of its own files: a
- * deploy that changes only the app gets a new app cache and keeps the pose
- * cache as it is, so the pose files aren't copied or downloaded again.
+ * The cache that keeps one pose file, named by the file's own hash. Each pose
+ * file has its own, so a deploy that changes one of them (e.g. a newer model)
+ * leaves the others where they are: nothing is copied, and the update needs
+ * room only for the file that changed.
  */
-export function cacheNames(m: PrecacheManifest): { app: string; pose: string } {
-  return { app: `${CACHE_PREFIX}app-${groupHash(m.app)}`, pose: `${CACHE_PREFIX}pose-${groupHash(m.pose)}` };
+export const poseCacheName = (e: PrecacheEntry) => `${CACHE_PREFIX}pose-${e.hash}`;
+
+/**
+ * The caches a version uses: the app's, named by the hash of the app's files
+ * (a deploy that changes only the app gets a new one and leaves the pose
+ * files alone), and one per pose file.
+ */
+export function cacheNames(m: PrecacheManifest): { app: string; pose: string[] } {
+  return { app: `${CACHE_PREFIX}app-${groupHash(m.app)}`, pose: m.pose.map(poseCacheName) };
 }
 
 /** This app's caches that the current version doesn't use (other caches are never touched). */
