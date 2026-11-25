@@ -14,7 +14,7 @@ import type { BodyKind } from '../demo/body';
 import { levelsAt, peakLevels, type Levels, type Moment } from '../demo/engagement';
 import { frameMarkup, viewBoxOf } from '../demo/render';
 import type { Demo } from '../demo/types';
-import { barFill, heroMarkup, heroState } from './frame';
+import { barFill, heroMarkup, heroState, stageLabel } from './frame';
 import { LIFTS } from './lifts';
 import type { HeroData, HeroLift } from './types';
 
@@ -94,10 +94,7 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
 
   const describe = () => {
     const l = lift();
-    figure.setAttribute(
-      'aria-label',
-      `${l.name}: ${still ? 'how-to demo, the start and the turnaround' : 'animated how-to demo'}, ${l.view}. Muscles working: ${l.words}.`,
-    );
+    figure.setAttribute('aria-label', stageLabel(l, still ? 'still' : 'live'));
     for (const c of chips) c.setAttribute('aria-pressed', String(c.dataset.lift === l.id));
     for (const [id, el] of legends) el.classList.toggle('is-off', id !== l.id);
     for (const el of names) el.classList.toggle('is-off', el.dataset.for !== l.id);

@@ -38,6 +38,10 @@ export function heroFrame(lift: HeroLift, demo: Demo, t: number, body: BodyKind)
   return { ...state, markup: heroMarkup(lift, demo, state, body) };
 }
 
+/** The figure's description for screen readers: as written into the page ('static'), and as the script keeps it. */
+export const stageLabel = (lift: HeroLift, how: 'static' | 'live' | 'still') =>
+  `${lift.name}: ${how === 'live' ? 'animated how-to demo' : how === 'still' ? 'how-to demo, the start and the turnaround' : 'how-to demo'}, ${lift.view}. Muscles working: ${lift.words}.`;
+
 /** A legend bar's fill: its width (0..1 of the track) and colour on the heat ramp, as SVG attribute values. */
 export function barFill(level: number): { width: string; fill: string } {
   return { width: Math.min(1, Math.max(0, level)).toFixed(3), fill: engageColour(level) };

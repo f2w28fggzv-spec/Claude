@@ -22,7 +22,7 @@ import { timeline } from '../demo/timeline';
 import { legendOrder, musclesInWords } from '../screens/ExerciseDemo';
 import { THEME_COLOR } from '../theme';
 import { LogoMark } from '../ui/Logo';
-import { barFill, heroFrame } from './frame';
+import { barFill, heroFrame, stageLabel } from './frame';
 import { LIFTS } from './lifts';
 import { landingCsp, type SignupTarget } from './signup';
 import type { HeroData, HeroLift } from './types';
@@ -124,10 +124,6 @@ function legendList(e: Exercise, levels: Levels, on: boolean): string {
     .join('');
   return `<ul class="lg-list${on ? '' : ' is-off'}" data-for="${esc(e.id)}">${rows}</ul>`;
 }
-
-/** The figure's description for screen readers (the script keeps it up to date). */
-export const stageLabel = (lift: HeroLift, how: 'still' | 'live' | 'static') =>
-  `${lift.name}: ${how === 'live' ? 'animated how-to demo' : how === 'still' ? 'how-to demo, the start and the turnaround' : 'how-to demo'}, ${lift.view}. Muscles working: ${lift.words}.`;
 
 export interface Stage {
   /** The first lift's first frame, as an <svg>. */

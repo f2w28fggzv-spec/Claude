@@ -143,6 +143,8 @@ const noSideScroll = (page) => page.evaluate(() => document.documentElement.scro
 /** Text that must pass WCAG AA: its colour against the pixels behind it (with the text, borders, icons and dots hidden). */
 const CONTRAST_SELECTORS = ['.eyebrow', '.lead', '.soon-pill', '.phase b', '.body-pick button', '.key', '.lg-name', '.lg-role', '.lg-what', '.lifts-label', '.chip', '.stage figcaption', '.hero-facts li', '.kicker', '.pillar-text', '.rule-n', '.step-n', '.step p', '.step .sample', '.v-pass', '.v-fail', '.v-unknown', '.depth dd', '.section-lead', '.device figcaption', '.no-signal', '.facts p', '.vision-body p', '.soon-tag', '.panel-lede', '.privacy p', '.site-foot .small', '.head-link', '.field-label', '.fine', '.button'];
 const HIDE_PROPS = ['color', 'border-color', 'outline-color'];
+/** Set with the hiding, so no transition is caught half way. */
+const STILL_PROPS = ['transition'];
 const luminance = ([r, g, b]) => {
   const f = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
@@ -154,6 +156,14 @@ const contrastOf = (a, b) => {
 /** Every sampled text's lowest contrast against what's behind it. `decoder` is a blank page (the landing page's CSP allows no data: images). */
 async function contrast(page, decoder) {
   const out = [];
+  // Hold the hero still (a paused demo keeps one Lowering / Lifting pill lit and one lift picked), so nothing changes between reading a colour and taking the picture.
+  const paused = await page.evaluate(() => {
+    const pause = document.querySelector('.demo-pause');
+    if (!pause || pause.getAttribute('aria-pressed') !== 'false' || getComputedStyle(pause).display === 'none') return false;
+    pause.click();
+    return true;
+  });
+  await sleep(400);
   for (const sel of CONTRAST_SELECTORS) {
     for (const el of (await page.$$(sel)).slice(0, 3)) {
       const info = await el.evaluate((e) => {
@@ -164,14 +174,20 @@ async function contrast(page, decoder) {
       const m = /rgba?\(([\d.]+), ([\d.]+), ([\d.]+)/.exec(info.color);
       if (!info.shown || !m) continue;
       await el.scrollIntoViewIfNeeded();
+      await el.evaluate(
+        (e, [hide, still]) => {
+          for (const k of [e, ...e.querySelectorAll('*')]) {
+            for (const p of still) k.style.setProperty(p, 'none', 'important');
+            for (const p of hide) k.style.setProperty(p, 'transparent', 'important');
+          }
+          for (const k of e.querySelectorAll('svg, i, img, .dot, .v-icon')) k.style.setProperty('visibility', 'hidden', 'important');
+        },
+        [HIDE_PROPS, STILL_PROPS],
+      );
+      const png = await el.screenshot({ animations: 'disabled' });
       await el.evaluate((e, props) => {
-        for (const k of [e, ...e.querySelectorAll('*')]) for (const p of props) k.style.setProperty(p, 'transparent', 'important');
-        for (const k of e.querySelectorAll('svg, i, img, .dot, .v-icon')) k.style.setProperty('visibility', 'hidden', 'important');
-      }, HIDE_PROPS);
-      const png = await el.screenshot();
-      await el.evaluate((e, props) => {
-        for (const k of [e, ...e.querySelectorAll('*')]) for (const p of [...props, 'visibility']) k.style.setProperty(p, '');
-      }, HIDE_PROPS);
+        for (const k of [e, ...e.querySelectorAll('*')]) for (const p of props) k.style.setProperty(p, '');
+      }, [...HIDE_PROPS, ...STILL_PROPS, 'visibility']);
       const pixels = await decoder.evaluate(async (b64) => {
         const img = new Image();
         img.src = 'data:image/png;base64,' + b64;
@@ -195,6 +211,8 @@ async function contrast(page, decoder) {
       out.push({ sel, ratio: Math.round(ratio * 100) / 100, need: large ? 3 : 4.5 });
     }
   }
+  // And play again, as the visitor left it.
+  if (paused) await page.click('.demo-pause');
   return out;
 }
 const listState = (page) =>
