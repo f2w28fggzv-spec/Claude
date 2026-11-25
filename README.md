@@ -100,6 +100,68 @@ npm run offline:check -- --work /tmp/offline-check --port 4180
 The service worker is only registered in production builds, so `npm run dev`
 always serves fresh files.
 
+## Landing page
+
+fitee's landing page lives beside the app at
+https://f2w28fggzv-spec.github.io/Claude/about/ (source: `about/index.html`
+and `src/landing/`). It describes fitee and its vision and has an interest
+list; it doesn't link to the app. `npm run build` builds it into
+`dist/about/` as a build of its own: the app's files and `sw.js` come out the
+same with or without it, and the app's offline copy leaves `about/` out, so
+editing the page never updates the app on anyone's phone. The deploy workflow
+publishes it with the app, unchanged. (The page is inside the app's
+service-worker scope, though, so for someone who uses the app, opening the
+page lets the browser check for a new version of the app and install it in
+the background, as opening the app does. It only ever fetches this site's own
+files.)
+
+The page shares the app's origin, so it runs only its own files (no
+third-party scripts, styles, fonts, images or analytics, no cookies) and reads
+none of the app's data; its build fails if the page's script takes in code
+from outside `src/`. Its Content Security Policy is written at build time.
+
+**The interest list** isn't connected yet: it says sign-ups open soon and
+collects nothing. Before it opens, have the page's copy (its privacy note
+above all) reviewed along with the app's legal drafts. To open it, set
+`SIGNUP` in `src/landing/signup.ts` to one of the presets and deploy:
+
+```ts
+export const SIGNUP: SignupConfig | null = { service: 'buttondown', id: 'your-username', contact: 'list@your-domain.example' };
+// or { service: 'mailerlite', id: 'ACCOUNT_ID/FORM_ID', contact: 'list@your-domain.example' },
+// or { service: 'formspree', id: 'FORM_ID', contact: 'list@your-domain.example' }
+```
+
+The build then writes the form (a plain HTML form post to that service, never
+`fetch()`: the app's service worker refuses cross-origin fetches from pages it
+controls), opens the page's CSP to that one service, and names the service in
+the page's privacy note and footer. Check the preset's endpoint and field
+names against the service's current embed code first (MailerLite: turn on
+double opt-in, leave reCAPTCHA off). The page can't read the service's
+answer, so it never says the sign-up went through: Buttondown and Formspree
+show their own page, and MailerLite's answer shows in a sandboxed frame under
+the form. Every service needs `contact`, an address people can write to to
+leave the list, ask what it holds about them or have their address deleted
+(an unsubscribe link only stops the emails, and Formspree sends none of its
+own): a project or list address, as the page shows it.
+
+Check it end to end (Chromium via Playwright, cut off from every site but
+this machine; a stand-in sign-up service runs on port + 1; it also builds the
+app alone and checks its files and `sw.js` come out byte for byte the same):
+
+```sh
+npm run landing:check -- --work /tmp/landing-check --port 4402
+```
+
+The app screens on the page are the real app with made-up sample data; when
+the app's screens change, make them again (writes `src/landing/screens/`):
+
+```sh
+npm run landing:screens -- --work /tmp/landing-screens --port 4405
+```
+
+In `npm run dev` the page is at `/about/`, and reloads when you edit a module
+that writes its HTML (`src/landing/prerender.ts`, `src/landing/signup.ts`).
+
 ## Deploy (GitHub Pages)
 
 `.github/workflows/deploy.yml` builds and deploys on every push to `main`

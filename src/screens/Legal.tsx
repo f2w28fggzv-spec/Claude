@@ -1,13 +1,14 @@
 // Welcome (first launch: accept the terms), terms of service and privacy
-// policy. The texts describe what the app actually does: no account, no
-// server, everything stays on the device. Keep them in step with the code.
+// policy. The texts describe what the app actually does today: everything
+// stays on the device. Keep them in step with the code. They don't say "no
+// account" (or "no server"): a server with sign-ups is planned.
 import { loadProfile, saveProfile, TERMS_VERSION } from '../profile';
 import { navigate } from '../router';
 import { Logo } from '../ui/Logo';
 import { Icon } from './icons';
 import { Screen } from './Layout';
 
-const UPDATED = '24 November 2026';
+const UPDATED = '25 November 2026';
 
 /** First-launch screen. Continuing accepts the terms and privacy policy. */
 export function Welcome({ onDone }: { onDone: () => void }) {
@@ -34,7 +35,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
             <Icon name="calendar" size={20} /> A log of every set, rep and weight, with progress and a weekly body map
           </li>
           <li>
-            <Icon name="check" size={20} /> No account. Everything stays on this phone
+            <Icon name="check" size={20} /> Everything stays on this phone
           </li>
         </ul>
         <button type="button" class="big" onClick={() => accept('/profile?setup')}>
@@ -61,8 +62,8 @@ export function TermsScreen() {
         <h2>1. What the app does</h2>
         <p>
           fitee builds training plans, lets you log workouts, and gives automated technique feedback from your phone’s camera. It runs in your web browser, or
-          from your home screen if you add it there, and keeps a copy of its own files on your device so it works without a connection. There is no account
-          and no server: your data stays on your device (see the Privacy policy).
+          from your home screen if you add it there, and keeps a copy of its own files on your device so it works without a connection. Your data stays on
+          your device (see the Privacy policy).
         </p>
 
         <h2>2. Not medical advice</h2>
@@ -127,8 +128,8 @@ export function PrivacyScreen() {
     <Screen title="Privacy policy" subtitle={`Last updated ${UPDATED}`} back="settings">
       <article class="legal">
         <p class="lead">
-          Short version: fitee has no account and no server. Everything you enter, and any video you choose to save, stays in this browser on this device.
-          Nothing is sent to us or to anyone else.
+          Short version: everything you enter, and any video you choose to save, stays in this browser on this device. Nothing is sent to us or to anyone
+          else.
         </p>
 
         <h2>1. What is stored, and where</h2>

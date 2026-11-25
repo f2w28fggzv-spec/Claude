@@ -46,8 +46,8 @@ try {
 const demos = JSON.parse(fs.readFileSync(json, 'utf8'));
 fs.rmSync(json, { force: true });
 
-// Theme tokens straight from the app's stylesheet.
-const css = fs.readFileSync(path.join(ROOT, 'src', 'style.css'), 'utf8');
+// Theme tokens straight from the app's token file (shared by the app and the landing page).
+const css = fs.readFileSync(path.join(ROOT, 'src', 'tokens.css'), 'utf8');
 const block = (marker) => {
   const i = css.indexOf(marker);
   if (i < 0) throw new Error('token block not found: ' + marker);
@@ -87,7 +87,8 @@ body{margin:0;font-family:system-ui,sans-serif}
     console.error('This tool needs Playwright (npm i -g playwright, then npx playwright install chromium).');
     process.exit(1);
   }
-  const browser = await chromium.launch();
+  // Cut off from every site but this machine: the sheets are drawn from local markup only.
+  const browser = await require('../offline-check/local-only.cjs').launchLocalOnly(chromium);
   const errors = [];
   for (const theme of themes) {
     const tab = await browser.newPage({ viewport: { width: 2200, height: 900 }, deviceScaleFactor: 1 });

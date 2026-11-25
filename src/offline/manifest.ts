@@ -49,8 +49,19 @@ export const poseRuntimeFiles = (simd: boolean) =>
 /** Everything one technique check loads: the runtime this browser uses plus one model. */
 export const poseFilesFor = (simd: boolean, variant: PoseVariant) => [...poseRuntimeFiles(simd), poseModelPath(variant)];
 
-/** Files never listed: the service worker itself (the browser checks it for updates) and source maps. */
-export const isListed = (path: string) => path !== 'sw.js' && !path.endsWith('.map') && !path.split('/').some((p) => p.startsWith('.'));
+/**
+ * The landing page's folder (about/, built beside the app by
+ * scripts/landing-build.ts). It is a page of its own, not part of the app:
+ * never saved on the phone, so editing the page never updates the app.
+ */
+export const LANDING_DIR = 'about/';
+
+/**
+ * Files never listed: the service worker itself (the browser checks it for
+ * updates), source maps, dotfiles, and the landing page (about/).
+ */
+export const isListed = (path: string) =>
+  path !== 'sw.js' && !path.endsWith('.map') && !path.split('/').some((p) => p.startsWith('.')) && !path.startsWith(LANDING_DIR);
 
 const TYPES: Record<string, string> = {
   html: 'text/html; charset=utf-8',

@@ -2,7 +2,9 @@
 // the build wrote (with a hash of its content) and writes the service worker,
 // sw.js, at the root of the output folder: src/offline/sw.ts bundled into one
 // classic script with that list built in. A changed file changes the list,
-// so sw.js changes and the browser installs the new version.
+// so sw.js changes and the browser installs the new version. The landing
+// page (about/, scripts/landing-build.ts) is left out of the list: it is a
+// page of its own, never saved on the phone (isListed in manifest.ts).
 //
 // Runs from the Vite plugin below (vite.config.ts), or by hand on a folder:
 //   node scripts/offline-build.ts dist
