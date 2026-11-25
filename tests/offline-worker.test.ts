@@ -1,13 +1,20 @@
 // The service worker's logic (src/offline/worker.ts) run against an in-memory
 // Cache Storage and a fake network: request routing, saving on use (one
 // download per file), install (reusing unchanged files), cache names and
-// clean-up across versions, a full phone, and a failing Cache Storage.
+// clean-up across versions, a full phone (over quota, and a store refused
+// with another error, as Chromium does on a really full disk), a newer
+// version on the site, and a failing Cache Storage.
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { buildManifest, cacheNames, cachesToDelete, HASH_HEADER, poseCacheName, type PrecacheEntry, type PrecacheManifest } from '../src/offline/manifest';
-import { activate, install, respond, routeRequest, status, type WorkerEnv } from '../src/offline/worker';
+import { activate, beginSave, install, respond, routeRequest, status, type WorkerEnv } from '../src/offline/worker';
 
 const BASE = 'https://example.github.io/Claude/';
+
+/** What Chromium's Cache.put() throws on a really full disk (its storage estimate still shows plenty of room). */
+const fullDisk = () => new DOMException('Unexpected internal error.', 'UnknownError');
+/** Refuses to store the pose files, as on a really full disk. */
+const refusePose = (url: string) => (url.includes('/mediapipe/') ? fullDisk() : undefined);
 
 class FakeCache {
   readonly entries = new Map<string, Response>();
@@ -20,6 +27,8 @@ class FakeCache {
     this.owner.check();
     // Like the real thing: the body is read now, and a full phone refuses it.
     const body = await res.arrayBuffer();
+    const refused = this.owner.refuse?.(String(req));
+    if (refused) throw refused;
     if (this.owner.used() + body.byteLength > this.owner.quota) throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
     this.entries.set(String(req), new Response(body, { status: res.status, headers: res.headers }));
   }
@@ -35,6 +44,8 @@ class FakeCaches {
   readonly stores = new Map<string, FakeCache>();
   /** Bytes this site may store in all (a full phone has little). */
   quota = Infinity;
+  /** Refuses to store some files, with this error, whatever the quota (Chromium on a really full disk throws UnknownError). */
+  refuse?: (url: string) => Error | undefined;
   /** Cache Storage itself fails (e.g. a damaged browser profile). */
   broken = false;
   check() {
@@ -154,7 +165,7 @@ function setup(files: Record<string, string> = V1, caches = new FakeCaches(), si
     waitUntil: (p) => void waits.push(p),
     saving: new Map(),
     room: async () => estimate.room,
-    state: { noRoom: new Set() },
+    state: { noRoom: new Set(), newer: false },
   };
   const settle = () => Promise.all(waits);
   /** What the worker answers for a page's GET of a path. */
@@ -250,22 +261,31 @@ describe('service worker responses', () => {
     expect(t.site.log).toEqual([]);
   });
 
-  it('serves a file that changed on the server but does not keep it', async () => {
+  it('serves a file that changed on the server but does not keep it, and reports that the site has a newer version', async () => {
     const t = setup();
+    expect((await status(t.env)).newer).toBe(false);
     t.site.set({ 'mediapipe/models/pose_landmarker_lite.task': 'model-lite, newer deploy' });
     const res = await t.get('mediapipe/models/pose_landmarker_lite.task');
     expect(await res.text()).toBe('model-lite, newer deploy');
     await t.settle();
-    expect((await status(t.env)).pose.find((p) => p.url.endsWith('lite.task'))?.saved).toBe(false);
+    const s = await status(t.env);
+    expect(s.pose.find((p) => p.url.endsWith('lite.task'))?.saved).toBe(false);
+    // Not a lack of room: the page updates first, then saves.
+    expect(s.newer).toBe(true);
+    expect(s.noRoom).toBe(false);
+    // A save starting afresh forgets it.
+    beginSave(t.env);
+    expect((await status(t.env)).newer).toBe(false);
   });
 
-  it('never keeps an error response', async () => {
+  it('never keeps an error response (and an error is not a newer version)', async () => {
     const t = setup();
     t.site.files.delete('mediapipe/models/pose_landmarker_lite.task');
     const res = await t.get('mediapipe/models/pose_landmarker_lite.task');
     expect(res.status).toBe(404);
     await t.settle();
     expect(Object.keys(t.caches.summary()).filter((n) => n.startsWith('fitee-pose-'))).toEqual([]);
+    expect((await status(t.env)).newer).toBe(false);
   });
 
   it('fails like the network when offline and the file is not saved', async () => {
@@ -377,23 +397,78 @@ describe('service worker responses', () => {
     await t.settle();
     let s = await status(t.env);
     expect(s.noRoom).toBe(true);
+    expect(s.newer).toBe(false);
     expect(s.pose.some((p) => p.saved)).toBe(false);
     expect(t.site.log[0].init.cache).toBe('no-store');
     // When the browser can tell there's no room, the file isn't even tried: it goes through the
     // HTTP cache like any web file, so a repeat is checked, not downloaded again.
+    beginSave(t.env);
     t.estimate.room = 3;
     t.site.log = [];
     expect(await (await t.get(path)).text()).toBe(V1[path]);
     expect(t.site.log.map((l) => l.init.cache)).toEqual(['default']);
     expect(t.site.log[0].url).toContain('?v=');
-    // Room again: saved, and the status says so.
+    expect((await status(t.env)).noRoom).toBe(true);
+    // Room again, and a save asks to try again: saved, and the status says so.
     t.caches.quota = Infinity;
     t.estimate.room = undefined;
+    beginSave(t.env);
     await (await t.get(path)).arrayBuffer();
     await t.settle();
     s = await status(t.env);
     expect(s.noRoom).toBe(false);
     expect(await t.poseSaved(path)).toBe(true);
+  });
+
+  it('a store refused for any other reason (Chromium on a full disk: UnknownError, estimate showing room) counts as no room: reported, then through the HTTP cache until a save asks to try again', async () => {
+    const t = setup();
+    await install(t.env);
+    t.estimate.room = 2 ** 30; // Chromium's fixed headroom, however full the disk
+    t.caches.refuse = refusePose;
+    t.site.log = [];
+    const path = 'mediapipe/models/pose_landmarker_full.task';
+    // The page still gets the file.
+    expect(await (await t.get(path)).text()).toBe(V1[path]);
+    await t.settle();
+    expect(t.site.log.map((l) => l.init.cache)).toEqual(['no-store']);
+    let s = await status(t.env);
+    expect(s.noRoom).toBe(true);
+    expect(await t.poseSaved(path)).toBe(false);
+    // From then on it goes through the HTTP cache, unsaved, instead of past it at every technique check.
+    t.site.log = [];
+    expect(await (await t.get(path)).text()).toBe(V1[path]);
+    await t.settle();
+    expect(t.site.log.map((l) => l.init.cache)).toEqual(['default']);
+    expect(t.site.log[0].url).toContain('?v=');
+    // A save ("Save for offline use", Try again, the auto-save) asks the worker to try again.
+    beginSave(t.env);
+    expect((await status(t.env)).noRoom).toBe(false);
+    t.site.log = [];
+    expect(await (await t.get(path)).text()).toBe(V1[path]);
+    await t.settle();
+    expect(t.site.log.map((l) => l.init.cache)).toEqual(['no-store']);
+    expect((await status(t.env)).noRoom).toBe(true); // still refused
+    // Once the phone can keep it, the next save keeps it.
+    t.caches.refuse = undefined;
+    beginSave(t.env);
+    await (await t.get(path)).arrayBuffer();
+    await t.settle();
+    s = await status(t.env);
+    expect(s.noRoom).toBe(false);
+    expect(await t.poseSaved(path)).toBe(true);
+  });
+
+  it('reports only pose files the phone couldn’t keep, not app files', async () => {
+    const t = setup();
+    await install(t.env);
+    // An app file missing from its cache (e.g. Cache Storage lost it) is fetched on use; the phone refuses to keep it.
+    const appCache = t.caches.stores.get(cacheNames(t.env.manifest).app)!;
+    appCache.entries.delete(`${BASE}assets/index-a1.js`);
+    t.caches.refuse = (url) => (url.endsWith('/index-a1.js') ? fullDisk() : undefined);
+    expect(await (await t.get('assets/index-a1.js')).text()).toBe(V1['assets/index-a1.js']);
+    await t.settle();
+    expect(t.env.state.noRoom.has('assets/index-a1.js')).toBe(true);
+    expect((await status(t.env)).noRoom).toBe(false);
   });
 
   it('reports saves still running once they land', async () => {
@@ -553,6 +628,35 @@ describe('service worker install, cache names and clean-up', () => {
     expect((await status(v2.env)).noRoom).toBe(false);
   });
 
+  it('an update still installs when the phone refuses to store a changed pose file it had saved for another reason (UnknownError on a full disk)', async () => {
+    const caches = new FakeCaches();
+    const v1 = setup(V1, caches);
+    await install(v1.env);
+    await activate(v1.env);
+    for (const p of DEFAULT_POSE) await (await v1.get(p)).arrayBuffer();
+    await v1.settle();
+    const V2 = { ...V1, 'index.html': 'v2 page!', 'mediapipe/models/pose_landmarker_full.task': 'model-full v2' };
+    const site = new FakeSite(V2);
+    const v2 = setup(V2, caches, site);
+    // Chromium on a really full disk: the estimate shows plenty of room, and the store is refused anyway.
+    v2.estimate.room = 2 ** 30;
+    caches.refuse = refusePose;
+    await install(v2.env);
+    // Downloaded and matched, couldn't be kept: skipped, so the update installs (and doesn't fail at every update check).
+    expect(site.paths().sort()).toEqual(['index.html', 'mediapipe/models/pose_landmarker_full.task']);
+    expect(await v2.poseSaved('mediapipe/models/pose_landmarker_full.task')).toBe(false);
+    expect((await status(v2.env)).noRoom).toBe(true);
+    // Once it applies, the old model's cache is deleted, which makes room: the new one is saved on use.
+    await activate(v2.env);
+    caches.refuse = undefined;
+    site.log = [];
+    expect(await (await v2.get('mediapipe/models/pose_landmarker_full.task')).text()).toBe('model-full v2');
+    await v2.settle();
+    expect(site.log.map((l) => l.init.cache)).toEqual(['no-store']);
+    expect(await v2.poseSaved('mediapipe/models/pose_landmarker_full.task')).toBe(true);
+    expect((await status(v2.env)).noRoom).toBe(false);
+  });
+
   it('pose files saved while an update that changes another pose file waits are still saved once it applies', async () => {
     const caches = new FakeCaches();
     const v1 = setup(V1, caches);
@@ -616,18 +720,36 @@ describe('service worker install, cache names and clean-up', () => {
     expect(s.app.saved).toBe(s.app.files);
   });
 
-  it('fails an install with no room for the app itself (it is retried later)', async () => {
+  it('fails an install with no room for the app itself (it is retried later), which says nothing about the pose model', async () => {
     const caches = new FakeCaches();
     caches.quota = 10;
     const t = setup(V1, caches);
-    await expect(install(t.env)).rejects.toThrow(/room/);
-    expect((await status(t.env)).noRoom).toBe(true);
+    await expect(install(t.env)).rejects.toThrow(/couldn't keep/);
+    expect((await status(t.env)).noRoom).toBe(false);
+  });
+
+  it('fails an install when the phone refuses to store one of the app’s own files for any reason (they must all be there)', async () => {
+    const first = new FakeCaches();
+    first.refuse = (url) => (url.endsWith('/index.html') ? fullDisk() : undefined);
+    const t = setup(V1, first);
+    await expect(install(t.env)).rejects.toThrow(/couldn't keep index\.html/);
+    expect((await status(t.env)).noRoom).toBe(false);
+    // An update copying an unchanged app file from the old version's cache, refused too.
+    const caches = new FakeCaches();
+    const v1 = setup(V1, caches);
+    await install(v1.env);
+    await activate(v1.env);
+    const V2 = { ...V1, 'index.html': 'v2 page' };
+    const v2 = setup(V2, caches, new FakeSite(V2));
+    caches.refuse = (url) => (url.endsWith('/index-b2.css') ? fullDisk() : undefined);
+    await expect(install(v2.env)).rejects.toThrow(/internal error/);
   });
 
   it('refuses to keep a version whose files on the server are not the ones it lists', async () => {
     const site = new FakeSite({ ...V1, 'assets/index-a1.js': 'console.log("a newer deploy")' });
     const t = setup(V1, new FakeCaches(), site);
     await expect(install(t.env)).rejects.toThrow(/doesn't match/);
+    expect((await status(t.env)).newer).toBe(true);
   });
 
   it('never touches caches that are not this app’s', async () => {

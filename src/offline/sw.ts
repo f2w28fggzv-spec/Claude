@@ -12,7 +12,7 @@
 // third layer after src/privacy.ts and the page's CSP. No analytics, logging
 // or beacons.
 import type { PrecacheManifest } from './manifest';
-import { activate, install, respond, routeRequest, status, type ToWorker, type WorkerEnv } from './worker';
+import { activate, beginSave, install, respond, routeRequest, status, type ToWorker, type WorkerEnv } from './worker';
 
 /** Filled in by the build: every file of this version with its hash. */
 declare const __FITEE_PRECACHE__: PrecacheManifest;
@@ -21,7 +21,7 @@ const worker = self as unknown as ServiceWorkerGlobalScope;
 const manifest = __FITEE_PRECACHE__;
 const base = new URL('./', worker.location.href).href;
 const saving: WorkerEnv['saving'] = new Map();
-const state: WorkerEnv['state'] = { noRoom: new Set() };
+const state: WorkerEnv['state'] = { noRoom: new Set(), newer: false };
 
 /** The only way this worker loads anything: this site's own files, never through a redirect. */
 async function ownFetch(url: string, init: RequestInit): Promise<Response> {
@@ -32,7 +32,11 @@ async function ownFetch(url: string, init: RequestInit): Promise<Response> {
   return res;
 }
 
-/** How much more this site may store, by the browser's estimate (undefined when it can't tell). */
+/**
+ * How much more this site may store, by the browser's estimate (undefined
+ * when it can't tell). Chromium reports a fixed headroom however full the
+ * disk is, so this only catches some shortages; a refused store tells the rest.
+ */
 async function room(): Promise<number | undefined> {
   const estimate = await worker.navigator.storage?.estimate?.();
   return estimate?.quota !== undefined && estimate.usage !== undefined ? estimate.quota - estimate.usage : undefined;
@@ -62,7 +66,11 @@ worker.addEventListener('message', (event) => {
   const msg = event.data as ToWorker | null;
   if (msg?.type === 'skip-waiting') void worker.skipWaiting();
   else if (msg?.type === 'claim') event.waitUntil(worker.clients.claim());
-  else if (msg?.type === 'status') {
+  else if (msg?.type === 'save') {
+    // The page is about to load the pose files to save them: keep them if the phone can.
+    beginSave({ state });
+    event.ports[0]?.postMessage(true);
+  } else if (msg?.type === 'status') {
     const port = event.ports[0];
     event.waitUntil(status(env((p) => event.waitUntil(p))).then((s) => port?.postMessage(s)));
   }

@@ -7,10 +7,10 @@
 //   npm run offline:check -- --work DIR --port 4180
 //
 // It builds the app into a temporary folder (--work to choose it), makes
-// four "deploys" of it that differ only in a marker in index.html and one
-// whose lite pose model changed too, and serves them under
-// http://localhost:<port>/Claude/ (localhost is a secure context, so the
-// service worker registers). Then it checks:
+// four "deploys" of it that differ only in a marker in index.html, one whose
+// lite pose model changed too and one whose full model changed too, and
+// serves them under http://localhost:<port>/Claude/ (localhost is a secure
+// context, so the service worker registers). Then it checks:
 //   1. the manifest has no installability errors, and maskable icons keep
 //      the logo inside the safe zone; Chrome's own install banner isn't
 //      suppressed (the "Install fitee" button in Settings is offered too);
@@ -37,11 +37,19 @@
 //      applies by itself right after the app opens on a safe screen; E
 //      fails half-way (a file missing on the server): the current version
 //      keeps working, offline too, and a later check installs E, downloading
-//      only what it hadn't saved; P (a new lite model) waits while the pose
-//      files are saved, and they're still saved once it applies;
+//      only what it hadn't saved; P (a new lite model) waits while a
+//      technique check saves the pose files, and they're still saved once it
+//      applies; with F (a new full model) waiting, the save button reads
+//      "Update and save": it reloads into F and saves F's files, each
+//      downloaded once, and Settings ends on "Ready to use offline";
 //   8. a first install that fails says so in Settings, and Try again saves
 //      the app; with no room on the phone (a small quota), Settings says so
-//      and the next launch doesn't download the pose model again;
+//      and the next launch doesn't download the pose model again; a phone
+//      whose Cache Storage refuses the pose files with UnknownError (as
+//      Chromium's does on a really full disk; a shim in front of sw.js, in a
+//      fresh context): the installed app's first launch says it couldn't
+//      keep them and starts the week-long back-off, the second downloads no
+//      pose file by itself, and a technique check still loads the model;
 //   9. no request leaves localhost at any point.
 // It prints PASS/FAIL lines and the bytes each scenario downloads, and writes
 // report.json and screenshots (Settings at 390 px, light and dark) to the
@@ -49,6 +57,7 @@
 //
 // Needs Playwright with Chromium (a dev tool, not a dependency of the app).
 const { execFileSync } = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -73,6 +82,26 @@ const NOT_SAVED =
 const LAUNCH_WINDOW_MS = 15_000;
 const DEFAULT_POSE = ['mediapipe/models/pose_landmarker_full.task', 'mediapipe/wasm/vision_wasm_internal.js', 'mediapipe/wasm/vision_wasm_internal.wasm'];
 const LITE = 'mediapipe/models/pose_landmarker_lite.task';
+const FULL = 'mediapipe/models/pose_landmarker_full.task';
+/** The first 16 hex digits of a file's SHA-256, as the build lists it (and downloads it: `?v=<hash>`). */
+const sha16 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 16);
+/** The setting Settings uses for its week-long back-off after the phone couldn't keep the pose model. */
+const NO_ROOM_KEY = 'formcheck.v1.device.offlineNoRoom';
+/**
+ * Put in front of sw.js: a Cache Storage that refuses to store the pose files
+ * the way Chromium's does on a really full disk (UnknownError, not
+ * QuotaExceededError; its storage estimate still shows plenty of room).
+ */
+const REFUSE_POSE_SHIM = `// offline-check: a phone that refuses to store the pose files, as Chromium does on a really full disk.
+(() => {
+  const put = Cache.prototype.put;
+  Cache.prototype.put = function (request, response) {
+    const url = typeof request === 'string' ? request : request.url;
+    if (String(url).includes('/mediapipe/')) return Promise.reject(new DOMException('Unexpected internal error.', 'UnknownError'));
+    return put.call(this, request, response);
+  };
+})();
+`;
 /** Pose files at about this many bytes a second where a scenario needs time (a phone's connection). */
 const PHONE_SPEED = 4_000_000;
 const slowPose = (e) => (e.path.includes('/mediapipe/') ? PHONE_SPEED : 0);
@@ -88,19 +117,20 @@ const mb = (n) => `${(n / 1e6).toFixed(2)} MB`;
 
 /**
  * Builds the app, then four deploys that differ only in a marker in
- * index.html, and one (p) whose lite pose model changed too, as when CI
- * fetches a newer model.
+ * index.html, one (p) whose lite pose model changed too, as when CI fetches
+ * a newer model, and one (f) whose full model changed too.
  */
 function buildAll() {
   const builds = { a: path.join(WORK, 'build-a') };
   execFileSync('npx', ['vite', 'build', '--outDir', builds.a, '--emptyOutDir', '--logLevel', 'warn'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] });
-  for (const marker of ['b', 'c', 'd', 'e', 'p']) {
+  for (const marker of ['b', 'c', 'd', 'e', 'p', 'f']) {
     const dir = path.join(WORK, `build-${marker}`);
     fs.rmSync(dir, { recursive: true, force: true });
     fs.cpSync(builds.a, dir, { recursive: true });
     const index = path.join(dir, 'index.html');
     fs.writeFileSync(index, fs.readFileSync(index, 'utf8').replace('<head>', `<head>\n    <meta name="fitee-build" content="${marker}" />`));
     if (marker === 'p') fs.appendFileSync(path.join(dir, LITE), Buffer.from([0]));
+    if (marker === 'f') fs.appendFileSync(path.join(dir, FULL), Buffer.from([0]));
     execFileSync(process.execPath, ['scripts/offline-build.ts', dir], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] });
     builds[marker] = dir;
   }
@@ -804,9 +834,10 @@ async function main() {
     );
     await inst.close();
 
-    // ── Update P changes the lite model; the pose files saved while it waits stay saved ──
-    // Each pose file has its own cache, named by its hash: files saved by the
-    // running version while P waits are P's files too (only the lite model changed).
+    // ── Update P changes the lite model; the pose files a technique check saves while it waits stay saved ──
+    // Each pose file has its own cache, named by its hash: files the running
+    // version saves (on use) while P waits are P's files too (only the lite
+    // model changed). (The save button would apply P first: scenario F.)
     server.setRoot(builds.e);
     server.setPhase('update-p-first-visit');
     const pc = await browser.newContext(PHONE);
@@ -827,8 +858,11 @@ async function main() {
     server.setPhase('update-p');
     await r.evaluate(() => navigator.serviceWorker.getRegistration().then((reg) => reg?.update()));
     const pWaits = await until(() => r.locator('li[data-update="ready"]').isVisible(), 60000);
-    await r.locator('li[data-offline="app-only"] button').click();
-    const pSaved = await until(() => r.locator('li[data-offline="ready"]').isVisible(), 90000);
+    await go(r, '#/analyze/back-squat');
+    const pLoaded = await until(() => r.getByRole('button', { name: 'Start camera' }).isEnabled(), 90000, 500);
+    await go(r, '#/settings');
+    const pSaved = pLoaded && (await until(() => r.locator('li[data-offline="ready"]').isVisible(), 30000));
+    const mWaiting = await marker(r);
     await r.close();
     await sleep(500);
     r = await pc.newPage();
@@ -843,11 +877,62 @@ async function main() {
     const pCheck = await until(() => r.getByRole('button', { name: 'Start camera' }).isEnabled(), 60000, 500);
     server.setDown(false);
     check(
-      'pose files saved while an update with a new lite model waits are still saved once it applies (offline technique check)',
-      pWaits && pSaved && mP === 'p' && pReady && pCheck,
-      `offered ${!!pWaits}; saved while it waited ${!!pSaved}; now running ${mP}; offline: Settings ready ${!!pReady}, check ready ${!!pCheck}; caches ${Object.keys(await cacheSummary(r)).join(', ')}`,
+      'pose files a technique check saves while an update with a new lite model waits are still saved once it applies (offline technique check)',
+      pWaits && pSaved && mWaiting === 'e' && mP === 'p' && pReady && pCheck,
+      `offered ${!!pWaits}; saved by a check while it waited (running ${mWaiting}) ${!!pSaved}; now running ${mP}; offline: Settings ready ${!!pReady}, check ready ${!!pCheck}; caches ${Object.keys(await cacheSummary(r)).join(', ')}`,
     );
     await pc.close();
+
+    // ── Update F changes the full model: "Update and save" applies it, then saves its files ──
+    // The running version can't keep a pose file the waiting update changed
+    // (the site already serves the new one), so with F waiting the save
+    // button reads "Update and save": it reloads into F and carries on, saving
+    // F's files, each downloaded once.
+    server.setRoot(builds.e);
+    server.setPhase('update-f-first-visit');
+    const uc = await browser.newContext(PHONE);
+    track(uc, 'update-and-save');
+    const u = await uc.newPage();
+    watchErrors(u, 'update-and-save');
+    await u.goto(BASE);
+    const uOpened = Date.now();
+    await u.getByRole('button', { name: 'Skip for now' }).click();
+    await until(async () => {
+      const s = await swStatus(u);
+      return s && s.app.saved === s.app.files;
+    }, 30000);
+    await go(u, '#/settings');
+    await sleep(Math.max(0, LAUNCH_WINDOW_MS + 1000 - (Date.now() - uOpened)));
+    server.setRoot(builds.f);
+    server.setPhase('update-f');
+    await u.evaluate(() => navigator.serviceWorker.getRegistration().then((reg) => reg?.update()));
+    const fWaits = await until(() => u.locator('li[data-update="ready"]').isVisible(), 60000);
+    const saveLabel = (await u.locator('li[data-offline="app-only"] button').textContent().catch(() => ''))?.trim();
+    const mBefore = await marker(u);
+    await screenshot(u, 'settings-update-and-save');
+    server.setPhase('update-and-save');
+    await u.locator('li[data-offline="app-only"] button').click({ timeout: 10000 }).catch((err) => report.notes.push(`“Update and save” couldn’t be pressed: ${err.message.split('\n')[0]}`));
+    const fReady = await until(() => u.locator('li[data-offline="ready"]').isVisible(), 90000);
+    const mF = await marker(u);
+    const fPose = server.requests('update-and-save').filter((e) => e.path.includes('/mediapipe/'));
+    const fFull = sha16(fs.readFileSync(path.join(builds.f, FULL)));
+    const fStatus = await swStatus(u);
+    check(
+      '“Update and save” while an update with a new full model waits: reloads into it, saves its files (each downloaded once), and ends on “Ready to use offline”',
+      fWaits &&
+        saveLabel === 'Update and save' &&
+        mBefore === 'e' &&
+        fReady &&
+        mF === 'f' &&
+        fPose.length === 3 &&
+        new Set(fPose.map((e) => e.path)).size === 3 &&
+        fPose.some((e) => e.path.endsWith(FULL) && e.query === `?v=${fFull}`) &&
+        DEFAULT_POSE.every((x) => fStatus?.pose.find((p) => p.url === x)?.saved),
+      `offered ${!!fWaits}; button “${saveLabel}” (running ${mBefore}); now running ${mF}; ${fPose.map((e) => `${e.path.split('/').pop()}${e.query}`).join(', ')}; ${mb(bytesIn(server, 'update-and-save'))}; Ready ${!!fReady}`,
+    );
+    report.bytes.updateAndSave = bytesIn(server, 'update-and-save');
+    await screenshot(u, 'settings-ready-after-update-and-save');
+    await uc.close();
 
     // ── 8a. A first install that fails says so, and Try again saves the app ──
     server.setRoot(builds.e);
@@ -875,10 +960,11 @@ async function main() {
     await fc.close();
 
     // ── 8b. No room on the phone ──────────────────────────────────────────
-    // A small quota (CDP) makes Cache Storage refuse the pose files. The
-    // browser's estimate doesn't see this override, so it's the worker's
-    // refused save that has to tell: Settings says there's no room (not
-    // "check your connection"), and the next launch doesn't download again.
+    // A small quota (CDP) makes Cache Storage refuse the pose files
+    // (QuotaExceededError). The browser's estimate doesn't see this override,
+    // so it's the worker's refused save that has to tell: Settings says the
+    // phone couldn't keep it (not "check your connection"), and the next
+    // launch doesn't download again.
     server.setPhase('no-room-launch-1');
     const nc = await browser.newContext(PHONE);
     await nc.addInitScript(() => Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true, configurable: true }));
@@ -890,27 +976,98 @@ async function main() {
     await n.goto(BASE);
     await n.getByRole('button', { name: 'Skip for now' }).click();
     await go(n, '#/settings');
-    const noRoomText = await until(async () => {
-      const t = (await n.locator('li[data-offline="app-only"]').textContent().catch(() => '')) ?? '';
-      return /isn’t room/.test(t) ? t.replace(/\s+/g, ' ').trim() : null;
-    }, 90000);
+    const couldntKeep = (page) =>
+      page
+        .locator('li[data-offline="app-only"]')
+        .textContent()
+        .then((t) => (/couldn’t keep the pose model \(\d+(\.\d)? MB\), most likely for lack of space/.test(t ?? '') ? t.replace(/\s+/g, ' ').trim() : null))
+        .catch(() => null);
+    const noRoomText = await until(() => couldntKeep(n), 90000);
+    const noRoomSince = await n.evaluate((k) => localStorage.getItem(k), NO_ROOM_KEY);
     await screenshot(n, 'settings-no-room');
     server.setPhase('no-room-launch-2');
     await n.reload();
     await sleep(6000);
     await go(n, '#/settings');
-    const secondText = await until(async () => {
-      const t = (await n.locator('li[data-offline="app-only"]').textContent().catch(() => '')) ?? '';
-      return /isn’t room/.test(t) ? t : null;
-    }, 10000);
+    const secondText = await until(() => couldntKeep(n), 10000);
     const secondPose = server.requests('no-room-launch-2').filter((e) => e.path.includes('/mediapipe/'));
     check(
-      'with no room for the pose model, Settings says so, and the next launch doesn’t download it again',
-      noRoomText && secondText && secondPose.length === 0,
-      `${noRoomText ?? 'no message'}; launch 1 ${mb(bytesIn(server, 'no-room-launch-1'))}, launch 2 pose requests: ${secondPose.length}`,
+      'with no room for the pose model, Settings says the phone couldn’t keep it, and the next launch doesn’t download it again',
+      noRoomText && Number(noRoomSince) > 0 && secondText && secondPose.length === 0,
+      `${noRoomText ?? 'no message'}; back-off since ${noRoomSince}; launch 1 ${mb(bytesIn(server, 'no-room-launch-1'))}, launch 2 pose requests: ${secondPose.length}`,
     );
     await ncdp.detach().catch(() => {});
     await nc.close();
+
+    // ── 8c. A phone that refuses to store the pose files (a full disk) ───
+    // On a really full disk Chromium's Cache.put() throws UnknownError
+    // ("Unexpected internal error"), not QuotaExceededError, and its storage
+    // estimate shows a fixed headroom, so neither the estimate nor the quota
+    // error tells. Played portably: the server puts a shim in front of sw.js
+    // whose Cache.prototype.put rejects the pose files that way (a fresh
+    // context, so a first install). Any refused store counts: the installed
+    // app's first launch tries once, says the phone couldn't keep the model
+    // and starts the week-long back-off; the second launch downloads no pose
+    // file by itself; a technique check still loads the model.
+    server.setSwPrefix(REFUSE_POSE_SHIM);
+    server.setPhase('refused-launch-1');
+    const rc = await browser.newContext(PHONE);
+    await rc.grantPermissions(['camera'], { origin: ORIGIN });
+    await rc.addInitScript(() => Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true, configurable: true }));
+    track(rc, 'refused');
+    let rp = await rc.newPage();
+    watchErrors(rp, 'refused');
+    await rp.goto(BASE);
+    await until(() => rp.evaluate(() => !!navigator.serviceWorker.controller), 30000);
+    const shimmed = await rp.evaluate(() => fetch('sw.js', { cache: 'no-store' }).then((res) => res.text())).then((t) => t.startsWith('// offline-check:'));
+    // The browser's estimate sees plenty of room, so only the refused store can tell.
+    const room = await rp.evaluate(async () => {
+      const e = await navigator.storage.estimate();
+      return e.quota - e.usage;
+    });
+    await rp.getByRole('button', { name: 'Skip for now' }).click();
+    await go(rp, '#/settings');
+    const refusedText = await until(() => couldntKeep(rp), 90000);
+    const refusedSince = await rp.evaluate((k) => localStorage.getItem(k), NO_ROOM_KEY);
+    const refusedStatus = await swStatus(rp);
+    await screenshot(rp, 'settings-refused-store');
+    const launch1 = server.requests('refused-launch-1').filter((e) => e.path.includes('/mediapipe/'));
+    await rp.close();
+    server.setPhase('refused-launch-2');
+    rp = await rc.newPage();
+    watchErrors(rp, 'refused');
+    await rp.goto(BASE);
+    await sleep(6000);
+    await go(rp, '#/settings');
+    const refusedAgain = await until(() => couldntKeep(rp), 10000);
+    const launch2 = server.requests('refused-launch-2').filter((e) => e.path.includes('/mediapipe/'));
+    check(
+      'a phone that refuses to store the pose files (UnknownError, as on a full disk): the installed app’s first launch says it couldn’t keep them and starts the back-off; the second launch downloads no pose file by itself',
+      shimmed &&
+        room > report.sizes.poseDefaultBytes &&
+        refusedText &&
+        Number(refusedSince) > 0 &&
+        refusedStatus?.noRoom === true &&
+        !refusedStatus.pose.some((p) => p.saved) &&
+        launch1.length === 3 &&
+        refusedAgain &&
+        launch2.length === 0,
+      `shim in front of sw.js: ${shimmed}; estimate's room ${mb(room)}; ${refusedText ?? 'no message'}; back-off since ${refusedSince}; launch 1: ${launch1.length} pose requests, ${mb(launch1.reduce((n, e) => n + e.bytes, 0))}; launch 2: ${launch2.length}`,
+    );
+    report.bytes.refusedLaunch1 = launch1.reduce((n, e) => n + e.bytes, 0);
+    report.bytes.refusedLaunch2 = launch2.reduce((n, e) => n + e.bytes, 0);
+    // Not saved, but a technique check still loads the model (through the HTTP cache).
+    server.setPhase('refused-check');
+    await go(rp, '#/analyze/back-squat');
+    const refusedCheck = await until(() => rp.getByRole('button', { name: 'Start camera' }).isEnabled(), 90000, 500);
+    const checkFiles = server.requests('refused-check').filter((e) => e.path.includes('/mediapipe/'));
+    check(
+      '…and a technique check still loads the pose model there',
+      refusedCheck,
+      checkFiles.map((e) => `${e.path.split('/').pop()}${e.query} ${e.status}`).join(', ') || 'no pose requests',
+    );
+    server.setSwPrefix(null);
+    await rc.close();
 
     // ── 9. Nothing left the device ────────────────────────────────────────
     const outside = requests.filter((r) => !r.url.startsWith(`${ORIGIN}/`) && !/^(data|blob):/.test(r.url));
@@ -950,6 +1107,8 @@ async function main() {
   console.log(`  first launch, installed:         ${mb(report.bytes.firstLaunchInstalled ?? 0)}  (about ${mb(over('installed-first-launch'))})`);
   console.log(`  "Save for offline use":          ${mb(report.bytes.saveButton ?? 0)}  (about ${mb(over('tab-save-button'))})`);
   console.log(`  update (pose files unchanged):   ${mb(report.bytes.updateUnchangedPose ?? 0)}  (about ${mb(over('update-b'))})`);
+  console.log(`  "Update and save" (new model):   ${mb(report.bytes.updateAndSave ?? 0)}  (about ${mb(over('update-and-save'))})`);
+  console.log(`  store refused (installed app):   launch 1 ${mb(report.bytes.refusedLaunch1 ?? 0)} of pose files, launch 2 ${mb(report.bytes.refusedLaunch2 ?? 0)}`);
   for (const n of report.notes) console.log(`Note: ${n}`);
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length} of ${results.length} checks passed. Report and screenshots in ${WORK}`);

@@ -1,8 +1,10 @@
 // The app side of offline use (src/offline/state.ts): install hints, what the
-// offline row in Settings shows, the pose-model message and when an update
-// may apply by itself.
+// offline row in Settings shows (its problem, message and button), the
+// pose-model message, when the app saves the pose model by itself and when
+// an update may apply by itself.
 import { describe, expect, it } from 'vitest';
 import {
+  appOnlyMessage,
   canApplyUpdate,
   formatMB,
   installHint,
@@ -11,11 +13,13 @@ import {
   mayAutoSave,
   modelErrorMessage,
   NO_ROOM_RETRY_MS,
+  noRoomSince,
   offlineView,
   POSE_NEEDS_CONNECTION,
   POSE_NOT_SAVED,
   poseSaved,
   poseToSave,
+  saveButtonLabel,
   variantNotSaved,
   type OfflineFacts,
 } from '../src/offline/state';
@@ -55,6 +59,7 @@ describe('install hint', () => {
 const status = (saved: string[], appSaved = 3): WorkerStatus => ({
   version: 'v1',
   noRoom: false,
+  newer: false,
   app: { files: 3, saved: appSaved, bytes: 900_000 },
   pose: [
     { url: 'mediapipe/models/pose_landmarker_full.task', size: 9_398_198, saved: false },
@@ -69,7 +74,7 @@ const SIMD_FULL = ['pose_landmarker_full.task', 'vision_wasm_internal.js', 'visi
 const NOSIMD_FULL = ['pose_landmarker_full.task', 'vision_wasm_nosimd_internal.js', 'vision_wasm_nosimd_internal.wasm'];
 
 describe('offline state', () => {
-  const view = (o: Partial<OfflineFacts>) => offlineView({ worker: 'active', simd: true, saveFailed: false, noRoom: false, online: true, ...o });
+  const view = (o: Partial<OfflineFacts>) => offlineView({ worker: 'active', simd: true, updateReady: false, online: true, ...o });
 
   it('is off without a service worker, saying why', () => {
     expect(view({ off: 'unsupported' })).toEqual({ kind: 'off', reason: 'unsupported' });
@@ -88,21 +93,45 @@ describe('offline state', () => {
     expect(view({ worker: 'failed', online: false })).toEqual({ kind: 'app-failed', online: false });
   });
   it('has the app but not the pose model, with what saving it downloads', () => {
-    expect(view({ status: status([]) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, failed: false, noRoom: false, online: true });
-    expect(view({ status: status(['vision_wasm_internal.js']) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980 - 334_128, failed: false, noRoom: false, online: true });
-    expect(view({ status: status([]), simd: false, saveFailed: true, online: false })).toEqual({
+    expect(view({ status: status([]) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, updateWaiting: false, online: true });
+    expect(view({ status: status(['vision_wasm_internal.js']) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980 - 334_128, updateWaiting: false, online: true });
+    expect(view({ status: status([]), simd: false, problem: 'failed', online: false })).toEqual({
       kind: 'app-only',
       poseBytes: 22_647_530,
-      failed: true,
-      noRoom: false,
+      problem: 'failed',
+      updateWaiting: false,
       online: false,
     });
     // The no-SIMD runtime doesn't help a SIMD browser, and the lite model isn't the default.
     expect(view({ status: status([...NOSIMD_FULL, 'lite.task']) }).kind).toBe('app-only');
     expect(poseToSave(status(['full.task']), true).map((p) => p.url)).toEqual(['mediapipe/wasm/vision_wasm_internal.js', 'mediapipe/wasm/vision_wasm_internal.wasm']);
   });
-  it('says when there was no room on the phone for the pose model', () => {
-    expect(view({ status: status([]), noRoom: true })).toMatchObject({ kind: 'app-only', noRoom: true });
+  it('says why the last try didn’t save the pose model: the connection, a phone that couldn’t keep it, or a newer version on the site', () => {
+    for (const problem of ['failed', 'no-room', 'newer'] as const)
+      expect(view({ status: status([]), problem })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, problem, updateWaiting: false, online: true });
+    // Once it's saved (e.g. by a technique check), a problem from before doesn't show.
+    expect(view({ status: status(SIMD_FULL), problem: 'no-room' }).kind).toBe('ready');
+  });
+  it('says when a new version is waiting (saving applies it first)', () => {
+    expect(view({ status: status([]), updateReady: true })).toMatchObject({ kind: 'app-only', updateWaiting: true });
+    expect(view({ status: status([]), updateReady: true, problem: 'newer' })).toMatchObject({ kind: 'app-only', updateWaiting: true, problem: 'newer' });
+  });
+  it('words each problem, with the real size of what is missing', () => {
+    expect(appOnlyMessage({ poseBytes: 24_198_980 })).toBe('Technique checks need the pose model. Save it (24 MB) to check your technique with no signal.');
+    expect(appOnlyMessage({ poseBytes: 23_864_852, problem: 'no-room' })).toBe(
+      'This phone couldn’t keep the pose model (24 MB), most likely for lack of space. Free up some space, then try again.',
+    );
+    expect(appOnlyMessage({ poseBytes: 9_398_198, problem: 'no-room' })).toContain('(9.4 MB)');
+    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'newer' })).toBe('A new version of fitee is out. Update it, then save the pose model.');
+    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'failed' })).toBe('Couldn’t save the pose model. Check your connection and try again.');
+  });
+  it('labels the button “Update and save” whenever a new version waits, else “Try again” after a problem, else “Save for offline use”', () => {
+    expect(saveButtonLabel({ updateWaiting: false })).toBe('Save for offline use');
+    for (const problem of ['failed', 'no-room', 'newer'] as const) {
+      expect(saveButtonLabel({ updateWaiting: false, problem })).toBe('Try again');
+      expect(saveButtonLabel({ updateWaiting: true, problem })).toBe('Update and save');
+    }
+    expect(saveButtonLabel({ updateWaiting: true })).toBe('Update and save');
   });
   it('shows progress while saving the pose model', () => {
     expect(view({ status: status([]), saving: { done: 5e6, total: 24e6 } })).toEqual({ kind: 'saving-pose', done: 5e6, total: 24e6 });
@@ -174,10 +203,19 @@ describe('when an installed app saves the pose model by itself', () => {
   it('not where the browser reports Data Saver', () => {
     expect(may({ saveData: true })).toBe(false);
   });
-  it('not again for a week after a save found no room, so a full phone doesn’t download it at every launch', () => {
+  it('not again for a week after the phone couldn’t keep it, so a full phone doesn’t download it at every launch', () => {
     expect(may({ noRoomAt: NOW - 60_000 })).toBe(false);
     expect(may({ noRoomAt: NOW - NO_ROOM_RETRY_MS + 1 })).toBe(false);
     expect(may({ noRoomAt: NOW - NO_ROOM_RETRY_MS })).toBe(true);
+  });
+  it('counts that week from the first failure: later ones in it don’t push it back; one after it starts a new week', () => {
+    expect(noRoomSince(undefined, NOW)).toBe(NOW);
+    expect(noRoomSince(NOW - 60_000, NOW)).toBe(NOW - 60_000);
+    expect(noRoomSince(NOW - NO_ROOM_RETRY_MS + 1, NOW)).toBe(NOW - NO_ROOM_RETRY_MS + 1);
+    expect(noRoomSince(NOW - NO_ROOM_RETRY_MS, NOW)).toBe(NOW);
+    // A time from a clock that has since been put back doesn't hold the app back for longer than a week.
+    expect(noRoomSince(NOW + 3 * NO_ROOM_RETRY_MS, NOW)).toBe(NOW);
+    expect(may({ noRoomAt: NOW + 3 * NO_ROOM_RETRY_MS })).toBe(true);
   });
 });
 

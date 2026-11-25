@@ -4,7 +4,7 @@
 // pose model is being saved. State comes from src/offline/client.ts.
 import { useEffect } from 'preact/hooks';
 import { applyUpdate, promptInstall, refreshOffline, retryOffline, savePoseFiles, useOffline } from '../offline/client';
-import { formatMB, installHint, offlineView, type OfflineView } from '../offline/state';
+import { appOnlyMessage, formatMB, installHint, offlineView, saveButtonLabel, type OfflineView } from '../offline/state';
 import { Icon } from './icons';
 
 export function OfflineSection() {
@@ -65,7 +65,7 @@ export function OfflineSection() {
           )}
         </li>
         <li class="status-row" data-offline={view.kind}>
-          <OfflineRow view={view} />
+          <OfflineRow view={view} updating={info.updating} />
         </li>
         {info.updateReady && (
           <li class="status-row" data-update="ready">
@@ -87,7 +87,7 @@ export function OfflineSection() {
   );
 }
 
-function OfflineRow({ view }: { view: OfflineView }) {
+function OfflineRow({ view, updating }: { view: OfflineView; updating: boolean }) {
   switch (view.kind) {
     case 'off':
       return (
@@ -149,16 +149,11 @@ function OfflineRow({ view }: { view: OfflineView }) {
         <>
           <span class="row-main">
             <strong>The app works offline</strong>
-            <small>
-              {view.noRoom
-                ? `There isn’t room on this phone for the pose model (${formatMB(view.poseBytes)}). Free up some space, then try again.`
-                : view.failed
-                  ? 'Couldn’t save the pose model. Check your connection and try again.'
-                  : `Technique checks need the pose model. Save it (${formatMB(view.poseBytes)}) to check your technique with no signal.`}
-            </small>
+            <small>{appOnlyMessage(view)}</small>
           </span>
-          <button type="button" class="small-btn secondary" disabled={!view.online} onClick={() => void savePoseFiles()}>
-            <Icon name="download" size={18} /> {view.failed || view.noRoom ? 'Try again' : 'Save for offline use'}
+          {/* With a new version waiting, it updates first and saves after the reload. */}
+          <button type="button" class="small-btn secondary" disabled={!view.online || updating} onClick={() => void savePoseFiles()}>
+            <Icon name="download" size={18} /> {saveButtonLabel(view)}
           </button>
           {!view.online && <small class="muted">Connect to the internet to save it.</small>}
         </>

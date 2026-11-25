@@ -45,6 +45,14 @@ export type OfflineOff =
  */
 export type WorkerState = 'unknown' | 'installing' | 'active' | 'failed';
 
+/**
+ * Why the pose model isn't saved after a try: the download failed (most
+ * likely the connection), the phone couldn't keep it (the browser refused to
+ * store it, most likely for lack of space), or the site already serves a
+ * newer version of it (update first, then save).
+ */
+export type SaveProblem = 'failed' | 'no-room' | 'newer';
+
 export interface OfflineFacts {
   off?: OfflineOff;
   worker: WorkerState;
@@ -53,9 +61,10 @@ export interface OfflineFacts {
   /** Whether this browser runs MediaPipe's SIMD runtime (decides which runtime to save). */
   simd: boolean;
   saving?: { done: number; total: number };
-  saveFailed: boolean;
-  /** The last try found no room on the phone for the pose model. */
-  noRoom: boolean;
+  /** Why the last try didn't save the pose model (or that a technique check couldn't keep it). */
+  problem?: SaveProblem;
+  /** A new version has installed and is waiting. */
+  updateReady: boolean;
   online: boolean;
 }
 
@@ -67,8 +76,11 @@ export type OfflineView =
   /** The first save of the app failed: nothing is saved yet. */
   | { kind: 'app-failed'; online: boolean }
   | { kind: 'saving-pose'; done: number; total: number }
-  /** The app is saved; the pose model isn't (yet). `poseBytes`: what saving it downloads. */
-  | { kind: 'app-only'; poseBytes: number; failed: boolean; noRoom: boolean; online: boolean }
+  /**
+   * The app is saved; the pose model isn't (yet). `poseBytes`: what saving it
+   * downloads; `updateWaiting`: a new version waits (saving applies it first).
+   */
+  | { kind: 'app-only'; poseBytes: number; problem?: SaveProblem; updateWaiting: boolean; online: boolean }
   | { kind: 'ready'; bytes: number };
 
 /** Whether the pose files one technique check needs are saved (the default full model unless given). */
@@ -92,24 +104,58 @@ export function offlineView(f: OfflineFacts): OfflineView {
   if (f.saving) return { kind: 'saving-pose', done: f.saving.done, total: f.saving.total };
   if (!poseSaved(s, f.simd)) {
     const poseBytes = poseToSave(s, f.simd).reduce((n, p) => n + p.size, 0);
-    return { kind: 'app-only', poseBytes, failed: f.saveFailed, noRoom: f.noRoom, online: f.online };
+    return { kind: 'app-only', poseBytes, problem: f.problem, updateWaiting: f.updateReady, online: f.online };
   }
   return { kind: 'ready', bytes: s.app.bytes + s.pose.filter((p) => p.saved).reduce((n, p) => n + p.size, 0) };
 }
 
-/** After a save that found no room on the phone, the app doesn't try again by itself for this long. */
+/** What the offline row says when the app is saved but the pose model isn't. */
+export function appOnlyMessage(v: { poseBytes: number; problem?: SaveProblem }): string {
+  switch (v.problem) {
+    case 'no-room':
+      return `This phone couldn’t keep the pose model (${formatMB(v.poseBytes)}), most likely for lack of space. Free up some space, then try again.`;
+    case 'newer':
+      return 'A new version of fitee is out. Update it, then save the pose model.';
+    case 'failed':
+      return 'Couldn’t save the pose model. Check your connection and try again.';
+    default:
+      return `Technique checks need the pose model. Save it (${formatMB(v.poseBytes)}) to check your technique with no signal.`;
+  }
+}
+
+/**
+ * The save button: "Update and save" whenever a new version is waiting (it
+ * applies first, then saves its files), else "Try again" after a problem,
+ * else "Save for offline use".
+ */
+export function saveButtonLabel(v: { problem?: SaveProblem; updateWaiting: boolean }): string {
+  if (v.updateWaiting) return 'Update and save';
+  return v.problem ? 'Try again' : 'Save for offline use';
+}
+
+/** After the phone couldn't keep the pose model, the app doesn't try again by itself for this long. */
 export const NO_ROOM_RETRY_MS = 7 * 24 * 60 * 60_000;
 
 /**
  * Whether an app opened from the home screen may save the pose model by
  * itself now: online, once the terms (which describe it) are accepted, not
- * when the browser reports Data Saver, and not for a week after a save that
- * found no room (so a full phone doesn't download it at every launch).
+ * when the browser reports Data Saver, and not for a week after the phone
+ * couldn't keep it (so a full phone doesn't download it at every launch).
  * Settings offers it otherwise.
  */
 export function mayAutoSave(o: { standalone: boolean; online: boolean; saveData: boolean; termsAccepted: boolean; noRoomAt?: number; now: number }): boolean {
   if (!o.standalone || !o.online || o.saveData || !o.termsAccepted) return false;
-  return o.noRoomAt === undefined || o.now - o.noRoomAt >= NO_ROOM_RETRY_MS;
+  return o.noRoomAt === undefined || noRoomSince(o.noRoomAt, o.now) !== o.noRoomAt;
+}
+
+/**
+ * When that week starts: at the first time the phone couldn't keep the pose
+ * model. Later failures within the week (every status while the worker runs
+ * says so again) don't push it back; one after it has run out (or a time
+ * from a clock that has since been put back) starts a new week.
+ */
+export function noRoomSince(previous: number | undefined, now: number): number {
+  return previous !== undefined && now >= previous && now - previous < NO_ROOM_RETRY_MS ? previous : now;
 }
 
 /** Megabytes for people: "0.9 MB", "24 MB". */

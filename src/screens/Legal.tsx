@@ -146,7 +146,7 @@ export function PrivacyScreen() {
           you open it. The pose model (about 24 MB) is saved the first time you use a technique check or the camera test, when you tap “Save for offline use”
           in Settings, or by itself when you open the app from your home screen while online, once you’ve accepted this policy. It isn’t downloaded by itself
           when your browser reports that data saver is on (Chrome on Android reports it; iPhones and iPads don’t report Low Data Mode to websites, so they
-          download it either way), or for a week after it didn’t fit on your device.
+          download it either way), or for a week after your device couldn’t keep it (usually for lack of space).
         </p>
         <p>None of this is sent to the developers or any third party. We can’t see it, and we can’t recover it for you.</p>
 

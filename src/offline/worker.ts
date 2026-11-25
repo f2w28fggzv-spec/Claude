@@ -10,8 +10,8 @@
 //   browser tries again at its next update check.
 // - Each pose file has a cache of its own, named by the file's hash, so an
 //   update leaves unchanged pose files where they are. A changed one is
-//   downloaded only if the phone had saved the old one; if there's no room
-//   for it, it's left to be saved later rather than holding up the update.
+//   downloaded only if the phone had saved the old one; if the phone can't
+//   keep it, it's left to be saved later rather than holding up the update.
 // - Before downloading a file it looks in the browser's own HTTP cache
 //   (never the network): the page has usually just loaded the app's code,
 //   and phones that used technique checks before may still have the pose
@@ -20,12 +20,18 @@
 //   makes follows a redirect: nothing leaves the phone.
 // - Requests for the app's files are answered from the cache. Pose files are
 //   answered from the cache, else downloaded once (a second request for a
-//   file already on its way waits for it) and saved as they're used; when
-//   there's no room to keep one, it goes through the HTTP cache like any web
-//   file. If Cache Storage itself fails, requests go to the network, so the
-//   app still opens online. Anything else of this site's (other methods,
-//   unknown files) goes to the network untouched and is never stored.
-// - Activating a version deletes this app's caches that it doesn't use.
+//   file already on its way waits for it) and saved as they're used. A file
+//   the browser refused to store (for lack of room, or any other reason: on a
+//   really full disk Chromium says "UnknownError", not "QuotaExceededError")
+//   is reported, and from then on goes through the HTTP cache like any web
+//   file, until the page starts a save and asks the worker to try again. If
+//   Cache Storage itself fails, requests go to the network, so the app still
+//   opens online. Anything else of this site's (other methods, unknown
+//   files) goes to the network untouched and is never stored.
+// - A download that arrives but isn't this version's file means the site
+//   already serves a newer version: reported, so the page can update first.
+// - Activating a version deletes this app's caches that it doesn't use (the
+//   room they free means files that didn't fit are tried again).
 import {
   CACHE_PREFIX,
   cacheNames,
@@ -55,10 +61,22 @@ export interface WorkerEnv {
    * again.
    */
   saving: Map<string, Promise<ArrayBuffer | undefined>>;
-  /** Bytes this site may still store (the browser's estimate); undefined when it can't tell. */
+  /**
+   * Bytes this site may still store (the browser's estimate); undefined when
+   * it can't tell. Only a cheap first check: Chromium reports a fixed
+   * headroom however full the disk is, so a refused store has the last word.
+   */
   room: () => Promise<number | undefined>;
-  /** Shared while the worker runs: files it couldn't keep for lack of room on the phone (until one is kept). */
-  state: { noRoom: Set<string> };
+  /** Shared while the worker runs. */
+  state: SaveState;
+}
+
+/** What the worker learned while saving files, until the page starts a save (`beginSave`). */
+export interface SaveState {
+  /** Files the phone couldn't keep: the browser refused to store them, or its estimate showed no room. */
+  noRoom: Set<string>;
+  /** A download came back fine but wasn't this version's file: the site already serves a newer version. */
+  newer: boolean;
 }
 
 /** What to do with one request. */
@@ -79,16 +97,23 @@ export interface RequestLike {
   mode: string;
 }
 
-/** Messages the app sends to the worker. "claim": take over a page loaded past it (e.g. a hard reload). */
-export type ToWorker = { type: 'status' } | { type: 'skip-waiting' } | { type: 'claim' };
+/**
+ * Messages the app sends to the worker. "claim": take over a page loaded past
+ * it (e.g. a hard reload). "save": the page is about to load the pose files
+ * to save them (answered once noted), so the worker tries again to keep the
+ * ones it couldn't keep before.
+ */
+export type ToWorker = { type: 'status' } | { type: 'skip-waiting' } | { type: 'claim' } | { type: 'save' };
 
 /** What the worker has saved, as reported to the app. */
 export interface WorkerStatus {
   version: string;
   app: { files: number; saved: number; bytes: number };
   pose: { url: string; size: number; saved: boolean }[];
-  /** A file the worker tried to keep didn't fit on the phone (and hasn't been kept since). */
+  /** A pose file couldn't be kept on the phone (since the last save began, and it hasn't been kept since). */
   noRoom: boolean;
+  /** A download showed the site already serves a newer version (since the last save began). */
+  newer: boolean;
 }
 
 /**
@@ -97,7 +122,7 @@ export interface WorkerStatus {
  * lead to another site.
  */
 const NETWORK: RequestInit = { cache: 'no-store', credentials: 'same-origin', redirect: 'error' };
-/** A pose file there's no room to keep: through the HTTP cache, like any web file, so a repeat is checked rather than downloaded again. */
+/** A pose file the phone can't keep: through the HTTP cache, like any web file, so a repeat is checked rather than downloaded again. */
 const UNKEPT: RequestInit = { cache: 'default', credentials: 'same-origin', redirect: 'error' };
 /** Only the browser's HTTP cache, stale copies included; never the network. */
 const HTTP_CACHE_ONLY: RequestInit = { cache: 'only-if-cached', mode: 'same-origin', credentials: 'same-origin', redirect: 'error' };
@@ -153,18 +178,17 @@ async function exactBody(entry: PrecacheEntry, res: Response): Promise<ArrayBuff
 const keptResponse = (entry: PrecacheEntry, body: ArrayBuffer) =>
   new Response(body, { status: 200, headers: { 'content-type': entry.type, 'content-length': String(body.byteLength), [HASH_HEADER]: entry.hash } });
 
-/** The browser refused to store something for lack of room. */
-const isNoRoom = (err: unknown) => (err as { name?: unknown } | null)?.name === 'QuotaExceededError';
-
 /**
- * Stores this version's exact copy of a file. Returns false when the phone
- * has no room for it (noted for the status); other failures throw.
+ * Stores this version's exact copy of a file (it downloaded and matched).
+ * Returns false when the browser refuses it, whatever the reason: the phone
+ * couldn't keep it, noted for the status. Over quota the browser says
+ * QuotaExceededError, but on a really full disk Chromium says UnknownError
+ * ("Unexpected internal error"), and a damaged Cache Storage fails too.
  */
 async function store(env: WorkerEnv, cacheName: string, entry: PrecacheEntry, body: ArrayBuffer): Promise<boolean> {
   try {
     await (await env.caches.open(cacheName)).put(absolute(env, entry.url), keptResponse(entry, body));
-  } catch (err) {
-    if (!isNoRoom(err)) throw err;
+  } catch {
     env.state.noRoom.add(entry.url);
     return false;
   }
@@ -174,7 +198,9 @@ async function store(env: WorkerEnv, cacheName: string, entry: PrecacheEntry, bo
 
 /**
  * Whether there's room to keep a file this size, by the browser's own
- * estimate (true when it can't tell: then a failed store says so).
+ * estimate (true when it can't tell). Only a first check: it can say there's
+ * room on a full phone (Chromium reports a fixed headroom), and then the
+ * refused store says so.
  */
 async function roomFor(env: WorkerEnv, entry: PrecacheEntry): Promise<boolean> {
   let room: number | undefined;
@@ -247,12 +273,24 @@ export async function respond(route: Exclude<Route, { kind: 'pass' }>, env: Work
 }
 
 /**
+ * The body of a download that arrived fine, if it is exactly this version's
+ * file. If it isn't, the site already serves a newer version (a deploy since
+ * this one): noted for the status, so the page can update before saving.
+ */
+async function downloadedBody(env: WorkerEnv, entry: PrecacheEntry, res: Response): Promise<ArrayBuffer | undefined> {
+  const body = await exactBody(entry, res);
+  if (!body) env.state.newer = true;
+  return body;
+}
+
+/**
  * Gets a file that isn't saved: this version's copy from the browser's HTTP
  * cache (saved first), else the network, saving the file in the background
  * as it's used (only if it is exactly this version's file and the response
- * is OK; through the HTTP cache, unsaved, when there's no room to keep it).
- * Registered at once, so a request for the same file meanwhile waits for
- * this one.
+ * is OK). A pose file the phone couldn't keep goes through the HTTP cache,
+ * unsaved, like any web file (until a save asks to try again), and so does
+ * one the browser's estimate has no room for. Registered at once, so a
+ * request for the same file meanwhile waits for this one.
  */
 function fetchAndKeep(env: WorkerEnv, kind: 'app' | 'pose', cacheName: string, entry: PrecacheEntry): Promise<Response> {
   let answered = false;
@@ -266,11 +304,11 @@ function fetchAndKeep(env: WorkerEnv, kind: 'app' | 'pose', cacheName: string, e
     const local = await fromHttpCache(env, entry);
     if (local) {
       // Saved before answering, then served like any saved file (from the cache, not from memory).
-      await store(env, cacheName, entry, local).catch(() => false);
+      await store(env, cacheName, entry, local);
       answer((await orNothing(savedCopy(env, cacheName, entry))) ?? keptResponse(entry, local));
       return local;
     }
-    if (kind === 'pose' && !(await roomFor(env, entry))) {
+    if (kind === 'pose' && (env.state.noRoom.has(entry.url) || !(await roomFor(env, entry)))) {
       answer(env.fetch(absolute(env, networkPath(entry)), UNKEPT));
       return undefined;
     }
@@ -279,8 +317,8 @@ function fetchAndKeep(env: WorkerEnv, kind: 'app' | 'pose', cacheName: string, e
     const res = await download;
     if (!res.ok) return undefined;
     // Cloned before the page reads it (this runs first once the response arrives).
-    const body = await exactBody(entry, res.clone());
-    if (body) await store(env, cacheName, entry, body).catch(() => false);
+    const body = await downloadedBody(env, entry, res.clone());
+    if (body) await store(env, cacheName, entry, body);
     return body;
   })();
   void work.catch((err: unknown) => {
@@ -327,14 +365,14 @@ async function savedBefore(env: WorkerEnv, ours: readonly string[], entry: Preca
 async function download(env: WorkerEnv, entry: PrecacheEntry): Promise<ArrayBuffer> {
   const res = await env.fetch(absolute(env, networkPath(entry)), NETWORK);
   if (!res.ok) throw new Error(`${entry.url}: HTTP ${res.status}`);
-  const body = await exactBody(entry, res);
+  const body = await downloadedBody(env, entry, res);
   if (!body) throw new Error(`${entry.url} doesn't match this version`);
   return body;
 }
 
-/** Throws unless the file is stored: a full phone fails the install like any other error. */
+/** Throws unless the file is stored: an app file the phone can't keep fails the install, like any other error (they must all be there). */
 async function storeOrThrow(env: WorkerEnv, cacheName: string, entry: PrecacheEntry, body: ArrayBuffer): Promise<void> {
-  if (!(await store(env, cacheName, entry, body))) throw new Error(`No room on the phone for ${entry.url}`);
+  if (!(await store(env, cacheName, entry, body))) throw new Error(`The phone couldn't keep ${entry.url}`);
 }
 
 /**
@@ -354,9 +392,10 @@ export async function install(env: WorkerEnv): Promise<void> {
   });
   // Pose files: an unchanged one is already in its own cache. A changed one
   // is downloaded only if the phone had saved the old one, so it keeps
-  // working offline; with no room for it, it's skipped (saved later, on use
-  // or from Settings) instead of failing the update, which would then never
-  // apply.
+  // working offline. If the phone can't keep it (the estimate shows no room,
+  // or the browser refuses to store it, for whatever reason), it's skipped
+  // (saved later, on use or from Settings) instead of failing the update,
+  // which would then fail again at every update check and never apply.
   const kept: PrecacheEntry[] = [];
   for (const entry of env.manifest.pose) {
     const cacheName = poseCacheName(entry);
@@ -384,7 +423,21 @@ export async function activate(env: WorkerEnv): Promise<string[]> {
   const names = cacheNames(env.manifest);
   const doomed = cachesToDelete(await env.caches.keys(), [names.app, ...names.pose]);
   await Promise.all(doomed.map((name) => env.caches.delete(name)));
+  // The room they took is free again (e.g. the old copy of a pose file the
+  // install couldn't keep): try again to keep what didn't fit.
+  if (doomed.length) env.state.noRoom.clear();
   return doomed;
+}
+
+/**
+ * The page is about to load the pose files to save them ("Save for offline
+ * use", Try again, or the installed app's auto-save): try again to keep the
+ * ones the phone couldn't keep before (they went through the HTTP cache
+ * meanwhile), and forget an earlier sign of a newer version.
+ */
+export function beginSave(env: Pick<WorkerEnv, 'state'>): void {
+  env.state.noRoom.clear();
+  env.state.newer = false;
 }
 
 /** What is saved now (after any save still running). */
@@ -399,6 +452,8 @@ export async function status(env: WorkerEnv): Promise<WorkerStatus> {
     version: env.manifest.version,
     app: { files: app.length, saved: app.filter(Boolean).length, bytes: env.manifest.app.reduce((n, e) => n + e.size, 0) },
     pose,
-    noRoom: env.state.noRoom.size > 0,
+    // Pose files only: an app file an install couldn't keep fails that install, and says nothing about the pose model.
+    noRoom: env.manifest.pose.some((e) => env.state.noRoom.has(e.url)),
+    newer: env.state.newer,
   };
 }

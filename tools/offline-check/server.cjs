@@ -5,7 +5,9 @@
 // connection dropped), switch to another build (a deploy), answer chosen
 // requests with 404 (a file missing half-way through a deploy) or a redirect
 // (as GitHub Pages does for every file once a site moves to a custom
-// domain), and send chosen files slowly (a phone's connection).
+// domain), send chosen files slowly (a phone's connection), and prepend a
+// shim to sw.js (e.g. a Cache Storage that refuses some files, as on a phone
+// whose disk is full).
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
@@ -30,6 +32,7 @@ function createServer({ port, prefix = '/Claude/' }) {
   let fail = null;
   let redirect = null;
   let slow = null;
+  let swPrefix = null;
   let phase = 'start';
   const log = [];
   const sockets = new Set();
@@ -51,7 +54,8 @@ function createServer({ port, prefix = '/Claude/' }) {
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://localhost:${port}`);
-    const entry = { phase, method: req.method, path: url.pathname, query: url.search, status: 0, bytes: 0 };
+    // cacheControl: "no-cache" when the request skipped the browser's HTTP cache (fetch's cache: 'no-store' or 'reload').
+    const entry = { phase, method: req.method, path: url.pathname, query: url.search, status: 0, bytes: 0, cacheControl: req.headers['cache-control'] ?? '' };
     log.push(entry);
     if (down) {
       entry.status = 'dropped';
@@ -83,7 +87,8 @@ function createServer({ port, prefix = '/Claude/' }) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       return res.end('Not found');
     }
-    const body = fs.readFileSync(file);
+    let body = fs.readFileSync(file);
+    if (swPrefix && rel === 'sw.js') body = Buffer.concat([Buffer.from(swPrefix), body]);
     const ext = path.extname(file).slice(1).toLowerCase();
     entry.status = 200;
     entry.bytes = body.length;
@@ -131,6 +136,10 @@ function createServer({ port, prefix = '/Claude/' }) {
     /** Send files for which `fn(entry)` returns a number at that many bytes a second (null: full speed). */
     setSlow: (fn) => {
       slow = fn;
+    },
+    /** Serve sw.js with this script in front of it (null: as built). */
+    setSwPrefix: (text) => {
+      swPrefix = text;
     },
     setPhase: (name) => {
       phase = name;
