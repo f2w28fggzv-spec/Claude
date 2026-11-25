@@ -171,7 +171,7 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
           ? `${below ? 'at or below' : 'at or above'} ${check.reference}`
           : check.margin > 0
             ? `at least ${pct(check.margin)} of torso ${word} ${check.reference}`
-            : `no more than ${pct(-check.margin)} of torso short of ${check.reference}`;
+            : `at most ${pct(-check.margin)} of torso ${below ? 'above' : 'below'} ${check.reference}`;
       // How far `point` is past `reference` in the required direction, as a
       // fraction of torso length; the best frame near the position counts.
       const values = around(ctx, rep, check.at).map((i) => {

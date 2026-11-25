@@ -17,7 +17,21 @@ const SIDE_INDEX: Record<Exclude<keyof Side, 'hand' | 'ball'>, [right: number, l
   toe: [32, 31],
 };
 
-export function demoSequence(e: Exercise, o: { reps?: number; fps?: number } = {}): PoseSequence {
+/** Where a frame falls in the demo: movement progress s (0 = start, 1 = turnaround), the way back, which rep (from 0). */
+export interface DemoMoment {
+  s: number;
+  back: boolean;
+  rep: number;
+}
+
+export interface DemoSequenceOptions {
+  reps?: number;
+  fps?: number;
+  /** Changes each solved figure, to make a faulty variant of the demo (frames after the last rep have rep = reps). */
+  edit?: (f: Figure, at: DemoMoment) => Figure;
+}
+
+export function demoSequence(e: Exercise, o: DemoSequenceOptions = {}): PoseSequence {
   const reps = o.reps ?? 3;
   const fps = o.fps ?? 20;
   const demo = e.demo;
@@ -34,8 +48,10 @@ export function demoSequence(e: Exercise, o: { reps?: number; fps?: number } = {
     const moving = !hold && t < reps * tl.total;
     const s = moving ? progressAt(tl, t) : 0;
     // The way back may take its own path (Demo.back).
-    const back = moving && returningAt(tl, t) && demo.back;
-    figures.push(solve(demo.view, back ? back(s) : demo.pose(s)));
+    const returning = moving && returningAt(tl, t);
+    const back = returning && demo.back;
+    const f = solve(demo.view, back ? back(s) : demo.pose(s));
+    figures.push(o.edit ? o.edit(f, { s, back: returning, rep: moving ? Math.floor(t / tl.total) : reps }) : f);
   }
   // Fit the whole movement into 80% of the frame.
   const all: Vec[] = figures.flatMap((f) => [...Object.values(f.a), ...Object.values(f.b), f.head]);

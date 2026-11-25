@@ -839,8 +839,9 @@ const DRAFT_EXERCISES: Exercise[] = [
       // reaches parallel as the chest nears the floor, so a rep to full depth can read just past level,
       // within the camera's error (about 0.02–0.07 torso lengths in a 3D arm model; the demo reads 0.08).
       // So, as for the bench press, the shoulder's centre may stay up to 10% of torso length above the
-      // elbow's (tolerance derived, not published): a rep that stops with the trunk about 12 cm off the
-      // floor (70% of the way down, −0.12) still fails.
+      // elbow's (tolerance derived, not published). On the demo's path the limit falls with the chest
+      // about 10 cm off the floor: a rep that stops with it about 12 cm up (70% of the way down) reads
+      // −0.16 and still fails.
       cite(
         C.height('depth', 'Depth: upper arms parallel or lower', 'shoulder', 'elbow', 'atOrBelow', 'bottom', -0.1, 'partialRange'),
         `${SRC.fm722}; ${SRC.fm2120} (tolerance derived, not published)`,

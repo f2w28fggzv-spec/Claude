@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { getExercise } from '../data/exercises';
+import { describeMargin, marginRange } from '../data/describe';
 import { jointsOf } from '../data/helpers';
 import type { Check, Exercise, RelativeHeightCheck } from '../data/types';
 import { analyze } from '../engine/analyze';
@@ -171,7 +172,10 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
         <details class="more">
           <summary>Adjust depth strictness</summary>
           {depthChecks.map((c) => {
-            const value = overrides[exercise.id]?.[c.id]?.margin ?? c.margin;
+            const saved = overrides[exercise.id]?.[c.id]?.margin;
+            const value = saved ?? c.margin;
+            // Centred on this check's own margin (the reverse lunge's is −1.2), so a first touch only nudges it.
+            const range = marginRange(c, saved);
             return (
               <label class="slider">
                 <span>
@@ -179,11 +183,11 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
                 </span>
                 <input
                   type="range"
-                  min={-0.2}
-                  max={0.2}
-                  step={0.01}
+                  min={range.min}
+                  max={range.max}
+                  step={range.step}
                   value={value}
-                  onInput={(e) => setOverrides(saveOverride(exercise.id, c.id, 'margin', Number(e.currentTarget.value)))}
+                  onInput={(e) => setOverrides(saveOverride(exercise.id, c.id, 'margin', Math.round(Number(e.currentTarget.value) * 100) / 100))}
                 />
                 <span class="muted small">Left is more forgiving, right is stricter. Saved on this phone.</span>
                 {value !== c.margin && (
@@ -232,13 +236,6 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
       </div>
     </div>
   );
-}
-
-function describeMargin(m: number, c: RelativeHeightCheck): string {
-  const pct = Math.round(Math.abs(m) * 100);
-  if (pct === 0) return `${c.point} level with ${c.reference} counts`;
-  const dir = c.relation === 'atOrBelow' ? 'below' : 'above';
-  return m > 0 ? `${c.point} must be ${pct}% of torso ${dir} ${c.reference}` : `${c.point} may stop ${pct}% of torso short`;
 }
 
 function Summary({ exercise, result }: { exercise: Exercise; result: AnalysisResult }) {
