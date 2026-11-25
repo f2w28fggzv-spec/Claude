@@ -21,6 +21,42 @@ export const SRC = {
     'Soucie JM, et al. (2011). Range of motion measurements: reference values and a database for comparison studies. Haemophilia 17(3):500–507',
   schellenberg2013:
     'Schellenberg F, Lindorfer J, List R, Taylor WR, Lorenzetti S (2013). Kinetic and kinematic differences between deadlifts and goodmornings. BMC Sports Sci Med Rehabil 5:27',
+  /**
+   * The Army Physical Fitness Test's push-up event (Figure A-1, p. A-6): depth, full extension and the
+   * body line seen from the side. Read at https://armyrotc.siu.edu/_common/documents/fm-7-22.pdf.
+   * Appendix A was superseded in 2020 by ATP 7-22.01, whose hand-release push-up keeps the full
+   * extension and the straight body but goes down to the floor.
+   */
+  fm722:
+    'US Army FM 7-22, Army Physical Readiness Training (26 October 2012, incl. Change 1, 3 May 2013), Appendix A: Army Physical Fitness Test, push-up event (Appendix A superseded in 2020 by ATP 7-22.01)',
+  /**
+   * The same push-up event in the earlier field manual (chapter 14, pp. 14-11 to 14-13). Read at
+   * https://elon.edu/assets/docs/rotc/FM%2021_20%20Physical%20Fitness%20Training.pdf.
+   */
+  fm2120: 'US Army FM 21-20, Physical Fitness Training (30 September 1992, incl. Change 1, 1 October 1998), chapter 14: Army Physical Fitness Test, push-up event',
+  /**
+   * The Army's current test: hand-release push-up errors (paragraphs 2-78 to 2-80). Read at
+   * https://arotc.illinoisstate.edu/downloads/resources/ATP_7-22.01_20201001.pdf.
+   */
+  atp72201: 'US Army ATP 7-22.01, Holistic Health and Fitness Testing (1 October 2020): hand-release push-up',
+  /**
+   * A school fitness test's 90° push-up: the test on printed page 22, its form corrections on page 23.
+   * Read at https://portal.ct.gov/-/media/SDE/Phys-Ed/CPFA-Manual-Fall-of-2022.pdf.
+   */
+  cpfa: 'Connecticut State Department of Education, Connecticut Physical Fitness Assessment (Third Generation), Test Administrator’s Manual 2021–22: 90° push-up, pp. 22–23',
+  /**
+   * Forward lunges lowered until the back knee was 2–3 cm off the floor (p. 405). Read as the
+   * article's PDF at https://bretcontreras.com/wp-content/uploads/farrokhi-2008.pdf
+   * (doi:10.2519/jospt.2008.2634).
+   */
+  farrokhi2008:
+    'Farrokhi S, Pollard CD, Souza RB, Chen YJ, Reischl S, Powers CM (2008). Trunk position influences the kinematics, kinetics, and muscle activity of the lead lower extremity during the forward lunge exercise. J Orthop Sports Phys Ther 38(7):403–409',
+  /**
+   * A book (ISBN 978-0-470-39818-0), not online: its segment lengths as fractions of height, as
+   * src/engine/personalize.ts and src/demo/figure.ts already use them (thigh 0.245, shank 0.246,
+   * torso 0.818 − 0.530 = 0.288).
+   */
+  winter2009: 'Winter DA (2009). Biomechanics and Motor Control of Human Movement, 4th ed. (segment lengths as fractions of height)',
 };
 
 /**
@@ -31,11 +67,26 @@ export const SRC = {
 export const LOCKOUT_DEG = 165;
 
 /**
- * Tempo thresholds are in measured seconds. The engine times the movement
- * between the 5% and 95% points of each phase, which is about 80% of the
- * full phase, so ACSM's 1 s lower bound for a moderate tempo becomes 0.8 s.
+ * Tempo thresholds are in measured seconds, and the engine doesn't count the
+ * slow ends of a phase: it times the smoothed tracked joint from the last
+ * frame still within 5% of its travel of the start to the first frame within
+ * 5% of the end (phaseSeconds in src/engine/checks.ts). For a smooth movement
+ * that is about two thirds of the time it takes. Measured through analyze()
+ * at 15–60 fps: a 1.0 s lowering with a minimum-jerk profile reads 0.65–0.73 s,
+ * a cosine-eased one 0.73–0.80 s, one at constant speed 0.90–1.0 s; the
+ * library's demos read 50–75% (mean 67%) of their 2 s lowering.
+ * src/demo/timeline.ts paces the demos with this share.
  */
-export const MIN_ECCENTRIC_SEC = 0.8;
+export const TEMPO_MEASURED_SHARE = 0.65;
+
+/**
+ * ACSM 2009's lower bound for a moderate tempo ("1–2 s ECC") as the engine
+ * measures it (see TEMPO_MEASURED_SHARE): a smooth 1.0 s lowering passes at
+ * about the limit (0.65–0.73 s with a minimum-jerk profile), while a smooth
+ * 0.8 s one reads 0.52–0.60 s (minimum-jerk) or 0.58–0.67 s (cosine) and
+ * mostly fails.
+ */
+export const MIN_ECCENTRIC_SEC = 0.65;
 
 /** Normal adult active range (Soucie et al. 2011, ages 20–44, lower of the male/female means). */
 const NORMAL_RANGE: Partial<Record<Joint, string>> = {

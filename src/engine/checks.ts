@@ -76,10 +76,21 @@ function positionFrame(rep: RepSegment, at: RepPosition) {
   return at === 'top' ? rep.topFrame : rep.bottomFrame;
 }
 
-/** Frame indices around `center`, kept inside the rep. */
-function around(rep: RepSegment, center: number, k = WINDOW): number[] {
+/**
+ * Frame indices within `k` of the rep position `at`, kept inside the rep,
+ * except at the top of a lift whose first move is down: there the top is the
+ * rep's last frame (standing tall after a squat), so the window runs on past
+ * it into the frames after the rep (within the recording) and sees both sides
+ * of the turning point, as it does at every other position. Up-first lifts
+ * judge their start at the rep's first frame and stay inside the rep.
+ */
+function around(ctx: CheckContext, rep: RepSegment, at: RepPosition, k = WINDOW): number[] {
+  const center = positionFrame(rep, at);
+  const tracking = ctx.exercise.tracking;
+  const pastEnd = at === 'top' && tracking.kind === 'reps' && tracking.firstMove === 'down';
+  const last = pastEnd ? ctx.seq.frames.length - 1 : rep.endFrame;
   const out: number[] = [];
-  for (let i = Math.max(rep.startFrame, center - k); i <= Math.min(rep.endFrame, center + k); i++) out.push(i);
+  for (let i = Math.max(rep.startFrame, center - k); i <= Math.min(last, center + k); i++) out.push(i);
   return out;
 }
 
@@ -137,7 +148,7 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
   switch (check.type) {
     case 'jointAngle': {
       const target = rangeText(check.min, check.max);
-      const values = around(rep, positionFrame(rep, check.at)).map((i) => angleIn(ctx, i, check.angle));
+      const values = around(ctx, rep, check.at).map((i) => angleIn(ctx, i, check.angle));
       const v = median(values);
       if (values.filter(Number.isFinite).length < 2 || !Number.isFinite(v)) return unknown(check, target, NOT_VISIBLE);
       return verdict(check, inRange(v, check.min, check.max), v, `${round(v)}°`, target);
@@ -163,7 +174,7 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
             : `no more than ${pct(-check.margin)} of torso short of ${check.reference}`;
       // How far `point` is past `reference` in the required direction, as a
       // fraction of torso length; the best frame near the position counts.
-      const values = around(rep, positionFrame(rep, check.at)).map((i) => {
+      const values = around(ctx, rep, check.at).map((i) => {
         const f = ctx.seq.frames[i];
         const p = point(f, check.point, ctx.reader);
         const r = point(f, check.reference, ctx.reader);
@@ -193,7 +204,7 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
         }
       }
       const target = `${rangeText(minDeg, maxDeg)} from vertical`;
-      const values = around(rep, positionFrame(rep, check.at)).map((i) => {
+      const values = around(ctx, rep, check.at).map((i) => {
         const f = ctx.seq.frames[i];
         const sh = point(f, 'shoulder', ctx.reader);
         const hip = point(f, 'hip', ctx.reader);
@@ -221,7 +232,7 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
     case 'symmetry': {
       const target = `within ${check.maxDiffDeg}°`;
       if (view !== 'front') return unknown(check, target, 'Left/right balance needs a front-on camera.');
-      const diffs = around(rep, positionFrame(rep, check.at)).map((i) =>
+      const diffs = around(ctx, rep, check.at).map((i) =>
         Math.abs(sidedAngle(ctx, i, check.angle, 'left') - sidedAngle(ctx, i, check.angle, 'right')),
       );
       const ok = diffs.filter(Number.isFinite);
@@ -242,11 +253,11 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
 
     case 'lockout': {
       const target = `at least ${check.minDeg}°`;
-      // Lockout may peak a moment before or after the turning point.
+      // Lockout may peak a moment before or after the turning point: the
+      // largest angle within 0.3 s of it counts (on a down-first lift, up to
+      // 0.3 s past the rep's end; see around()).
       const fps = framesPerSecond(ctx);
-      const values = around(rep, positionFrame(rep, check.at), Math.max(WINDOW, Math.round(fps * 0.3))).map((i) =>
-        angleIn(ctx, i, check.angle),
-      );
+      const values = around(ctx, rep, check.at, Math.max(WINDOW, Math.round(fps * 0.3))).map((i) => angleIn(ctx, i, check.angle));
       const ok = values.filter(Number.isFinite);
       if (ok.length < 2) return unknown(check, target, NOT_VISIBLE);
       const v = Math.max(...ok);
