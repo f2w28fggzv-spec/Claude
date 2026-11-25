@@ -37,7 +37,10 @@ export interface OfflineInfo {
   updateReady: boolean;
   /** A new version couldn't install for lack of room on the phone (the worker said so): what it still needed, in bytes. */
   updateHeld?: number;
-  /** The first save of the app failed for lack of room on the phone: what it still needed, in bytes. */
+  /**
+   * The first save of the app failed for lack of room on the phone: what it
+   * still needed, in bytes (0: not known, when the browser wouldn't even register it).
+   */
   installNoRoom?: number;
   /** Switching to a new version, or looking for one. */
   updating: boolean;
@@ -241,9 +244,17 @@ async function registerNow(): Promise<void> {
   try {
     reg = await sw.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL, updateViaCache: 'none' });
   } catch (err) {
-    // Refused outright (the browser doesn't allow it here): off. Anything
-    // else, e.g. no connection when sw.js was fetched: tried again later.
-    return set((err as { name?: unknown } | null)?.name === 'SecurityError' ? { off: 'failed' } : { worker: 'failed' });
+    const name = (err as { name?: unknown } | null)?.name;
+    // Refused outright (the browser doesn't allow it here): off.
+    if (name === 'SecurityError') return set({ off: 'failed' });
+    // A version already runs this page, so the app is saved: ask it what else is.
+    if (sw.controller) return void refresh();
+    // Aborted: the browser couldn't store the registration, as Chromium does on
+    // a nearly full disk (until it restarts, even once there's room): like no
+    // room, with no size known, so not tried again by itself until the next
+    // launch. Anything else, e.g. no connection when sw.js was fetched: tried
+    // again later.
+    return set(name === 'AbortError' ? { worker: 'failed', installNoRoom: 0 } : { worker: 'failed' });
   }
   registration = reg;
   if (!watched.has(reg)) {

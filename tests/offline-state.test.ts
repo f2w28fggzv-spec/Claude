@@ -106,6 +106,12 @@ describe('offline state', () => {
       expect(appFailedMessage({ online, noRoomBytes: 716_727 })).toBe(
         `This phone couldn’t keep it (${MB('0.7')}), most likely for lack of space. Free up some space, then try again.`,
       );
+    // The browser wouldn't even register it (Chromium on a nearly full disk): no size known, and no Try again promised.
+    expect(view({ worker: 'failed', installNoRoom: 0 })).toEqual({ kind: 'app-failed', online: true, noRoomBytes: 0 });
+    for (const online of [true, false])
+      expect(appFailedMessage({ online, noRoomBytes: 0 })).toBe(
+        'This phone couldn’t keep it, most likely for lack of space. Free up some space; it tries again the next time you open fitee.',
+      );
   });
   it('has the app but not the pose model, with what saving it downloads', () => {
     expect(view({ status: status([]) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, updateWaiting: false, updateHeld: false, online: true });
@@ -173,10 +179,10 @@ describe('offline state', () => {
       if (problem) expect(text).toMatch(/Update and save/);
     }
   });
-  it('says how much more room a new version needs', () => {
+  it('says how much free space a new version needs (all it writes: the estimate can’t show the shortfall)', () => {
     expect(UPDATE_HELD_HEADING).toBe('A new version needs more space');
     expect(updateHeldMessage(9_398_199)).toBe(
-      `It needs about ${MB('9.4')} more on this phone. Until then this version keeps working, offline too. Free up some space, then try again.`,
+      `It needs about ${MB('9.4')} of free space on this phone. Until then this version keeps working, offline too. Free up some space, then try again.`,
     );
   });
   it('labels the button “Update and save” whenever a new version waits, else “Try again” after a problem, else “Save for offline use”', () => {

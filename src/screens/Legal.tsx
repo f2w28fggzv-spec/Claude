@@ -149,7 +149,8 @@ export function PrivacyScreen() {
           reports it; iPhones and iPads don’t report Low Data Mode to websites, so they download it either way). When an update of the app changes a file of
           the pose model that’s saved on your device, the update downloads the new copy by itself, data saver or not, so technique checks keep working
           offline; until your device has room for it, the version you have keeps working. A file your device couldn’t keep isn’t downloaded by itself again
-          for a week (for a day if it’s one of the app’s own files, which are small).
+          for a week (for a day if it’s one of the app’s own files, which are small). On a nearly full device even that note may be lost, and the file may
+          then be downloaded again sooner.
         </p>
         <p>None of this is sent to the developers or any third party. We can’t see it, and we can’t recover it for you.</p>
 

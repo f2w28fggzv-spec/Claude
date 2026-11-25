@@ -60,11 +60,14 @@ time (`fitee-unkept-<hash>-<time>`, so it survives the worker stopping and new
 versions): for a week (a day for the app's own files, which are small) nothing
 downloads it again by itself (a technique check gets it through the HTTP
 cache, unsaved; the installed app doesn't save it; an update that needs it
-doesn't download it), until a save asks to try again. An
+doesn't download it), until a save asks to try again. On a nearly full disk
+even that marker can be lost when the browser restarts, and the file may then
+be downloaded again sooner (the privacy policy says so). An
 update that changes a pose file the phone had saved installs only once the new
 copy is kept, so it never leaves the phone without it: until there's room, the
-current version keeps running (offline too), and Settings says how much more
-space the new version needs, with *Try again*. If a new version is waiting,
+current version keeps running (offline too), and Settings says how much free
+space the new version needs (all it writes: Chromium's estimate can't show the
+shortfall), with *Try again*. If a new version is waiting,
 *Update and save* applies it first and carries on saving after the reload
 (never on the old version); the installed app's own save waits for an update
 on its way. When the site already serves a newer version that the phone hasn't

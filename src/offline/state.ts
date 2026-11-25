@@ -162,6 +162,9 @@ export function appOnlyMessage(v: { poseBytes: number; problem?: SaveProblem; up
 
 /** What the offline row says when the first save of the app failed. */
 export function appFailedMessage(v: { online: boolean; noRoomBytes?: number }): string {
+  // 0: the browser wouldn't even register it, so no size is known (and in
+  // Chromium a retry only works once the browser has restarted).
+  if (v.noRoomBytes === 0) return 'This phone couldn’t keep it, most likely for lack of space. Free up some space; it tries again the next time you open fitee.';
   if (v.noRoomBytes !== undefined)
     return `This phone couldn’t keep it (${formatMB(v.noRoomBytes)}), most likely for lack of space. Free up some space, then try again.`;
   return v.online
@@ -172,7 +175,7 @@ export function appFailedMessage(v: { online: boolean; noRoomBytes?: number }): 
 /** A new version that couldn't install for lack of room (its own row in Settings, with Try again). */
 export const UPDATE_HELD_HEADING = 'A new version needs more space';
 export const updateHeldMessage = (bytes: number) =>
-  `It needs about ${formatMB(bytes)} more on this phone. Until then this version keeps working, offline too. Free up some space, then try again.`;
+  `It needs about ${formatMB(bytes)} of free space on this phone. Until then this version keeps working, offline too. Free up some space, then try again.`;
 
 /**
  * The save button: "Update and save" whenever a new version is waiting (it

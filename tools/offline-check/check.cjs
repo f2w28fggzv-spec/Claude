@@ -1020,7 +1020,7 @@ async function main() {
     const heldInstall = await tryUpdate(hp).catch((err) => `error: ${err.message}`);
     const heldRow = await until(async () => {
       const t = await rowText(hp, 'li[data-update="no-room"]');
-      return /needs about \d+(\.\d)?\sMB more/.test(t) ? t : null;
+      return /needs about \d+(\.\d)?\sMB of free space/.test(t) ? t : null;
     }, 10000);
     const heldReady = await hp.locator('li[data-offline="ready"]').isVisible();
     const heldOffered = await hp.locator('li[data-update="ready"]').count();
