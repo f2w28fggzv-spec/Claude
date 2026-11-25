@@ -1,6 +1,6 @@
 import { useMemo } from 'preact/hooks';
 import { getExercise } from '../data/exercises';
-import { CLEAN_SHARE, FORM_WINDOW_DAYS, formState, techniqueTrend } from '../log/coach';
+import { CLEAN_SHARE, FORM_WINDOW_DAYS, formGated, formState, techniqueTrend } from '../log/coach';
 import { exerciseInfo } from '../log/exercises';
 import { exerciseHistory, formatSet, formatSetShort, formatWeight, personalRecords, toUnit } from '../log/stats';
 import { loadBodyweight, loadTechnique, loadUnit, loadWorkouts } from '../log/store';
@@ -17,6 +17,8 @@ export function ProgressScreen({ id }: { id: string }) {
   const technique = useMemo(() => loadTechnique().filter((t) => t.exerciseId === id), [id]);
   const trend = techniqueTrend(technique, id);
   const gate = formState(technique, id);
+  // The form gate's status only where the coach gates (the same rule as suggest()): not on a plain bodyweight set.
+  const gated = !!ex && formGated(ex, history[history.length - 1]);
   const pct = (v: number) => `${Math.round(v * 100)}%`;
   const rec = personalRecords(history);
   const bw = !!info?.bodyweight;
@@ -133,7 +135,7 @@ export function ProgressScreen({ id }: { id: string }) {
               points={trend.points.map((p) => ({ date: p.at, value: p.share * 100, detail: `${p.clean} of ${p.reps} reps clean` }))}
             />
           )}
-          {ex.analysis === 'full' && (
+          {gated && (
             <p class={`form-gate ${gate.state}`}>
               <strong>{gate.state === 'clean' ? 'Form ✓' : gate.state === 'faults' ? 'Form: hold weight' : 'Form: check needed'}</strong>
               <span>

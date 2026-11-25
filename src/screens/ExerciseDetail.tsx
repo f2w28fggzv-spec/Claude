@@ -62,7 +62,7 @@ export function ExerciseDetail({ id }: { id: string }) {
         <summary>How we judge it</summary>
         <p class="muted small">
           {e.analysis === 'full'
-            ? 'Full analysis: these checks come from written coaching and competition standards.'
+            ? 'Full analysis: these checks follow written coaching, competition and fitness-test standards and published research, each named below.'
             : 'Basic analysis: camera placement, rep counting and range of motion.'}{' '}
           All values are starting points and haven’t been calibrated against recorded reps yet.
         </p>

@@ -8,10 +8,12 @@
 // to two reps over the target. Repeated technique faults lower the load and
 // add the fault's corrective exercise (the Phase 5 rule in CLAUDE.md).
 //
-// Form gate (Phase 5): on full-analysis lifts, weight only goes up when the
-// latest technique check (within FORM_WINDOW_DAYS) was clean on at least
-// CLEAN_SHARE of its reps. No recent check: keep the weight and ask for one.
-// Faults: keep the weight until a check comes back clean.
+// Form gate (Phase 5): on full-analysis lifts lifted with weight (formGated),
+// weight only goes up when the latest technique check (within
+// FORM_WINDOW_DAYS) was clean on at least CLEAN_SHARE of its reps. No recent
+// check: keep the weight and ask for one. Faults: keep the weight until a
+// check comes back clean. Bodyweight moves without added weight progress by
+// reps and aren't gated.
 //
 // Easier week: Bell et al. (2023, Delphi consensus, Sports Med Open 9:87)
 // define a deload as a period of reduced training stress to manage fatigue,
@@ -85,6 +87,22 @@ export function loadStep(e: Exercise, current: number, unit: Unit = 'kg'): numbe
 /** A load in kg rounded to the smallest step of the user's unit. */
 const roundLoad = (kg: number, unit: Unit) => fromUnit(roundTo(toUnit(kg, unit), STEPS[unit].min), unit);
 
+/** A session lifted with weight: a loaded lift, or a bodyweight move with weight added. */
+const loaded = (session: SessionSummary) => session.sets.some((s) => (s.weight ?? 0) > 0);
+
+/**
+ * Whether the form gate applies to an exercise: the coach adds weight only
+ * after a clean technique check. It does on full-analysis lifts lifted with
+ * weight; a bodyweight move (the push-up, the reverse lunge) without added
+ * weight progresses by reps and is never gated. `last` is the latest session
+ * (the last of exerciseHistory); before the first, a lift counts as the coach
+ * starts it: bodyweight moves at body weight, everything else with weight.
+ * suggest() decides by this, and the progress page shows the gate by it.
+ */
+export function formGated(ex: Exercise, last: SessionSummary | undefined): boolean {
+  return ex.analysis === 'full' && (last ? loaded(last) : !isBodyweight(ex));
+}
+
 /** Technique faults seen in at least 2 of the last 3 checks of an exercise. */
 export function repeatedFaults(technique: TechniqueSummary[], exerciseId: string): string[] {
   const recent = technique
@@ -114,7 +132,7 @@ export function suggest(item: ProgramItem, history: SessionSummary[], technique:
     };
   }
 
-  const weighted = last.sets.some((s) => (s.weight ?? 0) > 0);
+  const weighted = loaded(last);
   const top = Math.max(0, ...last.sets.map((s) => s.weight ?? 0));
   const atTop = weighted ? last.sets.filter((s) => (s.weight ?? 0) === top) : last.sets;
   const amount = (s: (typeof atTop)[number]) => (item.unit === 'seconds' ? (s.seconds ?? 0) : (s.reps ?? 0));
@@ -148,7 +166,7 @@ export function suggest(item: ProgramItem, history: SessionSummary[], technique:
       return { kind: 'increase', note: item.unit === 'seconds' ? 'Every set hit the target: add 5–10 s.' : `Every set hit ${hi} reps: add reps or move to a harder variation.` };
     }
     const weight = roundLoad(top + loadStep(ex, top, weightUnit), weightUnit);
-    if (ex.analysis === 'full') {
+    if (formGated(ex, last)) {
       // Consistent form progresses load; otherwise hold until a clean check.
       const { state, latest } = formState(technique, item.exerciseId, now);
       if (state === 'clean') {

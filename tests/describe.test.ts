@@ -1,6 +1,6 @@
 // The "Adjust depth strictness" slider on the results screen (src/screens/Results.tsx) and the
 // wording of relative-height targets: the slider is centred on each check's own margin and names
-// the check's reference point.
+// the check's reference point; and the plain-words targets of "How we judge it".
 import { describe, expect, it } from 'vitest';
 import { EXERCISES, getExercise } from '../src/data/exercises';
 import { MARGIN_SPAN, describeMargin, describeTarget, marginRange } from '../src/data/describe';
@@ -69,5 +69,15 @@ describe('relative-height targets', () => {
     const depth = analyze(e, demoSequence(e)).reps[0].checks.find((c) => c.checkId === 'depth')!;
     expect(depth.target).toBe('at most 120% of torso above toe');
     expect(depth.measured).toBe('Hip 102% of torso above toe');
+  });
+});
+
+describe('tempo targets', () => {
+  it('say what a minimum asks in all, since the engine doesn’t time a movement’s slow start and finish', () => {
+    for (const id of ['back-squat', 'bench-press', 'reverse-lunge']) {
+      const tempo = getExercise(id)!.checks.find((c) => c.type === 'tempo')!;
+      // MIN_ECCENTRIC_SEC 0.65 measured ≈ ACSM's 1 s lower bound for a smooth lowering (src/data/sources.ts).
+      expect(describeTarget(tempo)).toBe('Lowering takes at least 0.65 s, not counting its slow start and finish (about 1 s in all)');
+    }
   });
 });

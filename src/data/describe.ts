@@ -1,6 +1,7 @@
 // Human-readable text for config values.
 import type { Check, Exercise, Placement, RelativeHeightCheck } from './types';
 import { EQUIPMENT_LABELS, MUSCLE_LABELS } from './types';
+import { TEMPO_MEASURED_SHARE } from './sources';
 
 const HEIGHT: Record<Placement['phoneHeight'], string> = {
   floor: 'on the floor',
@@ -25,6 +26,7 @@ export const secondaryText = (e: Exercise) => e.secondary.map((g) => MUSCLE_LABE
 export const equipmentText = (e: Exercise) => e.equipment.map((q) => EQUIPMENT_LABELS[q]).join(' + ');
 
 const pct = (v: number) => `${Math.round(Math.abs(v) * 100)}%`;
+const secs = (v: number) => `${Math.round(v * 10) / 10} s`;
 const range = (min?: number, max?: number, unit = '°') =>
   min !== undefined && max !== undefined ? `${min}–${max}${unit}` : max !== undefined ? `at most ${max}${unit}` : `at least ${min}${unit}`;
 
@@ -49,8 +51,11 @@ export function describeTarget(c: Check): string {
       return `Moves at most ${pct(c.maxDrift)} of torso length sideways`;
     case 'symmetry':
       return `Left and right within ${c.maxDiffDeg}°`;
-    case 'tempo':
-      return `${c.phase === 'eccentric' ? 'Lowering' : 'Lifting'} takes ${range(c.minSec, c.maxSec, ' s')}`;
+    case 'tempo': {
+      // The engine doesn't time a movement's slow start and finish (TEMPO_MEASURED_SHARE): say what a minimum asks in all.
+      const inAll = c.minSec !== undefined ? `, not counting its slow start and finish (about ${secs(c.minSec / TEMPO_MEASURED_SHARE)} in all)` : '';
+      return `${c.phase === 'eccentric' ? 'Lowering' : 'Lifting'} takes ${range(c.minSec, c.maxSec, ' s')}${inAll}`;
+    }
     case 'lockout':
       return `Straightens to at least ${c.minDeg}° at the ${c.at}`;
     case 'holdAlignment':
