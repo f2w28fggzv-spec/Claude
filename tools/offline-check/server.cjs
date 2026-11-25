@@ -1,5 +1,6 @@
-// A small static server for the offline check: serves one build folder under
-// /Claude/ (like GitHub Pages), with the MIME types the app needs
+// A small static server for the offline check (and the landing check):
+// serves one build folder under /Claude/ (like GitHub Pages: a folder's
+// index.html, a folder without its slash redirected), with the MIME types the app needs
 // (application/wasm, application/manifest+json) and Pages' 10-minute cache
 // header. It logs every request by phase, and can play "no signal" (every
 // connection dropped), switch to another build (a deploy), answer chosen
@@ -24,6 +25,7 @@ const TYPES = {
   txt: 'text/plain; charset=utf-8',
   wasm: 'application/wasm',
   task: 'application/octet-stream',
+  webp: 'image/webp',
 };
 
 function createServer({ port, prefix = '/Claude/' }) {
@@ -80,7 +82,13 @@ function createServer({ port, prefix = '/Claude/' }) {
       return res.end();
     }
     let rel = url.pathname.startsWith(prefix) ? decodeURIComponent(url.pathname.slice(prefix.length)) : null;
-    if (rel === '') rel = 'index.html';
+    // Like GitHub Pages: a folder's index.html (the landing page at about/), and a folder without its slash redirected to it.
+    if (rel !== null && rel !== '' && !rel.endsWith('/') && root && fs.existsSync(path.join(root, rel)) && fs.statSync(path.join(root, rel)).isDirectory()) {
+      entry.status = 301;
+      res.writeHead(301, { Location: `${url.pathname}/${url.search}` });
+      return res.end();
+    }
+    if (rel === '' || (rel !== null && rel.endsWith('/'))) rel = `${rel}index.html`;
     const file = rel === null ? null : path.join(root, rel);
     if (!file || !file.startsWith(root + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
       entry.status = 404;

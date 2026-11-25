@@ -102,8 +102,8 @@ export interface Moment {
 
 const ease = (u: number) => (1 - Math.cos(Math.PI * clamp01(u))) / 2;
 
-/** Where in the rep time t (seconds) falls. Matches progressAt in ./timeline. */
-export function momentAt(exercise: Exercise, tl: Timeline, t: number): Moment {
+/** Where in the rep time t (seconds) falls. Matches progressAt in ./timeline. Reads only the exercise's tracking. */
+export function momentAt(exercise: Pick<Exercise, 'tracking'>, tl: Timeline, t: number): Moment {
   if (exercise.tracking.kind === 'hold') return { phase: 'hold', s: 0, u: 0, action: 'holding' };
   const [p0, out, p1, back] = tl.segments;
   const first = exercise.tracking.firstPhase === 'eccentric' ? 'lowering' : 'lifting';

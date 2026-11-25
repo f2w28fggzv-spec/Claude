@@ -21,8 +21,8 @@ export function legendOrder(spec: Engagement): MuscleUse[] {
   return [...spec.muscles].sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || b.peak - a.peak);
 }
 
-/** "quads and glutes (main), hamstrings (assists), core (steadies)" for screen readers. */
-function musclesInWords(muscles: MuscleUse[]): string {
+/** "quads and glutes (main), hamstrings (assists), core (steadies)" for screen readers (the landing page's demo says it too). */
+export function musclesInWords(muscles: MuscleUse[]): string {
   const parts: string[] = [];
   for (const role of ['main', 'assist', 'stabilize'] as const) {
     const names = muscles.filter((m) => m.role === role).map((m) => MUSCLE_LABELS[m.group].toLowerCase());

@@ -1,0 +1,387 @@
+<!doctype html>
+<!--
+  fitee's landing page, served at /Claude/about/ beside the app (same site,
+  same origin). Source: about/index.html, filled in at build time by
+  scripts/landing-build.ts with the app's own code (src/landing/prerender.ts)
+  and the sign-up config (src/landing/signup.ts). The page runs only its own
+  files: nothing from another site, no inline script or style, no cookies.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!--fitee:head-->
+    <meta name="color-scheme" content="light dark" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>fitee: technique feedback on every rep</title>
+    <meta name="description" content="fitee is a lifting app for your phone, in early testing. Film a set and it gives technique feedback on every rep, then adapts your plan to what it sees. It all runs on your phone." />
+    <meta property="og:title" content="fitee: technique feedback on every rep" />
+    <meta property="og:description" content="A lifting app for your phone, in early testing. Film a set, get feedback on every rep, and a plan that adapts to what it sees." />
+    <link rel="icon" href="../public/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../src/landing/landing.css" />
+    <script type="module" src="../src/landing/main.ts"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-head">
+      <div class="wrap head-row">
+        <span class="logo heat" role="img" aria-label="fitee"
+          ><!--fitee:logo-mark 28--><span class="wordmark" aria-hidden="true"><span class="wm-1">f</span><span class="wm-2">i</span><span class="wm-3">t</span><span class="wm-4">e</span><span class="wm-5">e</span></span></span
+        >
+        <a class="head-link" href="#list">Interest list</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="wrap hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">A lifting app in early testing</p>
+            <h1 id="hero-title">Film a set. Get feedback on every&nbsp;rep.</h1>
+            <p class="lead">Prop up your phone and lift. fitee checks your technique on every rep and adapts your plan to what it&nbsp;sees.</p>
+            <!--fitee:if closed-->
+            <a class="soon-pill" href="#list"><span class="dot" aria-hidden="true"></span>Interest list: sign-ups open&nbsp;soon</a>
+            <!--fitee:else-->
+            <a class="button" href="#list" data-join>Join the interest list</a>
+            <!--fitee:end-->
+          </div>
+
+          <figure class="stage" data-body="female" aria-labelledby="stage-cap">
+            <div class="stage-top">
+              <span class="phase" aria-hidden="true"><b data-act="lowering">Lowering</b><b data-act="lifting">Lifting</b></span>
+              <span class="stage-tools">
+                <span class="body-pick" role="radiogroup" aria-label="Figure">
+                  <button type="button" role="radio" aria-checked="true" data-body-pick="female">Female</button
+                  ><button type="button" role="radio" aria-checked="false" data-body-pick="male" tabindex="-1">Male</button>
+                </span>
+                <button type="button" class="demo-pause" aria-label="Pause the demo" aria-pressed="false" hidden>
+                  <svg class="icon i-pause" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8.5 5.5v13M15.5 5.5v13" /></svg>
+                  <svg class="icon i-play" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10-6.5z" /></svg>
+                </button>
+              </span>
+            </div>
+            <div class="stage-body">
+              <div class="stage-figure" role="img" aria-label="{{HERO_LABEL}}"><!--fitee:hero-figure--></div>
+              <div class="legend">
+                <p class="legend-head"><strong>Muscles working</strong><span class="key" aria-hidden="true">Resting <i></i> Hardest</span></p>
+                <div class="lg-stack"><!--fitee:hero-legends--></div>
+              </div>
+            </div>
+            <div class="lifts" role="group" aria-labelledby="lifts-label">
+              <p class="lifts-label" id="lifts-label">Full technique analysis on {{FULL_COUNT}} lifts:</p>
+              <div class="chips"><!--fitee:hero-chips--></div>
+            </div>
+            <figcaption id="stage-cap">
+              <span class="dn-stack"><!--fitee:hero-names--></span>
+              The app’s own how-to demo, drawn from the camera’s angle. Every exercise has one. Hotter colours mean harder work: a guide to typical muscle use, not a measurement.
+            </figcaption>
+          </figure>
+
+          <ul class="hero-facts">
+            <li><svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7" /></svg>No account</li>
+            <li><svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7" /></svg>Video stays on your phone</li>
+            <li><svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7" /></svg>Works offline once installed</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="idea" aria-labelledby="idea-title">
+        <div class="wrap">
+          <h2 class="kicker" id="idea-title">The idea</h2>
+          <p class="statement">A log counts what you lifted. fitee also looks at <em>how</em> you lifted it, and plans your training around&nbsp;that.</p>
+          <ol class="pillars">
+            <li>
+              <a href="#how"
+                ><i class="pillar-plate p1" aria-hidden="true"></i><span class="pillar-n">01</span><strong>Every rep checked</strong
+                ><span class="pillar-text">Film a set. fitee checks each rep, and the coach adjusts your plan.</span></a
+              >
+            </li>
+            <li>
+              <a href="#log"
+                ><i class="pillar-plate p2" aria-hidden="true"></i><span class="pillar-n">02</span><strong>Every set logged</strong
+                ><span class="pillar-text">Sets, reps and weights, your progress, and a weekly body map.</span></a
+              >
+            </li>
+            <li>
+              <a href="#private"
+                ><i class="pillar-plate p3" aria-hidden="true"></i><span class="pillar-n">03</span><strong>Kept on your phone</strong
+                ><span class="pillar-text">No account, no uploads, and it works with no signal once installed.</span></a
+              >
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="how" id="how" aria-labelledby="how-title">
+        <div class="wrap">
+          <div class="rule" aria-hidden="true" data-rule><i class="collar"></i><i class="plate p1"></i><i class="collar"></i><b class="rule-n">01</b></div>
+          <p class="kicker">How it works</p>
+          <h2 id="how-title">From the muscles you pick to every rep you lift.</h2>
+          <ol class="steps">
+            <li class="step">
+              <div class="step-text">
+                <div class="step-head"><span class="plate" aria-hidden="true"></span><span class="step-n">Step 1</span><h3>Pick your muscles</h3></div>
+                <p>Tap the muscle groups you want to train. Then pick days a week, your experience and your equipment.</p>
+                <p class="sample">Shown with sample data.</p>
+              </div>
+              <div class="phones">
+                <div class="phone">
+                  <picture>
+                    <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/groups-dark-480.webp 480w, ../src/landing/screens/groups-dark-780.webp 780w" sizes="(min-width: 720px) 266px, 232px" />
+                    <img src="../src/landing/screens/groups-light-480.webp" srcset="../src/landing/screens/groups-light-480.webp 480w, ../src/landing/screens/groups-light-780.webp 780w" sizes="(min-width: 720px) 266px, 232px" width="780" height="1120" loading="lazy" decoding="async" alt="fitee’s muscle picker, step 1 of 2: chest, back, quads and glutes picked, shown as tiles with the muscle highlighted on a body figure." />
+                  </picture>
+                </div>
+              </div>
+            </li>
+            <li class="step">
+              <div class="step-text">
+                <div class="step-head"><span class="plate" aria-hidden="true"></span><span class="step-n">Step 2</span><h3>Get a weekly plan</h3></div>
+                <p>fitee builds your week: sets per muscle for your level, big lifts first. Rather plan your own? Log your own workouts and routines.</p>
+                <p class="sample">Shown with sample data.</p>
+              </div>
+              <div class="phones">
+                <div class="phone">
+                  <picture>
+                    <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/program-dark-480.webp 480w, ../src/landing/screens/program-dark-780.webp 780w" sizes="(min-width: 720px) 266px, 232px" />
+                    <img src="../src/landing/screens/program-light-480.webp" srcset="../src/landing/screens/program-light-480.webp 480w, ../src/landing/screens/program-light-780.webp 780w" sizes="(min-width: 720px) 266px, 232px" width="780" height="1120" loading="lazy" decoding="async" alt="A plan in fitee, three days a week. Day 1 starts with the barbell back squat and bench press, 4 sets of 6 to 10 reps each." />
+                  </picture>
+                </div>
+              </div>
+            </li>
+            <li class="step">
+              <div class="step-text">
+                <div class="step-head"><span class="plate" aria-hidden="true"></span><span class="step-n">Step 3</span><h3>Prop up your phone</h3></div>
+                <p>Side-on for most lifts, front-on for some. A setup check makes sure your whole body is in view, then recording starts and stops by itself. Or use a video you already have.</p>
+                <p class="sample">Shown with sample data.</p>
+              </div>
+              <div class="phones">
+                <div class="phone">
+                  <picture>
+                    <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/analyze-dark-480.webp 480w, ../src/landing/screens/analyze-dark-780.webp 780w" sizes="(min-width: 720px) 266px, 232px" />
+                    <img src="../src/landing/screens/analyze-light-480.webp" srcset="../src/landing/screens/analyze-light-480.webp 480w, ../src/landing/screens/analyze-light-780.webp 780w" sizes="(min-width: 720px) 266px, 232px" width="780" height="1120" loading="lazy" decoding="async" alt="The technique check for the barbell back squat: the demo from the side, then how to set up the phone: film from the side, at hip height, 2.5 to 4 metres away, phone upright at 1x." />
+                  </picture>
+                </div>
+              </div>
+            </li>
+            <li class="step step-wide">
+              <div class="step-text">
+                <div class="step-head"><span class="plate" aria-hidden="true"></span><span class="step-n">Step 4</span><h3>See every rep</h3></div>
+                <p>fitee counts your reps and checks each one, with a skeleton drawn over your video. It never guesses: when the camera can’t see well enough, it says so. Each fault comes with a cue and an exercise that helps.</p>
+                <ul class="verdicts" aria-label="What each check can say">
+                  <li class="v v-pass"><span class="v-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="14" height="14"><path d="M5 12.5l4.5 4.5L19 7" /></svg></span>Passed</li>
+                  <li class="v v-fail"><span class="v-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="14" height="14"><path d="M7 7l10 10M17 7L7 17" /></svg></span>Fault</li>
+                  <li class="v v-unknown"><span class="v-icon" aria-hidden="true">?</span>Couldn’t judge</li>
+                </ul>
+                <p class="sample">Sample data: the app’s demo figure stands in for a lifter. Rep 3 stops short of depth. In rep 4 the knee was out of sight, so its depth couldn’t be judged.</p>
+              </div>
+              <div class="phones duo">
+                <div class="phone">
+                  <picture>
+                    <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/set-dark-480.webp 480w, ../src/landing/screens/set-dark-780.webp 780w" sizes="(min-width: 720px) 250px, 62vw" />
+                    <img src="../src/landing/screens/set-light-480.webp" srcset="../src/landing/screens/set-light-480.webp 480w, ../src/landing/screens/set-light-780.webp 780w" sizes="(min-width: 720px) 250px, 62vw" width="780" height="1432" loading="lazy" decoding="async" alt="A saved set of back squats replayed in fitee with the skeleton drawn over the video, paused at the bottom of rep 3, marked “Not reaching depth”." />
+                  </picture>
+                </div>
+                <picture class="shot-card">
+                  <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/reps-dark-440.webp 440w, ../src/landing/screens/reps-dark-716.webp 716w" sizes="(min-width: 720px) 230px, 48vw" />
+                  <img src="../src/landing/screens/reps-light-440.webp" srcset="../src/landing/screens/reps-light-440.webp 440w, ../src/landing/screens/reps-light-716.webp 716w" sizes="(min-width: 720px) 230px, 48vw" width="716" height="1240" loading="lazy" decoding="async" alt="The same set’s checks for each rep. Rep 3: depth failed, the hip 34% of torso length above the knee; torso lean, lockouts and lowering passed. Rep 4: depth couldn’t be judged because the joints weren’t clearly visible; the other checks passed." />
+                </picture>
+              </div>
+            </li>
+            <li class="step step-wide">
+              <div class="step-text">
+                <div class="step-head"><span class="plate" aria-hidden="true"></span><span class="step-n">Step 5</span><h3>The coach adjusts</h3></div>
+                <p>Simple rules, on your phone. It adds weight once every set reaches the top of your rep range and your latest check on that lift was clean. The same fault in two of your last three checks? A lighter load, plus an exercise that helps. Lifts stalling? It offers an easier week.</p>
+                <p class="sample">Sample data: depth was missed in two of the last three squat checks, so the squat is about 10% lighter and a box squat is added.</p>
+              </div>
+              <div class="phones duo">
+                <div class="phone">
+                  <picture>
+                    <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/workout-dark-480.webp 480w, ../src/landing/screens/workout-dark-780.webp 780w" sizes="(min-width: 720px) 250px, 62vw" />
+                    <img src="../src/landing/screens/workout-light-480.webp" srcset="../src/landing/screens/workout-light-480.webp 480w, ../src/landing/screens/workout-light-780.webp 780w" sizes="(min-width: 720px) 250px, 62vw" width="780" height="1432" loading="lazy" decoding="async" alt="A workout in fitee: the barbell back squat at 67.5 kg, about 10% lighter than before because depth was missed in recent technique checks, and a box squat added by the coach." />
+                  </picture>
+                </div>
+                <picture class="shot-card">
+                  <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/coach-dark-440.webp 440w, ../src/landing/screens/coach-dark-716.webp 716w" sizes="(min-width: 720px) 230px, 48vw" />
+                  <img src="../src/landing/screens/coach-light-440.webp" srcset="../src/landing/screens/coach-light-440.webp 440w, ../src/landing/screens/coach-light-716.webp 716w" sizes="(min-width: 720px) 230px, 48vw" width="716" height="900" loading="lazy" decoding="async" alt="The coach’s note: not reaching depth on the barbell back squat, seen in 2 of the last 3 technique checks, with a cue to sit lower and the box squat as an exercise that helps." />
+                </picture>
+              </div>
+            </li>
+          </ol>
+
+          <dl class="depth">
+            <div class="depth-full">
+              <dt><span class="big">{{FULL_COUNT}}</span> lifts with full analysis</dt>
+              <dd>Back squat, bench press, deadlift, overhead press, barbell row and Romanian deadlift. The checks follow written coaching standards: NSCA, IPF rules and published research. They haven’t been tested against real, labelled reps yet, so treat them as a guide.</dd>
+            </div>
+            <div>
+              <dt><span class="big">{{EXERCISE_COUNT}}</span> exercises in the library</dt>
+              <dd>Free weights, bodyweight, cables and machines, each with an animated how-to demo. The rest get basic analysis: placement, rep counting and range of motion.</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <section class="log" id="log" aria-labelledby="log-title">
+        <div class="wrap">
+          <div class="rule" aria-hidden="true" data-rule><i class="collar"></i><i class="plate p1"></i><i class="plate p2"></i><i class="collar"></i><b class="rule-n">02</b></div>
+          <div class="log-grid">
+            <div class="log-text">
+              <p class="kicker">Your log</p>
+              <h2 id="log-title">Every set, in one place.</h2>
+              <p class="section-lead">Every workout lands in your log with its sets, reps and weights, whether the plan built it or you did.</p>
+              <ul class="log-points">
+                <li><svg class="icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4M8 14h2M12 14h2M8 17h2M12 17h2" /></svg>A calendar of every workout</li>
+                <li><svg class="icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 19h16M5 15l4.5-4.5 3.5 3L19 7" /></svg>Progress charts and records for every exercise</li>
+                <li><svg class="icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="4.5" r="2" /><path d="M12 7.5v7M7 10.5l5-1.5 5 1.5M9 21l3-6.5 3 6.5" /></svg>A weekly body map, shaded by the sets each muscle got</li>
+              </ul>
+            </div>
+            <div class="log-phones">
+              <figure class="device">
+                <div class="screen">
+                  <picture>
+                    <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/log-dark-480.webp 480w, ../src/landing/screens/log-dark-780.webp 780w" sizes="(min-width: 960px) 290px, 45vw" />
+                    <img src="../src/landing/screens/log-light-480.webp" srcset="../src/landing/screens/log-light-480.webp 480w, ../src/landing/screens/log-light-780.webp 780w" sizes="(min-width: 960px) 290px, 45vw" width="780" height="1688" loading="lazy" decoding="async" alt="The Log tab: November’s calendar with the trained days marked, and this month’s workouts, kilograms lifted and week streak." />
+                  </picture>
+                </div>
+                <figcaption>The month at a glance. Sample data.</figcaption>
+              </figure>
+              <figure class="device">
+                <div class="screen">
+                  <picture>
+                    <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/week-dark-480.webp 480w, ../src/landing/screens/week-dark-780.webp 780w" sizes="(min-width: 960px) 290px, 45vw" />
+                    <img src="../src/landing/screens/week-light-480.webp" srcset="../src/landing/screens/week-light-480.webp 480w, ../src/landing/screens/week-light-780.webp 780w" sizes="(min-width: 960px) 290px, 45vw" width="780" height="1688" loading="lazy" decoding="async" alt="This week on the Train tab: 2 of 3 workouts done, and front and back body figures shaded by the sets each muscle got." />
+                  </picture>
+                </div>
+                <figcaption>Sets per muscle this week. Sample data.</figcaption>
+              </figure>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="private" id="private" aria-labelledby="private-title">
+        <div class="wrap">
+          <div class="rule" aria-hidden="true" data-rule><i class="collar"></i><i class="plate p1"></i><i class="plate p2"></i><i class="plate p3"></i><i class="collar"></i><b class="rule-n">03</b></div>
+          <div class="private-grid">
+            <div class="private-intro">
+              <p class="kicker">Private by design</p>
+              <h2 id="private-title">No signal down in the basement? fitee doesn’t need&nbsp;one.</h2>
+              <p class="section-lead">No account and nothing to upload: fitee does its work on your phone, so your training stays there too.</p>
+            </div>
+            <figure class="device offline-phone">
+              <div class="screen">
+                <div class="statusbar" aria-hidden="true">
+                  <span>5:40</span>
+                  <span class="no-signal"
+                    ><svg viewBox="0 0 20 14" width="20" height="14"><rect x="1" y="9" width="3" height="4" rx="1" /><rect x="6" y="6.5" width="3" height="6.5" rx="1" /><rect x="11" y="4" width="3" height="9" rx="1" /><rect x="16" y="1" width="3" height="12" rx="1" /><path d="M1.5 1.5l17 11" /></svg>No signal</span
+                  >
+                </div>
+                <picture>
+                  <source media="(prefers-color-scheme: dark)" srcset="../src/landing/screens/today-dark-480.webp 480w, ../src/landing/screens/today-dark-780.webp 780w" sizes="(min-width: 1024px) 330px, 290px" />
+                  <img src="../src/landing/screens/today-light-480.webp" srcset="../src/landing/screens/today-light-480.webp 480w, ../src/landing/screens/today-light-780.webp 780w" sizes="(min-width: 1024px) 330px, 290px" width="780" height="1688" loading="lazy" decoding="async" alt="fitee’s Train tab with the network switched off: the next session, Day 1, with the coach’s weights and a Start workout button." />
+                </picture>
+              </div>
+              <figcaption>The Train tab with the network switched off: it opens from the copy saved on the phone. Sample data.</figcaption>
+            </figure>
+            <ul class="facts">
+              <li>
+                <span class="fact-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="22" height="22"><rect x="7" y="3" width="10" height="18" rx="2" /><path d="M11 18h2" /></svg></span>
+                <h3>Works with no signal</h3>
+                <p>Once it’s on your home screen, the app and its 24&nbsp;MB pose model are saved on your phone.</p>
+              </li>
+              <li>
+                <span class="fact-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="22" height="22"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg></span>
+                <h3>Video never leaves your phone</h3>
+                <p>The pose model runs on the phone itself. No uploads, no analytics.</p>
+              </li>
+              <li>
+                <span class="fact-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="22" height="22"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" /></svg></span>
+                <h3>Kept only if you save it</h3>
+                <p>Tap Save video after a check to keep a set, on your phone only. Otherwise it’s gone when you close the results.</p>
+              </li>
+              <li>
+                <span class="fact-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="22" height="22"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></svg></span>
+                <h3>No account</h3>
+                <p>Your plans, log and profile stay on your phone. Backups are files you keep.</p>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="vision" id="vision" aria-labelledby="vision-title">
+        <div class="wrap">
+          <p class="big-wordmark" aria-hidden="true"><span class="wm-1">f</span><span class="wm-2">i</span><span class="wm-3">t</span><span class="wm-4">e</span><span class="wm-5">e</span></p>
+          <div class="vision-text">
+            <p class="kicker">The vision</p>
+            <h2 id="vision-title">Every set logged. Every rep checked. A plan that adapts.</h2>
+            <p>Where fitee is going: a phone app that analyses your lifting and shapes your training around the technique it sees. A log and a coach that adapt the plan. Like a food diary, but for lifting.</p>
+            <p class="muted">It’s early: fitee is a first prototype, in testing now.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="list" id="list" aria-labelledby="list-title">
+        <div class="wrap">
+          <div class="panel" data-state="{{LIST_STATE}}">
+            <div class="rule rule-full" aria-hidden="true" data-rule><i class="collar"></i><i class="plate p1"></i><i class="plate p2"></i><i class="plate p3"></i><i class="plate p4"></i><i class="collar"></i><b class="rule-n">04</b></div>
+            <p class="kicker">Interest list</p>
+            <h2 id="list-title">Be first to try fitee.</h2>
+            <!--fitee:if closed-->
+            <div class="signup-closed">
+              <p class="soon-tag"><span class="dot" aria-hidden="true"></span>Sign-ups open soon</p>
+              <p class="panel-lede">The list isn’t open yet. When it is, you can leave your email here to hear when you can try fitee. Until then nothing is collected.</p>
+              <div class="field-row is-inert" aria-hidden="true"><span class="field-fake">you@example.com</span><span class="button-fake">Opening soon</span></div>
+            </div>
+            <!--fitee:else-->
+            <form class="signup" action="{{SIGNUP_ACTION}}" method="post" data-mode="{{SIGNUP_MODE}}">
+              <p class="panel-lede">Leave your email and we’ll let you know when you can try fitee.</p>
+              <label class="field-label" for="signup-email">Email</label>
+              <div class="field-row">
+                <input id="signup-email" class="field" type="email" name="{{SIGNUP_FIELD}}" required autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" aria-describedby="signup-status signup-fine" />
+                <button class="button" type="submit">Join the list</button>
+              </div>
+              <!--fitee:signup-extra-->
+              <p class="signup-status" id="signup-status" role="status"></p>
+              <p class="fine" id="signup-fine">We’ll use your email only to send you news about fitee. {{SIGNUP_NAME}} keeps the list for us<!--fitee:if page-->, and you’ll see its own page when you join<!--fitee:end-->. {{SIGNUP_LEAVE}} <a href="#privacy">Privacy</a></p>
+            </form>
+            <!--fitee:if frame-->
+            <div class="thanks" tabindex="-1" hidden>
+              <svg class="icon" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M4 7l8 6 8-6M4 6h16v12H4z" /></svg>
+              <h3>Check your inbox</h3>
+              <!--fitee:if confirms-->
+              <p>If your sign-up went through, an email is on its way so you can confirm your address. Once you have, you’re on the list.</p>
+              <!--fitee:else-->
+              <p>If your sign-up went through, we’ll email you when you can try fitee.</p>
+              <!--fitee:end-->
+              <p class="thanks-help">No email after a few minutes? Check your spam folder, or <button type="button" class="link-btn" data-again>try again</button>.</p>
+            </div>
+            <!--fitee:end-->
+            <!--fitee:end-->
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap foot-grid">
+        <div class="foot-brand">
+          <span class="logo" role="img" aria-label="fitee"><!--fitee:logo-mark 20--><span class="wordmark" aria-hidden="true">fitee</span></span>
+          <p>A lifting app in early testing.</p>
+        </div>
+        <section class="privacy" id="privacy" aria-labelledby="privacy-title">
+          <h2 id="privacy-title">Privacy</h2>
+          <!--fitee:if closed-->
+          <p>This page sets no cookies, has no analytics and makes no requests to other sites. It is hosted on GitHub Pages, which logs technical information such as your IP address when your browser loads it (see GitHub’s privacy statement).</p>
+          <p>No email is collected yet: the interest list isn’t open. When it opens, this note will say who runs the list, where your email is kept, what it’s used for (only news about fitee) and how to leave it.</p>
+          <!--fitee:else-->
+          <p>This page sets no cookies and has no analytics. It is hosted on GitHub Pages, which logs technical information such as your IP address when your browser loads it (see GitHub’s privacy statement).</p>
+          <p>The interest list is run by the people making fitee, with {{SIGNUP_NAME}}. When you join, the form sends your email address to {{SIGNUP_NAME}}, which keeps the list for us. We use it only to send you news about fitee. {{SIGNUP_LEAVE}} Nothing else on this page sends anything to another site.</p>
+          <!--fitee:end-->
+        </section>
+        <p class="small">App screens show made-up sample data. <!--fitee:if open-->Sign-ups are handled by {{SIGNUP_NAME}}. <!--fitee:end-->Set in Bricolage Grotesque (<a href="licenses/bricolage-grotesque-OFL.txt">SIL Open Font License</a>).</p>
+      </div>
+    </footer>
+  </body>
+</html>
