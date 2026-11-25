@@ -38,7 +38,7 @@
         <div class="wrap hero-grid">
           <div class="hero-copy">
             <p class="eyebrow">A lifting app in early testing</p>
-            <h1 id="hero-title">Film a set. Get feedback on every&nbsp;rep.</h1>
+            <h1 id="hero-title"><span class="sent">Film a set.</span> <span class="sent">Get feedback on every&nbsp;rep.</span></h1>
             <p class="lead">Prop up your phone and lift. fitee checks your technique on every rep, and its coach adjusts your training to&nbsp;match.</p>
             <!--fitee:if closed-->
             <a class="soon-pill" href="#list"><span class="dot" aria-hidden="true"></span><span>Interest list: <span class="nowrap">sign-ups</span> open&nbsp;soon</span></a>
@@ -51,7 +51,7 @@
             <div class="stage-top">
               <p class="stage-tag">How-to demo</p>
               <span class="stage-tools">
-                <span class="body-pick" role="radiogroup" aria-label="Figure">
+                <span class="body-pick" role="radiogroup" aria-label="Body drawing">
                   <button type="button" role="radio" aria-checked="true" data-body-pick="female">Female</button
                   ><button type="button" role="radio" aria-checked="false" data-body-pick="male" tabindex="-1">Male</button>
                 </span>
@@ -91,7 +91,7 @@
       <section class="idea" aria-labelledby="idea-title">
         <div class="wrap">
           <h2 class="kicker" id="idea-title">The idea</h2>
-          <p class="statement">A log counts what you lifted. fitee also looks at <em>how</em> you lifted it, and its coach adjusts your training to&nbsp;match.</p>
+          <p class="statement">A log counts what you lifted. fitee also looks at <em>how</em> you lifted&nbsp;it.</p>
           <ol class="pillars">
             <li>
               <a href="#how"
@@ -139,7 +139,7 @@
             <li class="step">
               <div class="step-text">
                 <div class="step-head"><span class="plate" aria-hidden="true"></span><span class="step-n">Step 2</span><h3>Get a weekly plan</h3></div>
-                <p>fitee builds your week: sets per muscle for your level, big lifts first. Rather plan your own? Log your own workouts and routines.</p>
+                <p>fitee builds your week: sets per muscle for your level, big lifts first. Rather plan your own? Log your own workouts and save the routines you repeat.</p>
                 <p class="sample">Shown with sample data.</p>
               </div>
               <div class="phones">
@@ -214,11 +214,11 @@
           <dl class="depth">
             <div class="depth-full">
               <dt><span class="big">{{FULL_COUNT}}</span> lifts with full analysis</dt>
-              <dd>Back squat, bench press, deadlift, overhead press, barbell row and Romanian deadlift. The checks follow written coaching standards: NSCA, IPF rules and published research. They haven’t been tested against real, labelled reps yet, so treat them as a guide.</dd>
+              <dd>Back squat, bench press, deadlift, overhead press, barbell row and Romanian deadlift. The checks follow written coaching and competition standards (NSCA, IPF rules) and published research, with our own starting numbers where those give none. They haven’t been tested against real, labelled reps yet, so treat them as a guide.</dd>
             </div>
             <div>
               <dt><span class="big">{{EXERCISE_COUNT}}</span> exercises in the library</dt>
-              <dd>Free weights, bodyweight, cables and machines, each with an animated how-to demo. The rest get basic analysis: placement, plus rep counting and, for most, range of motion. Holds such as the plank get a check on the position instead.</dd>
+              <dd>Free weights, bodyweight, cables and machines, each with an animated how-to demo. The rest get basic analysis: camera placement, plus rep counting and, for most, range of motion. Holds such as the plank get a check on the position instead.</dd>
             </div>
           </dl>
         </div>
@@ -290,7 +290,7 @@
               <li>
                 <span class="fact-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="22" height="22"><rect x="7" y="3" width="10" height="18" rx="2" /><path d="M11 18h2" /></svg></span>
                 <h3>Works with no signal</h3>
-                <p>Add it to your home screen, then open it once while you’re online and leave it open while it saves its {{POSE_MB}} pose model. After that it works with no signal.</p>
+                <p>Installed on a phone’s home screen, fitee saves its {{POSE_MB}} pose model the first time it’s opened online, if it’s left open until that’s done. After that it needs no signal.</p>
               </li>
               <li>
                 <span class="fact-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="22" height="22"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg></span>
@@ -318,10 +318,10 @@
           <div class="vision-text">
             <div class="vision-head">
               <p class="kicker">The vision</p>
-              <h2 id="vision-title">Every set logged. Every rep checked. A plan that adapts.</h2>
+              <h2 id="vision-title">A plan shaped by how you lift.</h2>
             </div>
             <div class="vision-body">
-              <p>Where fitee is going: a phone app that analyses your lifting and shapes your whole training plan around the technique it sees. Like a food diary, but for lifting.</p>
+              <p>That’s where fitee is going: a phone app that analyses your lifting and shapes your whole training plan around the technique it sees. Like a food diary, but for lifting.</p>
               <p class="muted">It’s early: fitee is a first prototype, in testing now.</p>
             </div>
           </div>
@@ -337,7 +337,7 @@
             <!--fitee:if closed-->
             <div class="signup-closed">
               <p class="soon-tag"><span class="dot" aria-hidden="true"></span><span><span class="nowrap">Sign-ups</span> open soon</span></p>
-              <p class="panel-lede">The list isn’t open yet. When it is, you can leave your email here to hear when you can try fitee. Until then no email is collected.</p>
+              <p class="panel-lede">The list isn’t open yet. When it is, you can leave your email here. Until then no email is collected.</p>
               <div class="field-row is-inert" aria-hidden="true"><span class="field-fake">you@example.com</span><span class="button-fake">Opening soon</span></div>
             </div>
             <!--fitee:else-->
@@ -375,7 +375,7 @@
           <p>No email is collected yet: the interest list isn’t open. When it opens, this note will name the service that keeps the list, and say what your email is used for (only news about fitee) and how to leave the list.</p>
           <!--fitee:else-->
           <p>This page sets no cookies and has no analytics. It is hosted on GitHub Pages, which logs technical information such as your IP address when your browser loads it (see the GitHub General Privacy Statement).</p>
-          <p>The interest list is kept by {{SIGNUP_NAME}} for the people making fitee. When you join, the form sends your email address to {{SIGNUP_NAME}}. Like any website, {{SIGNUP_NAME}} also receives your IP address and browser details, and it may set its own cookies (see its privacy policy). We use your email only to send you news about fitee. {{SIGNUP_LEAVE}} Nothing else on this page sends anything to another site.</p>
+          <p>The interest list is kept by {{SIGNUP_NAME}} for the people making fitee. When you join, the form sends your email address to {{SIGNUP_NAME}}. Like any website, {{SIGNUP_NAME}} also receives your IP address and browser details, and it may set its own cookies (see its privacy policy). We use your email only to send you news about fitee. {{SIGNUP_LEAVE}} <!--fitee:if frame-->The answer that shows under the form is {{SIGNUP_NAME}}’s own page, which may load files from other sites; apart from that, nothing on this page sends anything to another site.<!--fitee:else-->Nothing else on this page sends anything to another site.<!--fitee:end--></p>
           <!--fitee:end-->
         </section>
         <p class="small">App screens show made-up sample data. <!--fitee:if open-->Sign-ups are handled by {{SIGNUP_NAME}}. <!--fitee:end-->Set in Bricolage Grotesque (<a href="licenses/bricolage-grotesque-OFL.txt">SIL Open Font License</a>).</p>

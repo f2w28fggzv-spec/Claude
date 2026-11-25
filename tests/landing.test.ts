@@ -41,10 +41,10 @@ const directives = (csp: string) => Object.fromEntries(csp.split(';').map((d) =>
 const urls = (text: string) => [...text.matchAll(/https?:\/\/[^\s"'`)<>\\]+/g)].map((m) => m[0].replace(/[;,.]+$/, ''));
 /** What the build reads from its own files (the pose model's size), as a test page needs it. */
 const FACTS = { poseBytes: 24_198_980 };
-/** A valid config for each service (Formspree needs a contact address). */
+/** A valid config for each service (each needs a contact address). */
 const CONFIGS: Record<SignupService, SignupConfig> = {
-  buttondown: { service: 'buttondown', id: 'fitee' },
-  mailerlite: { service: 'mailerlite', id: '123456/987654' },
+  buttondown: { service: 'buttondown', id: 'fitee', contact: 'list@fitee.example' },
+  mailerlite: { service: 'mailerlite', id: '123456/987654', contact: 'list@fitee.example' },
   formspree: { service: 'formspree', id: 'xyzabcd', contact: 'list@fitee.example' },
 };
 
@@ -90,14 +90,22 @@ describe('the page’s Content-Security-Policy follows the sign-up config', () =
     expect(signupTarget(CONFIGS.mailerlite)!.field).toBe('fields[email]');
   });
 
-  it('never posts Formspree into the frame (its CAPTCHA can’t run there), and gives a way to leave before any email', () => {
+  it('posts into the frame only where the answer is a short message (a check the service’s page asks for can’t run there)', () => {
     expect(() => signupTarget({ ...CONFIGS.formspree, mode: 'frame' })).toThrow(/frame/);
-    // Formspree sends no email of its own: without a contact address there would be no way to leave the list.
-    expect(() => signupTarget({ service: 'formspree', id: 'xyzabcd' })).toThrow(/contact/);
-    expect(signupTarget(CONFIGS.formspree)!.leave).toContain('write to list@fitee.example');
-    // The mailing lists' emails carry an unsubscribe link; a contact address adds a way to ask.
-    expect(signupTarget(CONFIGS.buttondown)!.leave).toBe('Every email from the list has a link to unsubscribe.');
-    expect(signupTarget({ ...CONFIGS.buttondown, contact: 'hello@fitee.example' })!.leave).toContain('write to hello@fitee.example');
+    expect(() => signupTarget({ ...CONFIGS.buttondown, mode: 'frame' })).toThrow(/frame/);
+    expect(Object.entries(PRESETS).filter(([, p]) => p.framable).map(([s]) => s)).toEqual(['mailerlite']);
+  });
+
+  it('needs an address to write to for every service: to leave the list, ask what it holds, or have an address deleted', () => {
+    for (const service of Object.keys(PRESETS) as SignupService[]) {
+      // An unsubscribe link only stops the emails (and Formspree sends none of its own).
+      expect(() => signupTarget({ service, id: CONFIGS[service].id } as SignupConfig), service).toThrow(/contact/);
+      expect(() => signupTarget({ ...CONFIGS[service], contact: '  ' }), service).toThrow(/contact/);
+      expect(signupTarget(CONFIGS[service])!.leave, service).toMatch(/To leave (the list )?at any time, to ask what (it|the list) holds about you, or to have your address deleted, write to list@fitee\.example\.$/);
+    }
+    expect(signupTarget(CONFIGS.buttondown)!.leave).toBe(
+      'Every email from the list has a link to unsubscribe. To leave at any time, to ask what the list holds about you, or to have your address deleted, write to list@fitee.example.',
+    );
     // An address, nothing else (the page shows it as text).
     for (const contact of ['not an address', 'https://example.com', 'a@b', '<x>@y.example']) {
       expect(() => signupTarget({ ...CONFIGS.buttondown, contact }), contact).toThrow(/contact/);
@@ -112,9 +120,10 @@ describe('the page’s Content-Security-Policy follows the sign-up config', () =
   });
 
   it('refuses a config the build can’t use, and a test service anywhere but localhost', () => {
-    expect(() => signupTarget({ service: 'buttondown', id: 'bad id/../x' })).toThrow();
-    expect(() => signupTarget({ service: 'mailerlite', id: 'not-a-form' })).toThrow();
-    expect(() => signupTarget({ service: 'nope' as SignupService, id: 'x' })).toThrow();
+    const contact = 'list@fitee.example';
+    expect(() => signupTarget({ service: 'buttondown', id: 'bad id/../x', contact })).toThrow(/valid Buttondown id/);
+    expect(() => signupTarget({ service: 'mailerlite', id: 'not-a-form', contact })).toThrow(/valid MailerLite id/);
+    expect(() => signupTarget({ service: 'nope' as SignupService, id: 'x', contact })).toThrow(/unknown service/);
     expect(() => testSignupTarget(JSON.stringify({ action: 'https://example.com/subscribe' }))).toThrow();
     expect(() => testSignupTarget(JSON.stringify({ action: 'http://evil.localhost.example/subscribe' }))).toThrow();
     const local = testSignupTarget(JSON.stringify({ action: 'http://localhost:4403/subscribe' }));
@@ -274,6 +283,9 @@ describe('the page’s template', () => {
     expect(html).toContain('Buttondown also receives your IP address and browser details, and it may set its own cookies');
     expect(html).not.toContain('makes no requests to other sites');
     expect(html).toContain('you’ll see its own page when you join');
+    expect(html).not.toContain('its answer shows here');
+    expect(html).toContain('Nothing else on this page sends anything to another site.');
+    expect(html).not.toContain('The answer that shows under the form');
     // Posted top-level: no frame, and nothing on the page that says what happened.
     expect(html).not.toContain('class="answer"');
     expect(html).not.toMatch(/Check your inbox|you(’|')re on the list|subscribed|success/i);
@@ -290,16 +302,22 @@ describe('the page’s template', () => {
     expect(answer?.[2]).toBe('Here’s what came back. If it says your sign-up went through, an email is on its way so you can confirm your address (look in your spam folder too). If it’s blank, the sign-up service couldn’t be reached: try again later.');
     expect(html).not.toMatch(/Check your inbox|class="thanks"|data-again|you(’|')re on the list|subscribed|success/i);
     expect(html).toContain('its answer shows here when you join');
+    expect(html).not.toContain('you’ll see its own page');
+    // The service's answer is its own page, which the page's CSP doesn't govern: the privacy note says so.
+    expect(html).toContain('The answer that shows under the form is MailerLite’s own page, which may load files from other sites; apart from that, nothing on this page sends anything to another site.');
+    expect(html).not.toContain('Nothing else on this page sends anything to another site.');
     // A service that sends no confirmation (the test stand-in can be one) says so.
     const quiet = renderPage(TEMPLATE, { ...target, confirms: false }, FACTS);
     expect(quiet).toContain('If it says your sign-up went through, we’ll email you when you can try fitee. If it’s blank,');
     expect(quiet).not.toContain('confirm your address');
   });
 
-  it('names the contact address in the privacy note, where the config gives one', () => {
+  it('names the contact address in the privacy note and the fine print', () => {
     const html = renderPage(TEMPLATE, signupTarget(CONFIGS.formspree), FACTS);
-    expect(html).toContain('To leave the list at any time, or to ask about it, write to list@fitee.example.');
+    const leave = 'To leave the list at any time, to ask what it holds about you, or to have your address deleted, write to list@fitee.example.';
+    expect(html.split(leave).length - 1).toBe(2);
     expect(html).toContain('data-mode="page"');
+    expect(html).not.toContain('its answer shows here');
   });
 
   it('gives the panel the Molten tokens, the same as the pinned dark theme', () => {
@@ -337,12 +355,17 @@ describe('the page’s build', () => {
   it('refuses code from outside this repo (the page shares the app’s origin)', () => {
     const src = (f: string) => join(ROOT, 'src', f);
     expect(notOwnCode({ modules: [join(ROOT, 'about', 'index.html'), src('landing/main.ts'), src('landing/landing.css')], sources: ['public/favicon.svg', 'node_modules/@fontsource-variable/bricolage-grotesque/files/x.woff2', 'src/landing/screens/a.webp'] })).toEqual([]);
-    expect(notOwnCode({ modules: [join(ROOT, 'node_modules', 'left-pad', 'index.js'), '\0virtual:thing', src('landing/main.ts')], sources: ['node_modules/some-icons/a.svg', 'scripts/x.png'] })).toEqual([
+    expect(notOwnCode({ modules: [join(ROOT, 'node_modules', 'left-pad', 'index.js'), '\0virtual:thing', src('landing/main.ts'), src('vendor/node_modules/x/index.js')], sources: ['node_modules/some-icons/a.svg', 'scripts/x.png'] })).toEqual([
       'node_modules/left-pad/index.js',
       '\0virtual:thing',
+      join('src', 'vendor', 'node_modules', 'x', 'index.js'),
       'node_modules/some-icons/a.svg',
       'scripts/x.png',
     ]);
+    // A package is a node_modules folder inside the repo: the folders the repo is checked out in may be called anything.
+    const elsewhere = join('/home', 'me', 'node_modules_projects', 'fitee');
+    expect(notOwnCode({ modules: [join(elsewhere, 'about', 'index.html'), join(elsewhere, 'src', 'landing', 'main.ts')], sources: [join(elsewhere, 'src', 'landing', 'screens', 'a.webp'), join(elsewhere, 'public', 'favicon.svg')] }, elsewhere)).toEqual([]);
+    expect(notOwnCode({ modules: [join(elsewhere, 'node_modules', 'left-pad', 'index.js')], sources: [] }, elsewhere)).toEqual([join('node_modules', 'left-pad', 'index.js')]);
     // Styles: only the app's font and its own tokens are imported (postcss inlines them, so they aren't modules).
     const imports = [...read('src/landing/landing.css').matchAll(/@import\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
     expect(imports).toEqual(['@fontsource-variable/bricolage-grotesque/opsz.css', '../tokens.css']);
@@ -393,12 +416,25 @@ describe('the built page', () => {
       const others = urls(readFileSync(f, 'utf8')).filter((u) => !(connected && (u === connected.origin || u.startsWith(connected.origin + '/'))));
       expect(others, relative(out, f)).toEqual([]);
     }
-    // Every file the page loads is in about/ (nothing of the app's, nothing inlined as data:).
-    for (const m of html.matchAll(/(?:src|href)="([^"#]+)"/g)) {
-      expect(m[1]).not.toMatch(/^(data:|https?:|\/\/)/);
-      expect(new URL(m[1], 'https://example.org/Claude/about/').pathname.startsWith('/Claude/about/')).toBe(true);
+    // Every file the page loads is in about/ (nothing of the app's, nothing inlined as data:), pictures' srcset too.
+    const loads = [
+      ...[...html.matchAll(/\s(?:src|href)="([^"#]+)"/g)].map((m) => m[1]),
+      ...[...html.matchAll(/\ssrcset="([^"]+)"/g)].flatMap((m) => m[1].split(',').map((c) => c.trim().split(/\s+/)[0])),
+    ];
+    expect(loads.filter((u) => /\.webp$/.test(u)).length).toBeGreaterThan(40);
+    for (const u of loads) {
+      expect(u).not.toMatch(/^(data:|https?:|\/\/)/);
+      expect(new URL(u, 'https://example.org/Claude/about/').pathname.startsWith('/Claude/about/'), u).toBe(true);
     }
     expect(files.every((f) => relative(out, f).startsWith('about'))).toBe(true);
+  });
+
+  it('reads none of the app’s data: its script names no storage of any kind (the app’s is on the same origin)', () => {
+    const scripts = walk(join(out, 'about')).filter((f) => f.endsWith('.js'));
+    expect(scripts.length).toBeGreaterThan(0);
+    // Browser names, which minifying keeps as they are.
+    const storage = /localStorage|sessionStorage|indexedDB|\bcaches\b|cookieStore|\.cookie\b|serviceWorker|navigator\.storage|StorageManager/;
+    for (const f of scripts) expect(storage.exec(readFileSync(f, 'utf8'))?.[0], relative(out, f)).toBeUndefined();
   });
 
   it('carries the hero’s data and its first frame, and the list as the config says (closed while SIGNUP is null)', () => {

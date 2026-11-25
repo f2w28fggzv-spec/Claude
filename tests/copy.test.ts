@@ -10,6 +10,7 @@ import { signupTarget, type SignupConfig } from '../src/landing/signup';
 
 const ROOT = join(__dirname, '..');
 const NO_ACCOUNT = /\bno[\s-]+accounts?\b|\bwithout\s+(an\s+)?accounts?\b|\bno[\s-]+log[\s-]?ins?\b/i;
+const NO_ACCOUNT_ALL = new RegExp(NO_ACCOUNT.source, 'gi');
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
@@ -24,12 +25,39 @@ const withoutComments = (text: string) =>
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|[^:\\])\/\/.*$/gm, '$1');
 
-const hits = (text: string) => withoutComments(text).split('\n').filter((line) => NO_ACCOUNT.test(line));
+/**
+ * The words as a reader gets them, so a phrase split across lines (JSX joins them with a space), by a tag, by
+ * JSX's {' '} or by a no-break space (a character, an HTML entity or a string escape) is still one phrase.
+ */
+const asRead = (text: string) =>
+  withoutComments(text)
+    .replace(/&nbsp;|&#160;|&#x0*a0;|\\u00a0|\\xa0|\\u\{a0\}/gi, ' ')
+    .replace(/\{\s*(['"`])\s*\1\s*\}/g, ' ')
+    .replace(/<\/?[a-z][\w.:-]*(?:\s[^<>]*)?\/?>/gi, ' ');
+
+/** Each place the phrase occurs, with a little of the text around it. */
+const hits = (text: string) => {
+  const read = asRead(text);
+  return [...read.matchAll(NO_ACCOUNT_ALL)].map((m) => read.slice(Math.max(0, m.index - 30), m.index + m[0].length + 30).replace(/\s+/g, ' ').trim());
+};
 
 describe('no "no account" in the copy', () => {
   it('catches the phrasings it is meant to', () => {
     for (const s of ['No account', 'no accounts', 'No-account', 'without an account', 'No login needed', 'no log-in']) expect(NO_ACCOUNT.test(s), s).toBe(true);
     for (const s of ['your account', 'ACCOUNT_ID', 'If the app ever adds accounts', 'log in later']) expect(NO_ACCOUNT.test(s), s).toBe(false);
+    // However the words are split in the source: across a line break, by a tag or JSX's {' '}, or by a no-break space.
+    for (const s of [
+      '<p>Train with a plan, log every set, check your technique. No\n            account needed.</p>',
+      '<p class="muted">Free to try, no&nbsp;account needed.</p>',
+      'no&#160;account',
+      "const s = 'no\\u00a0account';",
+      'No{\' \'}\n      account needed',
+      'No <span class="nowrap">account</span> needed',
+      'without\nan account',
+    ]) {
+      expect(hits(s), s).toHaveLength(1);
+    }
+    for (const s of ['<p>Your account</p>', 'const x = a < b; // no account here, a comment', '<!-- no account -->']) expect(hits(s), s).toEqual([]);
   });
 
   it('the app: no screen, text or manifest says it', () => {
@@ -38,7 +66,7 @@ describe('no "no account" in the copy', () => {
       join(ROOT, 'index.html'),
       join(ROOT, 'public', 'manifest.webmanifest'),
     ];
-    const found = files.flatMap((f) => hits(readFileSync(f, 'utf8')).map((line) => `${relative(ROOT, f)}: ${line.trim()}`));
+    const found = files.flatMap((f) => hits(readFileSync(f, 'utf8')).map((hit) => `${relative(ROOT, f)}: ${hit}`));
     expect(found).toEqual([]);
   });
 
@@ -47,8 +75,8 @@ describe('no "no account" in the copy', () => {
     expect(hits(template)).toEqual([]);
     const configs: (SignupConfig | null)[] = [
       null,
-      { service: 'buttondown', id: 'example' },
-      { service: 'mailerlite', id: '123/456' },
+      { service: 'buttondown', id: 'example', contact: 'list@example.com' },
+      { service: 'mailerlite', id: '123/456', contact: 'list@example.com' },
       { service: 'formspree', id: 'abc123', contact: 'list@example.com' },
     ];
     for (const config of configs) {

@@ -121,12 +121,13 @@ none of the app's data; its build fails if the page's script takes in code
 from outside `src/`. Its Content Security Policy is written at build time.
 
 **The interest list** isn't connected yet: it says sign-ups open soon and
-collects nothing. To open it, set `SIGNUP` in `src/landing/signup.ts` to one
-of the presets and deploy:
+collects nothing. Before it opens, have the page's copy (its privacy note
+above all) reviewed along with the app's legal drafts. To open it, set
+`SIGNUP` in `src/landing/signup.ts` to one of the presets and deploy:
 
 ```ts
-export const SIGNUP: SignupConfig | null = { service: 'buttondown', id: 'your-username' };
-// or { service: 'mailerlite', id: 'ACCOUNT_ID/FORM_ID' },
+export const SIGNUP: SignupConfig | null = { service: 'buttondown', id: 'your-username', contact: 'list@your-domain.example' };
+// or { service: 'mailerlite', id: 'ACCOUNT_ID/FORM_ID', contact: 'list@your-domain.example' },
 // or { service: 'formspree', id: 'FORM_ID', contact: 'list@your-domain.example' }
 ```
 
@@ -138,12 +139,14 @@ names against the service's current embed code first (MailerLite: turn on
 double opt-in, leave reCAPTCHA off). The page can't read the service's
 answer, so it never says the sign-up went through: Buttondown and Formspree
 show their own page, and MailerLite's answer shows in a sandboxed frame under
-the form. Formspree sends no email of its own, so it needs `contact`, an
-address people can write to to leave the list (a project or list address: the
-page shows it).
+the form. Every service needs `contact`, an address people can write to to
+leave the list, ask what it holds about them or have their address deleted
+(an unsubscribe link only stops the emails, and Formspree sends none of its
+own): a project or list address, as the page shows it.
 
 Check it end to end (Chromium via Playwright, cut off from every site but
-this machine; a stand-in sign-up service runs on port + 1):
+this machine; a stand-in sign-up service runs on port + 1; it also builds the
+app alone and checks its files and `sw.js` come out byte for byte the same):
 
 ```sh
 npm run landing:check -- --work /tmp/landing-check --port 4402
@@ -156,7 +159,8 @@ the app's screens change, make them again (writes `src/landing/screens/`):
 npm run landing:screens -- --work /tmp/landing-screens --port 4405
 ```
 
-In `npm run dev` the page is at `/about/`.
+In `npm run dev` the page is at `/about/`, and reloads when you edit a module
+that writes its HTML (`src/landing/prerender.ts`, `src/landing/signup.ts`).
 
 ## Deploy (GitHub Pages)
 

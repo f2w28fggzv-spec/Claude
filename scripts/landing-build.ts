@@ -118,21 +118,25 @@ export interface LandingInputs {
  * The page shares its origin with the app, so it runs only this repo's own
  * code: every module of its script from src/, every other file from src/,
  * public/ or the app's font package. Returns what's out of place (empty when
- * all is well).
+ * all is well). `root` is the repo's folder (a test can name another).
  */
-export function notOwnCode(inputs: LandingInputs): string[] {
-  const src = join(ROOT, 'src');
+export function notOwnCode(inputs: LandingInputs, root = ROOT): string[] {
+  const src = join(root, 'src');
+  const template = join(root, LANDING_DIR, 'index.html');
+  const fonts = root === ROOT ? FONT_DIRS : [join(root, 'node_modules', '@fontsource-variable', 'bricolage-grotesque')];
+  /** A package's file: a node_modules folder on its path inside the repo (the folders the repo itself is in may be called anything). */
+  const inPackage = (file: string) => relative(root, file).split(sep).includes('node_modules');
   const out = inputs.modules.filter((m) => {
-    const file = resolve(ROOT, m.split('?')[0]);
+    const file = resolve(root, m.split('?')[0]);
     // The template is the entry (Vite reads the page's HTML as a module).
-    return file !== TEMPLATE && (!within(src, file) || file.includes('node_modules'));
+    return file !== template && (!within(src, file) || inPackage(file));
   });
   for (const f of inputs.sources) {
-    const file = resolve(ROOT, f);
-    const ok = (within(src, file) && !file.includes('node_modules')) || within(join(ROOT, 'public'), file) || FONT_DIRS.some((d) => within(d, file)) || file === TEMPLATE;
+    const file = resolve(root, f);
+    const ok = (within(src, file) && !inPackage(file)) || within(join(root, 'public'), file) || fonts.some((d) => within(d, file)) || file === template;
     if (!ok) out.push(f);
   }
-  return out.map((m) => (isAbsolute(m) ? relative(ROOT, m) : m));
+  return out.map((m) => (isAbsolute(m) ? relative(root, m) : m));
 }
 
 /** What the page's build and the dev server share: the HTML from its template, and the panel's tokens. */
@@ -214,7 +218,8 @@ export async function buildLanding(outDir: string): Promise<{ files: string[] } 
  * Vite plugin for the app's config: builds the page after every production
  * build, into the configured output folder (after sw.js is written; the
  * app's offline copy leaves about/ out either way). In the dev server it
- * serves the page at /about/.
+ * serves the page at /about/ (and sends /about there, as GitHub Pages does),
+ * and reloads it when a module that writes its HTML changes.
  */
 export function landingBuild(): Plugin[] {
   let outDir = '';
@@ -241,6 +246,19 @@ export function landingBuild(): Plugin[] {
       apply: 'serve',
       configureServer(s) {
         server = s;
+        // The page's HTML comes from modules the browser never loads (prerender.ts, signup.ts, and the library through
+        // them): Vite refreshes them in its SSR module graph, and the open page reloads to fetch the new HTML.
+        s.watcher.on('change', (file) => {
+          if (s.environments.ssr?.moduleGraph.getModulesByFile(file)?.size) s.ws.send({ type: 'full-reload', path: `/${LANDING_DIR}/index.html` });
+        });
+        // The folder without its slash goes to the page, as GitHub Pages sends it (rather than to the app).
+        s.middlewares.use((req, res, next) => {
+          const [path, query] = (req.url ?? '').split(/\?(.*)/s);
+          if (path !== `/${LANDING_DIR}`) return next();
+          res.statusCode = 301;
+          res.setHeader('Location', `/${LANDING_DIR}/${query ? `?${query}` : ''}`);
+          res.end();
+        });
       },
     },
   ];

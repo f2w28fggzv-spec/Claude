@@ -18,25 +18,36 @@ function launchLocalOnly(chromium, { args = [], ...options } = {}) {
   return chromium.launch({ ...options, args: [...LOCAL_ONLY_ARGS, ...args] });
 }
 
+/** The error the guard gives a request to another site (the proxy at 127.0.0.1:1 refuses it). */
+const GUARD_ERROR = /net::ERR_PROXY_CONNECTION_FAILED/;
+
 /**
- * Proves the browser can't reach another site: a page that asks for one gets
- * an error on this machine and no answer. Resolves to the error's text, or
- * throws if anything answered. The name is under .invalid, which no DNS
- * resolves, so even a browser without the guard couldn't reach a real site.
+ * Proves the browser is cut off by the guard: a page that asks for another
+ * site, over http and over https, gets the guard's own error on this machine
+ * (any other failure, such as a name no DNS resolves, would also come from a
+ * browser without the guard, so it proves nothing). Resolves to the errors'
+ * text, or throws. The name is under .invalid, which no DNS resolves, so even
+ * a browser without the guard couldn't reach a real site.
  */
 async function proveLocalOnly(browser) {
   const ctx = await browser.newContext();
   try {
     const page = await ctx.newPage();
-    const response = await page.goto('http://fitee-local-only-check.invalid/', { timeout: 10000 }).then(
-      (r) => r,
-      (e) => e,
-    );
-    if (!(response instanceof Error)) throw new Error(`a request to another site got an answer (${response && response.status()})`);
-    return response.message.split('\n')[0];
+    const seen = [];
+    for (const url of ['http://fitee-local-only-check.invalid/', 'https://fitee-local-only-check.invalid/']) {
+      const response = await page.goto(url, { timeout: 10000 }).then(
+        (r) => r,
+        (e) => e,
+      );
+      if (!(response instanceof Error)) throw new Error(`a request to another site got an answer (${url}: ${response && response.status()})`);
+      const message = response.message.split('\n')[0];
+      if (!GUARD_ERROR.test(message)) throw new Error(`not cut off by the guard (${message})`);
+      seen.push(message);
+    }
+    return seen.join('; ');
   } finally {
     await ctx.close();
   }
 }
 
-module.exports = { LOCAL_ONLY_ARGS, launchLocalOnly, proveLocalOnly };
+module.exports = { LOCAL_ONLY_ARGS, GUARD_ERROR, launchLocalOnly, proveLocalOnly };

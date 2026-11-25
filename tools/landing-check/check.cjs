@@ -6,25 +6,29 @@
 //   npm run landing:check -- --work DIR --port 4402
 //
 // It builds the app and the page as `npm run build` does (without the
-// typecheck) into DIR/build, and the page twice more with a stand-in sign-up
-// service connected (FITEE_LANDING_TEST_SIGNUP, a test-only override that
-// accepts localhost only): its answer in the sandboxed frame (DIR/connected)
-// and as its own page (DIR/connected-page). It serves a build under
+// typecheck) into DIR/build, the app alone without the page
+// (app-only.config.mjs, into DIR/app-only), and the page twice more with a
+// stand-in sign-up service connected (FITEE_LANDING_TEST_SIGNUP, a test-only
+// override that accepts localhost only): its answer in the sandboxed frame
+// (DIR/connected) and as its own page (DIR/connected-page). It serves a build under
 // http://localhost:<port>/Claude/ like GitHub Pages (server.cjs: a folder's
 // index.html, a folder without its slash redirected) and runs the stand-in
 // service on <port + 1>. Its Chromium is cut off from every site but this
 // machine (../offline-check/local-only.cjs), so a request to another site
 // fails here and is still reported. Then it checks:
 //   1. the build: the page's CSP, its JavaScript and first-load weight, the
-//      app's precache list (sw.js) leaving about/ out, and sw.js unchanged
-//      when only the page changes;
+//      app's precache list (sw.js) leaving about/ out, sw.js unchanged when
+//      only the page changes, and the app's files and sw.js byte for byte the
+//      same built without the page;
 //   2. at 390 and 1280 px, light and dark, without and then with the app's
 //      service worker installed (the app opened first in the same context):
 //      the page loads, its hero runs (the app's demo renderer), the list is
 //      in its closed state (no form, nothing to type into), nothing scrolls
 //      sideways, no request leaves localhost, no console errors, no cookies
-//      or storage; with the worker the page is controlled, still loads every
-//      file, and none of them lands in the app's offline copy; every kind of
+//      or storage (IndexedDB too), and the page's own code touches no storage
+//      API at all (it reads none of the app's data); with the worker the page
+//      is controlled, still loads every file, and none of them lands in the
+//      app's offline copy; every kind of
 //      text passes WCAG AA against the pixels behind it; full-page
 //      screenshots at device scale 2;
 //   3. layout and access: 320 px with nothing scrolling sideways; "sign-ups"
@@ -32,14 +36,21 @@
 //      figure is a how-to demo; keyboard focus visible on everything Tab
 //      reaches, a lift chip on a phone fully in view with its whole ring, and
 //      on a wide screen the headline's column before the demo's; the hero's
-//      one height for every lift and no layout shift while it tours (CLS);
-//      the Female / Male radio group's tab stop; the pause button saying what
-//      it does; the Lowering / Lifting pills telling on from off by shape;
-//      forced colours still showing what's picked; text at 200% and the
-//      WCAG text-spacing values without side scroll or empty legend bars;
-//      two columns of steps with no empty cell; pictures fetched no larger
-//      than the screen needs; the rep list readable on a phone; reduced
-//      motion; no JavaScript (the controls leave no gaps);
+//      one height for every lift and no layout shift while it tours (CLS),
+//      the toured lift's chip in view in the phone's sideways row (the page
+//      never scrolled by it); the Female / Male radio group's tab stop; the
+//      pause button saying what it does, and a lift picked while paused
+//      staying paused; the Lowering / Lifting pills telling on from off by
+//      shape; forced colours still showing what's picked, with outlines on
+//      the buttons and the legend key's ramp; text at 200% and the WCAG
+//      text-spacing values without side scroll or empty legend bars; two
+//      columns of steps with no empty cell; steps 4 and 5's card over the
+//      phone's edge only (720 to 1440 px); pictures fetched no larger than
+//      the screen needs; the rep list readable on a phone; reduced motion
+//      (and switched on and off while the page is open, the pause button
+//      there whenever anything moves; from 560 px the stills across the
+//      stage, with no layout shift as the script takes over); no JavaScript
+//      (the controls leave no gaps);
 //   4. with the stand-in service connected (with and without the app's
 //      worker): the hero's Join button goes to the email field; an empty or
 //      malformed address gets an inline error (aria-invalid, announced) and
@@ -49,8 +60,13 @@
 //      or the browser's own when the service can't be reached) shows in the
 //      frame under the form while the page says only what happens next if
 //      the sign-up went through: never a done state of its own, the form
-//      still there to try again; a service that never answers gets a
-//      message; and posted as its own page, the visitor goes to the service.
+//      still there to try again, each post in a frame of its own (trying
+//      again adds no step to Back); a service that never answers gets a
+//      message, the button busy meanwhile with keyboard focus still on it;
+//      the field's example address at 4.5:1 or more; the Join button's
+//      outline in forced colours; and posted as its own page, the visitor
+//      goes to the service, and coming Back (from the browser's back-forward
+//      cache) finds the line under the field cleared.
 // It prints PASS/FAIL lines, writes report.json and screenshots to DIR, and
 // exits 1 if any check fails.
 //
@@ -74,6 +90,7 @@ const PORT = Number(opt('port', 4402));
 const SERVICE_PORT = PORT + 1;
 const WORK = path.resolve(opt('work', '') || fs.mkdtempSync(path.join(os.tmpdir(), 'fitee-landing-check-')));
 const BUILD = path.join(WORK, 'build');
+const APP_ONLY = path.join(WORK, 'app-only');
 const CONNECTED = path.join(WORK, 'connected');
 const CONNECTED_PAGE = path.join(WORK, 'connected-page');
 const SHOTS = path.join(WORK, 'shots');
@@ -107,6 +124,8 @@ const walk = (dir) =>
 function build() {
   console.log(`Building into ${WORK} …`);
   execFileSync('npx', ['vite', 'build', '--outDir', BUILD, '--emptyOutDir', '--logLevel', 'warn'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] });
+  // The app on its own: its Vite config without the page's build.
+  execFileSync('npx', ['vite', 'build', '--config', path.join(__dirname, 'app-only.config.mjs'), '--outDir', APP_ONLY, '--emptyOutDir', '--logLevel', 'warn'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] });
   for (const [dir, mode] of [
     [CONNECTED, 'frame'],
     [CONNECTED_PAGE, 'page'],
@@ -154,6 +173,36 @@ function startService() {
         server.close(() => resolve());
       }),
   };
+}
+
+/**
+ * Run before the page's own scripts (an init script): wraps every storage API
+ * the page could read the app's data through (it shares the app's origin) and
+ * notes each use in the page's own window. The check reads the notes before
+ * it looks at storage itself.
+ */
+function storageAudit() {
+  const used = (window.__storageUsed = []);
+  const wrap = (target, name, label) => {
+    const d = Object.getOwnPropertyDescriptor(target, name);
+    if (!d || !d.get || !d.configurable) return;
+    Object.defineProperty(target, name, {
+      ...d,
+      get() {
+        used.push(label);
+        return d.get.call(this);
+      },
+      ...(d.set && {
+        set(v) {
+          used.push(`${label}=`);
+          d.set.call(this, v);
+        },
+      }),
+    });
+  };
+  for (const name of ['localStorage', 'sessionStorage', 'indexedDB', 'caches', 'cookieStore']) wrap(window, name, name);
+  wrap(Document.prototype, 'cookie', 'document.cookie');
+  for (const name of ['serviceWorker', 'storage']) wrap(Navigator.prototype, name, `navigator.${name}`);
 }
 
 // In-page helpers.
@@ -260,7 +309,8 @@ const heroState = (page) =>
 const answerState = (page) =>
   page.evaluate(() => {
     const answer = document.querySelector('.answer');
-    const frame = answer?.querySelector('iframe');
+    // The frame on show (the next post's frame waits hidden beside it).
+    const frame = answer?.querySelector('iframe:not([hidden])');
     const r = frame?.getBoundingClientRect();
     const form = document.querySelector('form.signup');
     return {
@@ -268,7 +318,7 @@ const answerState = (page) =>
       status: document.querySelector('.signup-status').textContent,
       error: document.querySelector('.signup-status').classList.contains('is-error'),
       formShown: !form.hidden && form.getBoundingClientRect().height > 0,
-      enabled: !form.querySelector('button[type=submit]').disabled,
+      enabled: form.querySelector('button[type=submit]').getAttribute('aria-disabled') !== 'true' && !form.querySelector('button[type=submit]').disabled,
       sandbox: frame?.getAttribute('sandbox'),
       panelText: document.querySelector('#list .panel').innerText,
       url: location.href,
@@ -307,13 +357,20 @@ async function main() {
   report.weight.jsGzip = jsGzip;
   check(`the page's JavaScript is at most ${kb(JS_BUDGET_GZIP)} gzipped`, jsGzip <= JS_BUDGET_GZIP, kb(jsGzip));
   const sw = fs.readFileSync(path.join(BUILD, 'sw.js'), 'utf8');
-  check("the app's precache list (sw.js) leaves about/ out", !/"url":"about\//.test(sw) && pageFiles.length > 0, `${pageFiles.length} files in about/`);
+  // Every file the list names (pretty-printed in sw.js: "url": "…").
+  const listed = [...sw.matchAll(/"url":\s*"([^"]+)"/g)].map((m) => m[1]);
+  check("the app's precache list (sw.js) leaves about/ out", listed.length > 10 && !listed.some((u) => u.startsWith('about/')) && pageFiles.length > 0, `${listed.length} files listed, ${pageFiles.length} in about/`);
   execFileSync(process.execPath, ['scripts/offline-build.ts', CONNECTED], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] });
   check('a different page (the connected build) gives the same sw.js', fs.readFileSync(path.join(CONNECTED, 'sw.js'), 'utf8') === sw);
-  const appSame = walk(BUILD)
-    .filter((f) => !path.relative(BUILD, f).startsWith('about'))
-    .every((f) => fs.readFileSync(f).equals(fs.readFileSync(path.join(CONNECTED, path.relative(BUILD, f)))));
-  check("and the same app files: the app doesn't depend on the page", appSame);
+  // The app built on its own (no page at all): the same files, byte for byte, sw.js too.
+  const appFiles = walk(BUILD).map((f) => path.relative(BUILD, f)).filter((f) => !f.startsWith(`about${path.sep}`)).sort();
+  const aloneFiles = walk(APP_ONLY).map((f) => path.relative(APP_ONLY, f)).sort();
+  const differ = appFiles.filter((f) => !aloneFiles.includes(f) || !fs.readFileSync(path.join(BUILD, f)).equals(fs.readFileSync(path.join(APP_ONLY, f))));
+  check(
+    "the app built without the page gives the same files byte for byte, sw.js too: the app doesn't depend on the page",
+    appFiles.includes('sw.js') && JSON.stringify(appFiles) === JSON.stringify(aloneFiles) && differ.length === 0,
+    differ.length ? `differ: ${differ.join(', ')}` : `${appFiles.length} files${appFiles.length !== aloneFiles.length ? `, ${aloneFiles.length} built alone` : ''}`,
+  );
 
   const server = createServer({ port: PORT });
   server.setRoot(BUILD);
@@ -366,6 +423,7 @@ async function main() {
         for (const theme of ['light', 'dark']) {
           const label = `${width} ${theme}${sw ? ' with the app' : ''}`;
           const ctx = await contextFor(label, { width, theme, sw });
+          await ctx.addInitScript(storageAudit);
           if (sw) await installApp(ctx);
           const page = await ctx.newPage();
           const bytes = { initial: 0, total: 0 };
@@ -392,6 +450,9 @@ async function main() {
           else check(`${label}: the interest list is closed: no form, nothing to type into`, list.state === 'closed' && !list.form && list.inputs === 0 && list.iframes === 0 && list.soon && list.pill && !list.join);
           await scrollThrough(page);
           check(`${label}: nothing scrolls sideways`, await noSideScroll(page));
+          // Read before the check looks at storage itself.
+          const used = await page.evaluate(() => window.__storageUsed ?? null);
+          check(`${label}: the page's own code touches no storage API (it reads none of the app's data)`, Array.isArray(used) && used.length === 0, used === null ? 'the audit didn’t run' : used.join(', '));
           if (sw) {
             const controlled = await page.evaluate(() => !!navigator.serviceWorker.controller);
             const cached = await page.evaluate(async () => {
@@ -403,11 +464,12 @@ async function main() {
           } else {
             const stored = await page.evaluate(async () => ({
               storage: localStorage.length + sessionStorage.length,
+              idb: (await indexedDB.databases()).length,
               worker: !!navigator.serviceWorker.controller || (await navigator.serviceWorker.getRegistrations()).length > 0,
               caches: (await caches.keys()).length,
             }));
             const cookies = await ctx.cookies();
-            check(`${label}: no cookies, nothing stored, no service worker of its own`, stored.storage === 0 && !stored.worker && stored.caches === 0 && cookies.length === 0, JSON.stringify(stored));
+            check(`${label}: no cookies, nothing stored (IndexedDB too), no service worker of its own`, stored.storage === 0 && stored.idb === 0 && !stored.worker && stored.caches === 0 && cookies.length === 0, JSON.stringify(stored));
           }
           if (!sw) {
             const decoder = await ctx.newPage();
@@ -553,7 +615,9 @@ async function main() {
       const after = await page.evaluate(() => [document.querySelector('.demo-pause').getAttribute('aria-label'), document.querySelector('.demo-pause').hasAttribute('aria-pressed'), document.querySelector('.stage').classList.contains('is-paused')]);
       await page.click('.demo-pause');
       check('the pause button says what it does: "Pause the demo", then "Play the demo", never "pressed"', before[0] === 'Pause the demo' && !before[1] && !before[2] && after[0] === 'Play the demo' && !after[1] && after[2], `${JSON.stringify(before)} → ${JSON.stringify(after)}`);
-      // Lowering / Lifting: the lit one has a filled dot, the other a ring (not colour alone).
+      // Lowering / Lifting: the lit one has a filled dot, the other a ring (not colour alone). Read while one is lit (a
+      // rep pauses at its ends, when neither is).
+      await page.waitForFunction(() => !!document.querySelector('.phase b.on'), null, { timeout: 4000 }).catch(() => undefined);
       const dots = await page.evaluate(() =>
         [...document.querySelectorAll('.phase b')].map((b) => {
           const s = getComputedStyle(b, '::before');
@@ -562,6 +626,16 @@ async function main() {
       );
       const filled = (d) => !/rgba\(0, 0, 0, 0\)|transparent/.test(d.fill);
       check('the Lowering / Lifting pills tell on from off by shape: a filled dot against a ring', dots.length === 2 && dots.some((d) => d.on) && dots.every((d) => filled(d) === d.on && parseFloat(d.ring) > 0), JSON.stringify(dots));
+      // A lift picked while the demo is paused shows from its start and stays paused (the play button plays it).
+      await page.click('.demo-pause');
+      await page.click('.chip[data-lift="deadlift"]');
+      await sleep(500);
+      const p0 = await heroState(page);
+      await sleep(800);
+      const p1 = await heroState(page);
+      const stays = await page.evaluate(() => document.querySelector('.stage').classList.contains('is-paused') && document.querySelector('.demo-pause').getAttribute('aria-label') === 'Play the demo');
+      await page.click('.demo-pause');
+      check('a lift picked while the demo is paused shows from its start and stays paused', stays && p0.showing === 'deadlift' && p0.markup === p1.markup, `${p0.showing}, paused ${stays}`);
       await page.locator('.chip').first().focus();
       await page.screenshot({ path: path.join(SHOTS, 'focus-chip.png') });
       await ctx.close();
@@ -616,11 +690,33 @@ async function main() {
         window.scrollTo({ top: stage.getBoundingClientRect().top + window.scrollY - innerHeight / 2, behavior: 'instant' });
       });
       const before = await heroState(page);
-      await sleep(26_000);
+      const y0 = await page.evaluate(() => scrollY);
+      // Meanwhile, each lift the tour moves on to: its chip comes wholly into view in the sideways row (which scrolls
+      // smoothly, so a moment after the change), and the page itself never scrolls.
+      const chips = new Map();
+      const t0 = Date.now();
+      while (Date.now() - t0 < 34_000 && !chips.has('barbell-row')) {
+        const id = await page.evaluate(() => document.querySelector('.chip[aria-pressed="true"]').dataset.lift);
+        if (!chips.has(id)) {
+          await sleep(900);
+          chips.set(
+            id,
+            await page.evaluate(() => {
+              const c = document.querySelector('.chip[aria-pressed="true"]');
+              const r = c.parentElement.getBoundingClientRect();
+              const b = c.getBoundingClientRect();
+              return b.left >= r.left - 0.5 && b.right <= r.right + 0.5;
+            }),
+          );
+        }
+        await sleep(300);
+      }
       const after = await heroState(page);
+      const y1 = await page.evaluate(() => scrollY);
       const cls = await page.evaluate(() => window.__cls);
       report.cls['390 touring'] = cls;
-      check('390 px, the hero half in view for 26 s while it tours the lifts: no layout shift', before.showing !== after.showing && cls < 0.01, `CLS ${cls.toFixed(4)}, ${before.showing} → ${after.showing}`);
+      check('390 px, the hero half in view while it tours the lifts: no layout shift', before.showing !== after.showing && cls < 0.01, `CLS ${cls.toFixed(4)}, ${before.showing} → ${after.showing}`);
+      check('390 px: each lift the tour moves on to has its chip wholly in view in the sideways row, and the page never scrolls', chips.size >= 4 && [...chips.values()].every(Boolean) && y0 === y1, [...chips].map(([id, ok]) => `${id} ${ok ? 'in view' : 'NOT in view'}`).join(', '));
       await ctx.close();
     }
     {
@@ -630,10 +726,13 @@ async function main() {
       await page.goto(PAGE, { waitUntil: 'load' });
       await sleep(500);
       const s = await page.evaluate(() => {
-        const bg = (sel) => getComputedStyle(document.querySelector(sel)).backgroundColor;
-        return { chip: bg('.chip[aria-pressed="true"]'), other: bg('.chip[aria-pressed="false"]'), radio: bg('[data-body-pick][aria-checked="true"]'), otherRadio: bg('[data-body-pick][aria-checked="false"]'), stage: getComputedStyle(document.querySelector('.stage')).borderTopWidth };
+        const cs = (sel) => getComputedStyle(document.querySelector(sel));
+        const bg = (sel) => cs(sel).backgroundColor;
+        const edge = (sel) => (cs(sel).borderTopStyle === 'solid' ? parseFloat(cs(sel).borderTopWidth) : 0);
+        return { chip: bg('.chip[aria-pressed="true"]'), other: bg('.chip[aria-pressed="false"]'), radio: bg('[data-body-pick][aria-checked="true"]'), otherRadio: bg('[data-body-pick][aria-checked="false"]'), stage: cs('.stage').borderTopWidth, pause: edge('.demo-pause'), otherRadioEdge: edge('[data-body-pick][aria-checked="false"]'), key: cs('.key i').backgroundImage };
       });
-      check('forced colours: the picked lift and the picked figure stand out from the rest, and the demo keeps its edge', s.chip !== s.other && s.radio !== s.otherRadio && parseFloat(s.stage) >= 1, JSON.stringify(s));
+      check('forced colours: the picked lift and the picked figure stand out from the rest, and the demo keeps its edge', s.chip !== s.other && s.radio !== s.otherRadio && parseFloat(s.stage) >= 1, JSON.stringify({ chip: s.chip, other: s.other, radio: s.radio, otherRadio: s.otherRadio, stage: s.stage }));
+      check("forced colours: the pause button and the figure option not picked keep an outline, and the legend's key keeps its heat ramp", s.pause >= 1 && s.otherRadioEdge >= 1 && /gradient/.test(s.key), `pause ${s.pause} px, other option ${s.otherRadioEdge} px, key ${s.key.slice(0, 24)}…`);
       await page.locator('.stage').screenshot({ path: path.join(SHOTS, 'hero-forced-colours.png') });
       await ctx.close();
     }
@@ -682,6 +781,25 @@ async function main() {
         if (gap.length) holes.push(`${width}: ${gap.join(', ')} px empty`);
       }
       check('steps, 720 to 1280 px: every row of cards spans the grid (no empty cell)', holes.length === 0, holes.join('; ') || '7 widths');
+      // Steps 4 and 5: the card from another screen lies over the phone's edge only (the replay's title and skeleton stay in view).
+      const covers = [];
+      for (const width of [720, 768, 900, 1023, 1024, 1100, 1179, 1180, 1280, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        await sleep(150);
+        const worst = await page.evaluate(() =>
+          Math.max(
+            ...[...document.querySelectorAll('.phones.duo')].map((d) => {
+              const phone = d.querySelector('.phone img').getBoundingClientRect();
+              const card = d.querySelector('.shot-card img').getBoundingClientRect();
+              const w = Math.max(0, Math.min(phone.right, card.right) - Math.max(phone.left, card.left));
+              const h = Math.max(0, Math.min(phone.bottom, card.bottom) - Math.max(phone.top, card.top));
+              return (w * h) / (phone.width * phone.height);
+            }),
+          ),
+        );
+        covers.push([width, Math.round(worst * 100)]);
+      }
+      check("steps 4 and 5, 720 to 1440 px: the card covers 15% of the phone's screen or less", covers.every(([, k]) => k <= 15), covers.map(([w, k]) => `${w}: ${k}%`).join(', '));
       await page.setViewportSize({ width: 768, height: 1000 });
       await page.locator('.steps > .step').nth(2).scrollIntoViewIfNeeded();
       await sleep(300);
@@ -741,6 +859,45 @@ async function main() {
       const pause = await page.evaluate(() => getComputedStyle(document.querySelector('.demo-pause')).display);
       check('reduced motion: the start and the turnaround side by side, nothing plays', a.still && a.svgs === 2 && a.markup === b.markup && pause === 'none');
       await page.locator('.stage').screenshot({ path: path.join(SHOTS, 'hero-reduced-motion.png') });
+      // Switched off and on again while the page is open: the demo plays (with its pause button), then stops again.
+      const motion = async () => {
+        const x = await heroState(page);
+        await sleep(800);
+        const y = await heroState(page);
+        return { still: y.still, svgs: y.svgs, moving: x.markup !== y.markup, pause: await page.evaluate(() => getComputedStyle(document.querySelector('.demo-pause')).display !== 'none') };
+      };
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await sleep(300);
+      const on = await motion();
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await sleep(300);
+      const off = await motion();
+      check(
+        'reduced motion switched off while the page is open: the demo plays, with its pause button; switched on again: the stills, nothing moves, no pause button',
+        !on.still && on.svgs === 1 && on.moving && on.pause && off.still && off.svgs === 2 && !off.moving && !off.pause,
+        `${JSON.stringify(on)} → ${JSON.stringify(off)}`,
+      );
+      await ctx.close();
+    }
+    {
+      // Reduced motion on a wide screen: the stills span the stage (the legend under them), and the stage is laid out so before the script runs too.
+      const ctx = await contextFor('reduced motion 1024', { width: 1024, dpr: 1, reducedMotion: 'reduce' });
+      await ctx.addInitScript(() => {
+        window.__cls = 0;
+        new PerformanceObserver((list) => {
+          for (const e of list.getEntries()) if (!e.hadRecentInput) window.__cls += e.value;
+        }).observe({ type: 'layout-shift', buffered: true });
+      });
+      const page = await ctx.newPage();
+      await page.goto(PAGE, { waitUntil: 'load' });
+      await sleep(600);
+      const s = await page.evaluate(() => {
+        const stills = [...document.querySelectorAll('.still svg')].map((e) => e.getBoundingClientRect());
+        const legend = document.querySelector('.legend').getBoundingClientRect();
+        return { widths: stills.map((r) => Math.round(r.width)), below: stills.every((r) => legend.top >= r.bottom), cls: window.__cls };
+      });
+      check('reduced motion, 1024 px: the stills span the stage with the legend under them, and nothing shifts as the script takes over', s.widths.length === 2 && s.widths.every((w) => w >= 180) && s.below && s.cls < 0.01, `stills ${s.widths.join(' and ')} px wide, CLS ${s.cls.toFixed(4)}`);
+      await page.locator('.stage').screenshot({ path: path.join(SHOTS, 'hero-reduced-motion-1024.png') });
       await ctx.close();
     }
     {
@@ -768,6 +925,7 @@ async function main() {
       const page = await ctx.newPage();
       await page.goto(PAGE, { waitUntil: 'load' });
       await sleep(500);
+      const arrival = await page.evaluate(() => history.length);
       if (!sw) {
         const s = await listState(page);
         check(`${label}: the hero's hot button reads Join, the list has its form and a visible Email label`, s.state === 'open' && s.form && s.join && !s.pill && (await page.locator('label[for="signup-email"]').isVisible()));
@@ -793,6 +951,21 @@ async function main() {
         await page.fill('#signup-email', 'someone@example.com');
         await sleep(100);
         check(`${label}: typing clears the error`, await page.evaluate(() => !document.querySelector('#signup-email').hasAttribute('aria-invalid') && !document.querySelector('.signup-status').textContent));
+        // The field's example address against the field (a Molten surface in both themes).
+        const [hint, field] = await page.evaluate(() => {
+          const i = document.querySelector('#signup-email');
+          return [getComputedStyle(i, '::placeholder').color, getComputedStyle(i).backgroundColor];
+        });
+        const rgb = (c) => /rgba?\(([\d.]+), ([\d.]+), ([\d.]+)/.exec(c).slice(1, 4).map(Number);
+        const hintRatio = contrastOf(rgb(hint), rgb(field));
+        check(`${label}: the field's example address passes WCAG AA against the field`, hintRatio >= 4.5, `${hintRatio.toFixed(2)}:1`);
+        await page.emulateMedia({ forcedColors: 'active' });
+        const join = await page.evaluate(() => {
+          const b = getComputedStyle(document.querySelector('form.signup .button'));
+          return b.borderTopStyle === 'solid' ? parseFloat(b.borderTopWidth) : 0;
+        });
+        await page.emulateMedia({ forcedColors: 'none' });
+        check(`${label}: in forced colours the Join button keeps an outline (its fill is gone)`, join >= 1, `${join} px`);
         // Offline: told so, nothing sent.
         await ctx.setOffline(true);
         await page.click('form.signup button[type=submit]');
@@ -819,7 +992,7 @@ async function main() {
         await page.click('form.signup button[type=submit]');
         await page.waitForFunction((re) => new RegExp(re).test(document.querySelector('.signup-status').textContent), CAME_BACK.source, { timeout: 15000 }).catch(() => undefined);
         const done = await answerState(page);
-        const frame = page.frames().find((f) => f.name() === 'fitee-signup');
+        const frame = await (await page.$('.answer iframe:not([hidden])'))?.contentFrame();
         const frameUrl = frame?.url() ?? '';
         const post = service.log.filter((e) => e.method === 'POST').at(-1);
         const said = CAME_BACK.test(done.status) && !done.error;
@@ -845,19 +1018,26 @@ async function main() {
         }
       }
       if (!sw) {
-        // A service that never answers.
+        // Each post went into a frame of its own: trying again adds no step to the browser's Back.
+        const now = await page.evaluate(() => history.length);
+        check(`${label}: three posts, each into a fresh frame, add no step to Back`, now === arrival, `history ${arrival} → ${now}`);
+        // A service that never answers, sent from the keyboard: the button looks busy and keeps focus.
         service.setMode('hang');
         const t0 = Date.now();
-        await page.click('form.signup button[type=submit]');
+        await page.focus('form.signup button[type=submit]');
+        await page.keyboard.press('Enter');
         await sleep(500);
-        const sending = await page.evaluate(() => [document.querySelector('.signup-status').textContent, document.querySelector('form.signup button[type=submit]').disabled]);
+        const sending = await page.evaluate(() => {
+          const b = document.querySelector('form.signup button[type=submit]');
+          return [document.querySelector('.signup-status').textContent, b.getAttribute('aria-disabled') === 'true', document.activeElement === b];
+        });
         await page.waitForFunction(() => /No answer from the sign-up service yet/.test(document.querySelector('.signup-status').textContent), null, { timeout: ANSWER_TIMEOUT_MS + 10000 }).catch(() => undefined);
         const late = await answerState(page);
         service.setMode('ok');
         check(
-          `${label}: a service that never answers: "Sending…", then a message, the form usable again, nothing claimed`,
-          /Sending/.test(sending[0]) && sending[1] === true && /No answer from the sign-up service yet/.test(late.status) && late.error && late.enabled && late.formShown && !DONE_CLAIM.test(late.panelText) && Date.now() - t0 >= ANSWER_TIMEOUT_MS - 1000,
-          `${late.status} after ${((Date.now() - t0) / 1000).toFixed(1)} s`,
+          `${label}: a service that never answers: "Sending…" with the button busy and keyboard focus still on it, then a message, the form usable again, nothing claimed`,
+          /Sending/.test(sending[0]) && sending[1] === true && sending[2] === true && /No answer from the sign-up service yet/.test(late.status) && late.error && late.enabled && late.formShown && !DONE_CLAIM.test(late.panelText) && Date.now() - t0 >= ANSWER_TIMEOUT_MS - 1000,
+          `${late.status} after ${((Date.now() - t0) / 1000).toFixed(1)} s${sending[2] ? '' : '; focus left the button'}`,
         );
       }
       await ctx.close();
@@ -876,6 +1056,28 @@ async function main() {
       const post = service.log.filter((e) => e.method === 'POST').at(-1);
       check(`${label}: a good address goes to the service as a top-level form navigation, and the visitor sees its page`, posts() === n + 1 && post.dest === 'document' && post.mode === 'navigate' && page.url().startsWith(SERVICE) && !(await page.evaluate(() => !!document.querySelector('iframe'))), `${post?.dest} ${post?.mode} → ${page.url()}`);
       await ctx.close();
+    }
+    {
+      // Back from the service's page: the browser keeps this page as it was (its back-forward cache, which Playwright turns
+      // off unless the full Chromium is launched without its default flag), and "Opening the sign-up page…" goes.
+      const label = 'connected, back from the service’s own page';
+      const keeping = await launchLocalOnly(chromium, { channel: 'chromium', ignoreDefaultArgs: ['--disable-back-forward-cache'] });
+      try {
+        const ctx = await keeping.newContext({ viewport: { width: 390, height: 844 } });
+        track(ctx, label);
+        await ctx.addInitScript(() => addEventListener('pageshow', (e) => e.persisted && (window.__kept = true)));
+        const page = await ctx.newPage();
+        await page.goto(PAGE, { waitUntil: 'load' });
+        await page.fill('#signup-email', 'someone@example.com');
+        await Promise.all([page.waitForURL((u) => u.href.startsWith(SERVICE), { timeout: 15000 }), page.click('form.signup button[type=submit]')]);
+        await page.goBack({ waitUntil: 'commit' });
+        await sleep(800);
+        const back = await page.evaluate(() => ({ kept: !!window.__kept, status: document.querySelector('.signup-status').textContent, email: document.querySelector('#signup-email').value }));
+        check(`${label}: the page comes back as it was, the line under the field cleared`, back.kept && back.status === '' && back.email === 'someone@example.com', JSON.stringify(back));
+        await ctx.close();
+      } finally {
+        await keeping.close();
+      }
     }
     server.setRoot(BUILD);
   } finally {

@@ -16,7 +16,11 @@
 // the same from outside (the service's thank-you, its error page, or the
 // browser's own "can't be reached"), so the page never says the sign-up went
 // through: it shows what came back, says what happens next if it did, and
-// keeps the form there to try again. A slow or missing answer says so.
+// keeps the form there to try again. A slow or missing answer says so. While
+// a post is on its way the button only looks busy (aria-disabled, not
+// disabled), so keyboard focus stays on it. Each post goes into a frame of
+// its own, made ready beforehand: a frame's first page replaces its empty
+// one, so trying again adds no step to the browser's Back.
 
 /** How long to wait for the service's answer in the frame. */
 export const ANSWER_TIMEOUT_MS = 20_000;
@@ -73,27 +77,57 @@ export function startList(doc: Document): void {
     });
   }
 
-  let frame: HTMLIFrameElement | null = null;
-  if (mode === 'frame' && answer) {
-    frame = doc.createElement('iframe');
-    frame.name = FRAME_NAME;
-    frame.title = answer.dataset.title || 'What came back from the sign-up service';
-    // The answer loads here with no scripts, no forms, no pop-ups and no way to move this page.
-    frame.setAttribute('sandbox', '');
-    answer.append(frame);
-    form.target = FRAME_NAME;
-  }
+  /** 'frame' services: the answer shows in a sandboxed frame under the form. */
+  const frames = mode === 'frame' && !!answer;
+  let made = 0;
+  /** Where the next post goes: a fresh frame, whose own empty page loaded when it was added. */
+  let spare: HTMLIFrameElement | null = null;
+  /** The frame the latest post went into, until its answer comes (a late one still shows). */
+  let pending: HTMLIFrameElement | null = null;
+  /** The answer on show. */
+  let shown: HTMLIFrameElement | null = null;
 
   /** A post is on its way: the button waits (until the answer, or the timeout). */
   let busy = false;
-  /** The next page the frame loads is the answer to a post (even one that comes after the timeout). */
-  let awaiting = false;
   let timer = 0;
   const ready = () => {
     window.clearTimeout(timer);
     busy = false;
-    button.disabled = false;
+    button.removeAttribute('aria-disabled');
   };
+
+  const answered = (frame: HTMLIFrameElement) => {
+    // A frame's own empty page loads as it's added: only the frame a post went into counts.
+    if (frame !== pending || !answer) return;
+    pending = null;
+    ready();
+    // Going offline meanwhile is the one case the page can tell (the frame then holds the browser's offline page).
+    if (navigator.onLine === false) {
+      frame.remove();
+      return say('You’re offline. Connect to the internet, then try again.', true);
+    }
+    shown?.remove();
+    shown = frame;
+    frame.hidden = false;
+    answer.hidden = false;
+    say(answer.dataset.say ?? '');
+  };
+  const fresh = () => {
+    if (!answer) return;
+    const frame = doc.createElement('iframe');
+    frame.name = `${FRAME_NAME}-${++made}`;
+    frame.title = answer.dataset.title || 'What came back from the sign-up service';
+    // The answer loads here with no scripts, no forms, no pop-ups and no way to move this page.
+    frame.setAttribute('sandbox', '');
+    frame.hidden = true;
+    frame.addEventListener('load', () => answered(frame));
+    answer.append(frame);
+    spare = frame;
+    form.target = frame.name;
+  };
+  if (frames) fresh();
+  // 'page': back on this page from the service's own (the browser kept it as it was), the line under the field no longer applies.
+  else window.addEventListener('pageshow', (e) => e.persisted && say(''));
 
   form.addEventListener('submit', (e) => {
     if (busy) return e.preventDefault();
@@ -112,26 +146,20 @@ export function startList(doc: Document): void {
       return say('You’re offline. Connect to the internet, then try again.', true);
     }
     // 'page': the browser goes on to the service's own page.
-    if (!frame) return say('Opening the sign-up page…');
+    if (!frames) return say('Opening the sign-up page…');
+    if (!spare) fresh();
     busy = true;
-    awaiting = true;
+    // An earlier post that never answered: its answer no longer counts.
+    pending?.remove();
+    pending = spare;
+    spare = null;
     say('Sending…');
-    // Disabled only after the browser has read the form for this post.
-    window.setTimeout(() => (button.disabled = busy), 0);
+    button.setAttribute('aria-disabled', 'true');
+    // The next post's frame, once the browser has read this post's target.
+    window.setTimeout(fresh, 0);
     timer = window.setTimeout(() => {
       ready();
       say('No answer from the sign-up service yet. Check your connection, then try again.', true);
     }, ANSWER_TIMEOUT_MS);
-  });
-
-  frame?.addEventListener('load', () => {
-    // The empty frame loads once when it's added; only an answer to a post counts.
-    if (!awaiting || !answer) return;
-    awaiting = false;
-    ready();
-    // Going offline meanwhile is the one case the page can tell (the frame then holds the browser's offline page).
-    if (navigator.onLine === false) return say('You’re offline. Connect to the internet, then try again.', true);
-    answer.hidden = false;
-    say(answer.dataset.say ?? '');
   });
 }

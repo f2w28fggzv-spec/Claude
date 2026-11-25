@@ -4,7 +4,8 @@
 // exercise page. It paints only while it's on screen and the page is visible.
 // Until the visitor picks a lift (or pauses), it moves on to the next lift
 // every two reps. With reduced motion it shows the start and the turnaround
-// side by side instead, and nothing plays. On a phone (or a small processor)
+// side by side instead, and nothing plays; it follows that setting when it
+// changes while the page is open. On a phone (or a small processor)
 // it paints at most 30 frames a second: each frame rewrites the figure's SVG,
 // and half the frames halve that work while the movement reads the same.
 //
@@ -27,11 +28,12 @@ const MIN_FRAME_MS = lowPower() ? 1000 / 30 - 2 : 0;
 const AT_START: Moment = { phase: 'start', s: 0, u: 0, action: 'holding' };
 const AT_FAR: Moment = { phase: 'far', s: 1, u: 0, action: 'holding' };
 
-function reducedMotion(): boolean {
+/** The reduced-motion setting, which can change while the page is open (null where it can't be read). */
+function reducedMotion(): MediaQueryList | null {
   try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    return window.matchMedia('(prefers-reduced-motion: reduce)');
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -65,13 +67,16 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
     return d;
   };
 
-  const still = reducedMotion();
+  const motion = reducedMotion();
+  /** Reduced motion: the start and the turnaround, and nothing plays. */
+  let still = !!motion?.matches;
   stage.classList.toggle('is-still', still);
   let index = 0;
   let body: BodyKind = data.body;
-  let playing = !still;
-  /** Until the visitor picks a lift or pauses, the demo moves on by itself. */
-  let touring = !still;
+  /** The visitor's play / pause (it plays only when motion is allowed, too). */
+  let playing = true;
+  /** Until the visitor picks a lift or pauses, the demo moves on by itself (only while it plays). */
+  let touring = true;
   /** Seconds of animation shown for the current lift, kept across pauses. */
   let clock = 0;
   let painted = '';
@@ -94,8 +99,10 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
   const layout = () => {
     const box = viewBoxOf(lift().box);
     if (!still) {
-      const svg = pictures()[0];
+      // The page's own frame, or (back from the stills) a new one.
+      const svg = figure.querySelector<SVGSVGElement>(':scope > svg');
       if (svg) svg.setAttribute('viewBox', box);
+      else figure.innerHTML = `<svg viewBox="${box}" preserveAspectRatio="xMidYMax meet" aria-hidden="true"></svg>`;
       return;
     }
     // Reduced motion: the HTML parser makes the SVG elements, so this needs no SVG namespace of its own.
@@ -119,6 +126,19 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
     }
     stage.dataset.body = body;
     stage.dataset.showing = l.id;
+  };
+
+  /** On a phone the chips scroll sideways: the lift the tour moves on to comes into view in the row (the row scrolls, never the page). */
+  const revealChip = () => {
+    const chip = chips.find((c) => c.dataset.lift === lift().id);
+    const row = chip?.parentElement;
+    if (!chip || !row || row.scrollWidth <= row.clientWidth) return;
+    const c = chip.getBoundingClientRect();
+    const r = row.getBoundingClientRect();
+    if (c.left >= r.left && c.right <= r.right) return;
+    // Its left edge where the row's scroll-padding puts it, so the chip before it peeks in.
+    const peek = parseFloat(getComputedStyle(row).scrollPaddingLeft) || 0;
+    row.scrollTo({ left: row.scrollLeft + c.left - r.left - peek, behavior: 'smooth' });
   };
 
   const paint = () => {
@@ -158,6 +178,7 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
       describe();
       paint();
       figure.classList.remove('fading');
+      if (touring && !still) revealChip();
     };
     window.clearTimeout(swap);
     if (fade && !still) {
@@ -210,12 +231,34 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
     else stop();
   };
 
+  // Reduced motion switched on or off while the page is open: the stills, or the animation, from the same lift.
+  const setStill = (on: boolean) => {
+    if (on === still) return;
+    still = on;
+    stop();
+    window.clearTimeout(swap);
+    swap = 0;
+    figure.classList.remove('fading');
+    stage.classList.toggle('is-still', still);
+    clock = 0;
+    painted = '';
+    layout();
+    describe();
+    paint();
+    start();
+  };
+  if (motion) {
+    const follow = () => setStill(motion.matches);
+    if (typeof motion.addEventListener === 'function') motion.addEventListener('change', follow);
+    else motion.addListener(follow); // Safari before 14
+  }
+
   for (const c of chips) {
+    // A pick shows that lift from its start; a paused demo stays paused (its play button plays it).
     c.addEventListener('click', () => {
       touring = false;
       const next = data.lifts.findIndex((l) => l.id === c.dataset.lift);
       if (next >= 0) show(next, next !== index);
-      if (!still && !playing) setPlaying(true);
     });
     // On a phone the chips scroll sideways: a chip that gets keyboard focus comes fully into view (with its
     // neighbour peeking in, from the row's scroll-padding), as the browser doesn't always scroll it there itself.

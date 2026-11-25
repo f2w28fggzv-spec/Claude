@@ -6,9 +6,12 @@
 // no form target and no frame.
 //
 // To connect a service, set SIGNUP to ONE of these, then deploy:
-//   export const SIGNUP: SignupConfig | null = { service: 'buttondown', id: 'your-username' };
-//   export const SIGNUP: SignupConfig | null = { service: 'mailerlite', id: 'ACCOUNT_ID/FORM_ID' };
+//   export const SIGNUP: SignupConfig | null = { service: 'buttondown', id: 'your-username', contact: 'list@your-domain.example' };
+//   export const SIGNUP: SignupConfig | null = { service: 'mailerlite', id: 'ACCOUNT_ID/FORM_ID', contact: 'list@your-domain.example' };
 //   export const SIGNUP: SignupConfig | null = { service: 'formspree', id: 'FORM_ID', contact: 'list@your-domain.example' };
+// `contact` is the address the page's privacy note gives for leaving the
+// list, asking what it holds or having an address deleted: a project or list
+// address, not a personal one (the page shows it).
 // The build (scripts/landing-build.ts) turns it into the form (its endpoint
 // and field names), the page's CSP (form-action, and frame-src when the
 // answer shows in a frame: that one service's origin) and the page's privacy
@@ -35,17 +38,19 @@ export interface SignupConfig {
   /** Buttondown: your username. MailerLite: "ACCOUNT_ID/FORM_ID". Formspree: the form's id. */
   id: string;
   /**
-   * An email address people can write to about the list, to leave it or to
-   * ask about it: a project or list address, not a personal one (the page
-   * shows it). Formspree needs one (it sends no email of its own, so writing
-   * is the only way to leave before fitee writes to you); optional otherwise.
+   * An email address people can write to about the list: to leave it, to
+   * ask what it holds about them, or to have their address deleted (an
+   * unsubscribe link only stops the emails). A project or list address, not
+   * a personal one: the page's privacy note and fine print show it. Every
+   * service needs one.
    */
-  contact?: string;
+  contact: string;
   /**
    * Instead of the preset's way to post: 'page' (the visitor goes to the
    * service's own page) or 'frame' (the service's answer shows in a
-   * sandboxed frame under the form; not for Formspree, whose CAPTCHA can't
-   * run there).
+   * sandboxed frame under the form; only where the answer is a short message,
+   * MailerLite's: the others' own pages can ask for a check, such as a
+   * CAPTCHA, that can't run there).
    */
   mode?: 'frame' | 'page';
 }
@@ -89,17 +94,15 @@ interface Preset {
   field: string;
   extra: Record<string, string>;
   mode: 'frame' | 'page';
-  /** Whether its answer can be shown in the sandboxed frame (a CAPTCHA can't). */
+  /** Whether its answer can be shown in the sandboxed frame (its own page's checks, a CAPTCHA say, can't run there). */
   framable: boolean;
   confirms: boolean;
-  /** How to leave the list, given the contact address (if any). */
-  leave: (contact: string | undefined) => string;
-  /** Whether the config must give a contact address. */
-  needsContact: boolean;
+  /** How to leave the list and ask about it, given the contact address. */
+  leave: (contact: string) => string;
 }
 
-const unsubscribe = (contact: string | undefined) =>
-  `Every email from the list has a link to unsubscribe.${contact ? ` To leave at any time, or to ask about the list, write to ${contact}.` : ''}`;
+const unsubscribe = (contact: string) =>
+  `Every email from the list has a link to unsubscribe. To leave at any time, to ask what the list holds about you, or to have your address deleted, write to ${contact}.`;
 
 /**
  * The three services offered for later. Endpoints and field names as their
@@ -111,7 +114,8 @@ export const PRESETS: Record<SignupService, Preset> = {
   // https://buttondown.com/api/emails/embed-subscribe/<username>, and
   // Buttondown emails a link to confirm. Posted top-level: the visitor sees
   // Buttondown's own page, which says what happened (and can show any check
-  // it asks for). Check against Buttondown's current embed code when connecting.
+  // it asks for, which couldn't run in the script-less frame: so never
+  // there). Check against Buttondown's current embed code when connecting.
   buttondown: {
     name: 'Buttondown',
     origin: 'https://buttondown.com',
@@ -120,10 +124,9 @@ export const PRESETS: Record<SignupService, Preset> = {
     field: 'email',
     extra: { embed: '1' },
     mode: 'page',
-    framable: true,
+    framable: false,
     confirms: true,
     leave: unsubscribe,
-    needsContact: false,
   },
   // MailerLite: the embedded form posts `fields[email]` (with `ml-submit=1`
   // and `anticsrf=true`) to
@@ -149,14 +152,13 @@ export const PRESETS: Record<SignupService, Preset> = {
     framable: true,
     confirms: true,
     leave: unsubscribe,
-    needsContact: false,
   },
   // Formspree: a plain form posts `email` to https://formspree.io/f/<form id>
   // and the visitor sees Formspree's own page, which can ask for a CAPTCHA
   // (so it always posts top-level, never into the frame). It's a form inbox:
-  // it sends no confirmation email and no email of its own, so the config
-  // must give a contact address to leave the list by. Check against
-  // Formspree's current docs when connecting.
+  // it sends no confirmation email and no email of its own, so writing to the
+  // contact address is the way to leave the list. Check against Formspree's
+  // current docs when connecting.
   formspree: {
     name: 'Formspree',
     origin: 'https://formspree.io',
@@ -167,8 +169,7 @@ export const PRESETS: Record<SignupService, Preset> = {
     mode: 'page',
     framable: false,
     confirms: false,
-    leave: (contact) => `To leave the list at any time, or to ask about it, write to ${contact}.`,
-    needsContact: true,
+    leave: (contact) => `To leave the list at any time, to ask what it holds about you, or to have your address deleted, write to ${contact}.`,
   },
 };
 
@@ -185,13 +186,13 @@ export function signupTarget(config: SignupConfig | null): SignupTarget | null {
   if (config.mode !== undefined && config.mode !== 'frame' && config.mode !== 'page') throw new Error(`landing sign-up: mode must be 'frame' or 'page'`);
   const mode = config.mode ?? preset.mode;
   if (mode === 'frame' && !preset.framable) {
-    throw new Error(`landing sign-up: ${preset.name} can't post into the frame (its CAPTCHA can't run there): leave mode out`);
+    throw new Error(`landing sign-up: ${preset.name} can't post into the frame (its own page can ask for a check, such as a CAPTCHA, that can't run there): leave mode out`);
   }
-  const contact = config.contact?.trim();
-  if (contact !== undefined && !CONTACT.test(contact)) throw new Error(`landing sign-up: contact must be an email address, like list@your-domain.example`);
-  if (preset.needsContact && !contact) {
-    throw new Error(`landing sign-up: ${preset.name} sends no email of its own, so set contact: an address people can write to to leave the list (a project or list address)`);
+  const contact = typeof config.contact === 'string' ? config.contact.trim() : '';
+  if (!contact) {
+    throw new Error(`landing sign-up: set contact: an address people can write to about the list, to leave it, ask what it holds or have their address deleted (a project or list address, not a personal one)`);
   }
+  if (!CONTACT.test(contact)) throw new Error(`landing sign-up: contact must be an email address, like list@your-domain.example`);
   return {
     name: preset.name,
     action: preset.endpoint(id),
