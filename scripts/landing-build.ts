@@ -19,7 +19,7 @@
 // Runs from the Vite plugin below (vite.config.ts), or by hand into a build folder:
 //   node scripts/landing-build.ts dist
 // FITEE_LANDING_TEST_SIGNUP (tests only) connects a stand-in service on localhost.
-import { readFileSync, rmSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Plugin, ViteDevServer } from 'vite';
@@ -36,6 +36,14 @@ const TOKENS = join(ROOT, 'src', 'tokens.css');
 const LICENCE = join(ROOT, 'public', 'licenses', 'bricolage-grotesque-OFL.txt');
 /** The one package the page takes files from: the app's own font (its CSS and font files, no code). */
 const FONT_PACKAGE = join(ROOT, 'node_modules', '@fontsource-variable', 'bricolage-grotesque');
+/** Where it really is (Vite reports files by their real path, so a symlinked node_modules points elsewhere). */
+const FONT_DIRS = (() => {
+  try {
+    return [...new Set([FONT_PACKAGE, realpathSync(FONT_PACKAGE)])];
+  } catch {
+    return [FONT_PACKAGE];
+  }
+})();
 /** In landing.css: replaced with the Molten tokens, so the interest list's panel is a Molten surface in both themes. */
 const MOLTEN_MARK = '/* fitee:molten-tokens */';
 
@@ -121,7 +129,7 @@ export function notOwnCode(inputs: LandingInputs): string[] {
   });
   for (const f of inputs.sources) {
     const file = resolve(ROOT, f);
-    const ok = (within(src, file) && !file.includes('node_modules')) || within(join(ROOT, 'public'), file) || within(FONT_PACKAGE, file) || file === TEMPLATE;
+    const ok = (within(src, file) && !file.includes('node_modules')) || within(join(ROOT, 'public'), file) || FONT_DIRS.some((d) => within(d, file)) || file === TEMPLATE;
     if (!ok) out.push(f);
   }
   return out.map((m) => (isAbsolute(m) ? relative(ROOT, m) : m));
