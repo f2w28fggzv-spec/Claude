@@ -37,11 +37,11 @@ const walk = (dir: string): string[] =>
 /** Directive name → its value, from a CSP string. */
 const directives = (csp: string) => Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).map(([name, ...v]) => [name, v.join(' ')]));
 /** http(s) URLs in a text. */
-const urls = (text: string) => [...text.matchAll(/https?:\/\/[^\s"'`)<>\\]+/g)].map((m) => m[0]);
+const urls = (text: string) => [...text.matchAll(/https?:\/\/[^\s"'`)<>\\]+/g)].map((m) => m[0].replace(/[;,.]+$/, ''));
 
 describe('the page’s Content-Security-Policy follows the sign-up config', () => {
   it('allows only this site’s own files, and no form target or frame while the list is closed', () => {
-    expect(SIGNUP).toBeNull(); // the user chose "decide later": not connected yet
+    // SIGNUP stays null until a service is chosen (the user chose "decide later"); these tests hold either way.
     const d = directives(landingCsp(signupTarget(null)));
     expect(d).toEqual({
       'default-src': "'none'",
@@ -284,7 +284,12 @@ describe('the built page', () => {
       } else expect(attrs).toMatch(/type="application\/json"/);
     }
     const files = walk(join(out, 'about'));
-    for (const f of files.filter((f) => /\.(html|js|css)$/.test(f))) expect(urls(readFileSync(f, 'utf8')), relative(out, f)).toEqual([]);
+    // Once a service is connected its endpoint is the form's action: the only other site the page names.
+    const connected = signupTarget(SIGNUP);
+    for (const f of files.filter((f) => /\.(html|js|css)$/.test(f))) {
+      const others = urls(readFileSync(f, 'utf8')).filter((u) => !(connected && (u === connected.origin || u.startsWith(connected.origin + '/'))));
+      expect(others, relative(out, f)).toEqual([]);
+    }
     // Every file the page loads is in about/ (nothing of the app's, nothing inlined as data:).
     for (const m of html.matchAll(/(?:src|href)="([^"#]+)"/g)) {
       expect(m[1]).not.toMatch(/^(data:|https?:|\/\/)/);
@@ -293,10 +298,11 @@ describe('the built page', () => {
     expect(files.every((f) => relative(out, f).startsWith('about'))).toBe(true);
   });
 
-  it('carries the hero’s data and its first frame, and the closed list', () => {
+  it('carries the hero’s data and its first frame, and the list as the config says (closed while SIGNUP is null)', () => {
     const data = JSON.parse(/<script type="application\/json" id="hero-data">([\s\S]*?)<\/script>/.exec(html)![1]);
     expect(data.lifts.map((l: { id: string }) => l.id)).toEqual(LIFTS.map((l) => l.id));
     expect(html).toContain(stageMarkup(heroData()).figure);
-    expect(html).toContain('data-state="closed"');
+    expect(html).toContain(`data-state="${SIGNUP ? 'open' : 'closed'}"`);
+    expect(/<form/.test(html)).toBe(SIGNUP !== null);
   });
 });

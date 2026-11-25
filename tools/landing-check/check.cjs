@@ -241,7 +241,12 @@ async function main() {
   // ── 1. The build ──
   const html = fs.readFileSync(path.join(BUILD, 'about', 'index.html'), 'utf8');
   const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html)?.[1].replace(/&#39;/g, "'") ?? '';
-  check('the page has its CSP: only its own files, no form target or frame while the list is closed', /default-src 'none'/.test(csp) && /script-src 'self'/.test(csp) && /form-action 'none'/.test(csp) && /frame-src 'none'/.test(csp) && /connect-src 'self'/.test(csp) && !/unsafe/.test(csp), csp);
+  // The repo's own config: closed until a service is set in src/landing/signup.ts (then the page's form posts to it).
+  const repoOpen = /data-state="open"/.test(html);
+  if (repoOpen) report.notes.push('src/landing/signup.ts connects a sign-up service: the main build is checked open');
+  const ownOnly = /default-src 'none'/.test(csp) && /script-src 'self'/.test(csp) && /connect-src 'self'/.test(csp) && !/unsafe/.test(csp);
+  if (repoOpen) check("the page has its CSP: only its own files, and the connected service's origin as the one form target", ownOnly && /form-action https:\/\/[^ ;]+;/.test(csp), csp);
+  else check('the page has its CSP: only its own files, no form target or frame while the list is closed', ownOnly && /form-action 'none'/.test(csp) && /frame-src 'none'/.test(csp), csp);
   const connectedHtml = fs.readFileSync(path.join(CONNECTED, 'about', 'index.html'), 'utf8');
   const cspOpen = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(connectedHtml)?.[1].replace(/&#39;/g, "'") ?? '';
   check('connected, the CSP allows that one service as form target and frame', cspOpen.includes(`form-action ${SERVICE}`) && cspOpen.includes(`frame-src ${SERVICE}`), cspOpen);
@@ -327,7 +332,8 @@ async function main() {
           const title = await page.title();
           check(`${label}: the page loads, and its hero runs the app's demo`, /fitee/.test(title) && h0.live && h1.markup !== h0.markup && h0.markup.length > 1000, title);
           const list = await listState(page);
-          check(`${label}: the interest list is closed: no form, nothing to type into`, list.state === 'closed' && !list.form && list.inputs === 0 && list.iframes === 0 && list.soon && list.pill && !list.join);
+          if (repoOpen) check(`${label}: the interest list is open (a service is connected): its form, and the Join button`, list.state === 'open' && list.form && list.join && !list.pill);
+          else check(`${label}: the interest list is closed: no form, nothing to type into`, list.state === 'closed' && !list.form && list.inputs === 0 && list.iframes === 0 && list.soon && list.pill && !list.join);
           await scrollThrough(page);
           check(`${label}: nothing scrolls sideways`, await noSideScroll(page));
           if (sw) {
@@ -361,8 +367,11 @@ async function main() {
               low.length ? low.map((x) => `${x.sel} ${x.ratio}:1`).join(', ') : `${samples.length} samples, lowest ${worst.ratio}:1 (${worst.sel})`,
             );
           }
-          await sleep(1400); // the chapter rules' plates settle
           if (!sw) {
+            // The picture: the back squat started again and caught near the bottom of its first rep, muscles warm.
+            await page.click('.chip[data-lift="back-squat"]');
+            await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+            await sleep(2500);
             await page.screenshot({ path: path.join(SHOTS, `landing-${width}-${theme}.png`), fullPage: true });
             report.weight[label] = bytes;
             if (width === 1280 && theme === 'light') check(`${label}: everything the page loads, scrolled to the end, is at most ${kb(FIRST_LOAD_BUDGET)}`, bytes.total <= FIRST_LOAD_BUDGET, `first screen ${kb(bytes.initial)}, all ${kb(bytes.total)}`);
@@ -492,6 +501,7 @@ async function main() {
       const ctx = await contextFor('no script', { width: 390, javaScriptEnabled: false });
       const page = await ctx.newPage();
       await page.goto(PAGE, { waitUntil: 'load' });
+      await sleep(1200); // the headline and the demo settle in (a CSS entrance, no script needed)
       const s = await page.evaluate(() => ({
         figure: (document.querySelector('.stage-figure svg')?.innerHTML.length ?? 0) > 1000,
         controls: getComputedStyle(document.querySelector('.stage .lifts')).visibility,
