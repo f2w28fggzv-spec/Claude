@@ -160,9 +160,9 @@ function buildAll() {
   return builds;
 }
 
-/** Sizes of a build, and roughly what GitHub Pages sends (it gzips text). */
+/** Sizes of a build, and roughly what GitHub Pages sends (it gzips text). The landing page (about/) isn't the app: counted apart. */
 function sizesOf(dir) {
-  const out = { app: 0, appGzip: 0, pose: {}, files: 0 };
+  const out = { app: 0, appGzip: 0, pose: {}, files: 0, landingFiles: 0, landingBytes: 0 };
   const walk = (d) => {
     for (const name of fs.readdirSync(d)) {
       const full = path.join(d, name);
@@ -172,7 +172,10 @@ function sizesOf(dir) {
         const bytes = fs.readFileSync(full);
         if (rel === 'sw.js') out.sw = bytes.length;
         else if (rel.startsWith('mediapipe/')) out.pose[rel] = bytes.length;
-        else {
+        else if (rel.startsWith('about/')) {
+          out.landingFiles++;
+          out.landingBytes += bytes.length;
+        } else {
           out.files++;
           out.app += bytes.length;
           out.appGzip += /\.(html|js|css|json|webmanifest|svg|txt)$/.test(rel) ? zlib.gzipSync(bytes).length : bytes.length;
@@ -337,7 +340,7 @@ async function main() {
     poseAllBytes: Object.values(sizes.pose).reduce((a, b) => a + b, 0),
   };
   console.log(
-    `App ${sizes.files} files ${mb(sizes.app)} (about ${mb(sizes.appGzip)} gzipped); sw.js ${sizes.sw} bytes; pose model by default ${mb(report.sizes.poseDefaultBytes)}, all pose files ${mb(report.sizes.poseAllBytes)}`,
+    `App ${sizes.files} files ${mb(sizes.app)} (about ${mb(sizes.appGzip)} gzipped); sw.js ${sizes.sw} bytes; pose model by default ${mb(report.sizes.poseDefaultBytes)}, all pose files ${mb(report.sizes.poseAllBytes)}; landing page (about/, not the app) ${sizes.landingFiles} files ${mb(sizes.landingBytes)}`,
   );
 
   const server = createServer({ port: PORT });
