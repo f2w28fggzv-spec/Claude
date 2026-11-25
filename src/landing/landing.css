@@ -451,7 +451,8 @@ h2 { margin: 0 0 28px; max-width: 19em; font-size: clamp(1.95rem, 1.2rem + 2.7vw
 .panel {
   /* fitee:molten-tokens */
   position: relative; overflow: hidden; padding: 30px 22px 34px; border-radius: 32px; color: var(--text);
-  background: radial-gradient(120% 130% at 100% 0%, rgba(239, 98, 53, 0.42), rgba(239, 98, 53, 0) 58%), var(--panel-bg);
+  /* The app's flame glow (Molten flame at 42%), from the token rather than a copy of it. */
+  background: radial-gradient(120% 130% at 100% 0%, color-mix(in srgb, var(--flame) 42%, transparent), transparent 58%), var(--panel-bg);
   box-shadow: var(--shadow-lg);
 }
 .panel .rule-n { background: transparent; color: var(--muted); }
