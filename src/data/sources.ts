@@ -74,7 +74,7 @@ export const LOCKOUT_DEG = 165;
  * that is about two thirds of the time it takes. Measured through analyze()
  * at 15–60 fps: a 1.0 s lowering with a minimum-jerk profile reads 0.65–0.73 s,
  * a cosine-eased one 0.73–0.80 s, one at constant speed 0.90–1.0 s; the
- * library's demos read 50–75% (mean 67%) of their 2 s lowering.
+ * library's demos read 50–75% (mean 67%) of their lowering.
  * src/demo/timeline.ts paces the demos with this share.
  */
 export const TEMPO_MEASURED_SHARE = 0.65;

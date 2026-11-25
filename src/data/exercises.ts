@@ -866,8 +866,8 @@ const DRAFT_EXERCISES: Exercise[] = [
         C.angle('body', 'top', { min: LOCKOUT_DEG }, 'bodyLine', 'Body straight at the top'),
         `${SRC.fm722}; ${SRC.fm2120}; ${SRC.atp72201} (numeric limit derived, not published); tolerance from ${SRC.wade2023}`,
       ),
-      // No tempo check: ACSM 2009's "1–2 s ECC" is for heavy loads, and for sets of many reps (the
-      // builder gives push-ups 10–25) it recommends moderate to fast velocities.
+      // No tempo check: ACSM 2009's "1–2 s ECC" goes with heavy loads; for sets of 15–25 reps or more it
+      // recommends moderate to fast velocities, and the builder gives push-ups up to 20 or 25 reps a set.
     ],
     faults: [
       F.partialRange('incline-push-up', 'Lower until your upper arms are level with the floor or lower.'),
