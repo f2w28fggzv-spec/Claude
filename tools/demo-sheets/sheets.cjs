@@ -46,8 +46,8 @@ try {
 const demos = JSON.parse(fs.readFileSync(json, 'utf8'));
 fs.rmSync(json, { force: true });
 
-// Theme tokens straight from the app's stylesheet.
-const css = fs.readFileSync(path.join(ROOT, 'src', 'style.css'), 'utf8');
+// Theme tokens straight from the app's token file (shared by the app and the landing page).
+const css = fs.readFileSync(path.join(ROOT, 'src', 'tokens.css'), 'utf8');
 const block = (marker) => {
   const i = css.indexOf(marker);
   if (i < 0) throw new Error('token block not found: ' + marker);
