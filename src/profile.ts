@@ -21,7 +21,7 @@ export interface Profile {
 }
 
 /** Bump when the terms or privacy policy change in a way people must re-accept. */
-export const TERMS_VERSION = '2026-11-24';
+export const TERMS_VERSION = '2026-11-25';
 
 const KEY = 'formcheck.v1.profile';
 let cache: Profile | null = null;
