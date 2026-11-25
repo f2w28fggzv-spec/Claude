@@ -231,7 +231,7 @@ h1 {
 }
 
 /* ── The idea ─────────────────────────────────────────── */
-.idea { padding: 24px 0 56px; }
+.idea { padding: 24px 0 40px; }
 .kicker { margin: 0 0 12px; color: var(--accent-text); font-size: 0.82rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
 .statement {
   max-width: 24ch; font-size: clamp(1.7rem, 1.05rem + 2.9vw, 3.2rem); line-height: 1.1; font-weight: 800; letter-spacing: -0.026em;
@@ -341,9 +341,9 @@ h2 { margin: 0 0 28px; max-width: 19em; font-size: clamp(1.95rem, 1.2rem + 2.7vw
 .phones { display: flex; align-items: flex-end; justify-content: center; gap: 12px; margin-top: auto; padding-top: 22px; }
 .phones .phone { flex-basis: 232px; }
 /* Steps 4 and 5: the phone, and a card from another part of the app laid over its edge, so one picture tells the story. */
-.phones.duo { position: relative; justify-content: flex-start; padding-left: 2%; }
-.duo .phone { flex: none; width: 62%; max-width: 250px; }
-.duo .shot-card { position: absolute; right: 0; bottom: 22px; width: 48%; max-width: 230px; }
+.phones.duo { position: relative; justify-content: flex-start; }
+.duo .phone { flex: none; width: 58%; max-width: 250px; }
+.duo .shot-card { position: absolute; right: -4px; bottom: 20px; width: 54%; max-width: 230px; }
 @media (min-width: 720px) {
   .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .steps > .step-wide { grid-column: 1 / -1; }
@@ -435,12 +435,13 @@ h2 { margin: 0 0 28px; max-width: 19em; font-size: clamp(1.95rem, 1.2rem + 2.7vw
   letter-spacing: -0.045em; font-variation-settings: 'opsz' 96; white-space: nowrap; user-select: none;
 }
 .big-wordmark span { display: inline-block; }
-.vision h2 { max-width: 15em; }
-.vision-text p { margin: 0 0 14px; max-width: 34em; font-size: 1.15rem; }
+.vision h2 { max-width: 15em; margin-bottom: 20px; }
+.vision-body p { margin: 0 0 14px; max-width: 34em; font-size: 1.15rem; }
 @media (min-width: 960px) {
   .vision { padding: 64px 0 88px; }
-  .vision .wrap { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 64px; align-items: end; }
-  .big-wordmark { margin-bottom: 0; font-size: min(26vw, 17rem); }
+  .big-wordmark { margin-bottom: 36px; }
+  .vision-text { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 64px; align-items: end; }
+  .vision h2 { margin-bottom: 0; }
 }
 
 /* The interest list: a Molten panel (dark with a flame glow in both themes, like the app's "Log a workout"). */
@@ -497,7 +498,7 @@ h2 { margin: 0 0 28px; max-width: 19em; font-size: clamp(1.95rem, 1.2rem + 2.7vw
 /* Footer, with the page's own privacy note. */
 .site-foot { padding: 32px 0 max(40px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); color: var(--muted); font-size: 0.92rem; }
 .foot-grid { display: grid; gap: 18px; }
-.foot-brand { display: grid; gap: 8px; }
+.foot-brand { display: grid; gap: 8px; align-content: start; }
 .site-foot .logo .wordmark { font-size: 1.6rem; }
 .privacy { max-width: 46rem; }
 .privacy h2 { margin: 0 0 6px; font-size: 1rem; letter-spacing: 0; color: var(--text); }

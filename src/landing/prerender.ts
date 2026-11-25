@@ -247,6 +247,9 @@ export function renderPage(template: string, target: SignupTarget | null): strin
         .map(([name, value]) => `<input type="hidden" name="${esc(name)}" value="${esc(value)}" />`)
         .join(''),
   };
+  for (const name of ['head', 'hero-figure', 'hero-legends', 'hero-names', 'hero-chips', 'hero-data']) {
+    if (!html.includes(`<!--fitee:${name}-->`)) throw new Error(`landing: the template has no <!--fitee:${name}-->`);
+  }
   html = html.replace(/<!--fitee:([a-z-]+)(?: ([^>]*?))?-->/g, (m, name: string, arg = '') => {
     const block = blocks[name];
     if (!block) throw new Error(`landing: unknown block ${m}`);
