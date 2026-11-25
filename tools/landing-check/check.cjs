@@ -34,10 +34,11 @@
 //   3. layout and access: 320 px with nothing scrolling sideways; "sign-ups"
 //      never broken at its hyphen; the first screen on a phone says the
 //      figure is a how-to demo; keyboard focus visible on everything Tab
-//      reaches, a lift chip on a phone fully in view with its whole ring, and
-//      on a wide screen the headline's column before the demo's; the hero's
-//      one height for every lift and no layout shift while it tours (CLS),
-//      the toured lift's chip in view in the phone's sideways row (the page
+//      reaches, every lift chip on a phone fully in view with its whole ring,
+//      and on a wide screen the headline's column before the demo's; the
+//      hero's one height for every lift (as many as the page says get full
+//      analysis) and no layout shift while it tours (CLS), each toured lift's
+//      chip in view in the phone's sideways row through to the last (the page
 //      never scrolled by it); the Female / Male radio group's tab stop; the
 //      pause button saying what it does, and a lift picked while paused
 //      staying paused; the Lowering / Lifting pills telling on from off by
@@ -48,8 +49,10 @@
 //      phone's edge only (720 to 1440 px); pictures fetched no larger than
 //      the screen needs; the rep list readable on a phone; reduced motion
 //      (and switched on and off while the page is open, the pause button
-//      there whenever anything moves; from 560 px the stills across the
-//      stage, with no layout shift as the script takes over); no JavaScript
+//      there whenever anything moves; on a phone a lift drawn wider than tall,
+//      the push-up, with its stills one above the other; from 560 px the
+//      stills across the stage, with no layout shift as the script takes
+//      over); no JavaScript
 //      (the controls leave no gaps);
 //   4. with the stand-in service connected (with and without the app's
 //      worker): the hero's Join button goes to the email field; an empty or
@@ -572,6 +575,8 @@ async function main() {
       const seen = [];
       const invisible = [];
       const chipsCut = [];
+      const chipsReached = [];
+      const chipCount = await page.locator('.chip').count();
       for (let i = 0; i < 40; i++) {
         await page.keyboard.press('Tab');
         await sleep(60);
@@ -593,16 +598,21 @@ async function main() {
             else if (roomY < ring) cut = `${label}: ring cut (${roomY.toFixed(1)} px of ${ring} px)`;
             void sb;
           }
-          return { label, outline: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) >= 2, onScreen: r.width > 0 && r.height > 0 && s.visibility !== 'hidden', cut };
+          return { label, chip: el.classList.contains('chip') ? el.dataset.lift : '', outline: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) >= 2, onScreen: r.width > 0 && r.height > 0 && s.visibility !== 'hidden', cut };
         });
         if (!f) break;
         seen.push(f.label);
+        if (f.chip) chipsReached.push(f.chip);
         if (!f.outline || !f.onScreen) invisible.push(f.label);
         if (f.cut) chipsCut.push(f.cut);
         if (i === 0) await page.screenshot({ path: path.join(SHOTS, 'focus-skip-link.png') });
       }
       check('keyboard: every stop Tab reaches shows a visible focus ring', seen.length >= 12 && invisible.length === 0, `${seen.length} stops${invisible.length ? `; no ring on: ${invisible.join(', ')}` : ''}`);
-      check('keyboard, 390 px: each lift chip in the sideways row comes wholly into view, its ring uncut', chipsCut.length === 0 && seen.filter((l) => /squat|press|deadlift|row/i.test(l)).length >= 6, chipsCut.join('; '));
+      check(
+        'keyboard, 390 px: each lift chip in the sideways row comes wholly into view, its ring uncut',
+        chipsCut.length === 0 && chipCount >= 2 && new Set(chipsReached).size === chipCount,
+        `${new Set(chipsReached).size} of ${chipCount} chips reached${chipsCut.length ? `; ${chipsCut.join('; ')}` : ''}`,
+      );
       // The Female / Male radio group: arrow keys choose, and the chosen one is the tab stop.
       await page.focus('[data-body-pick="female"]');
       await page.keyboard.press('ArrowRight');
@@ -673,7 +683,10 @@ async function main() {
         await sleep(350);
         heights.push(Math.round((await heroState(page)).height * 10) / 10);
       }
-      check(`${width} px: the hero keeps one height for all six lifts`, heights.length === 6 && new Set(heights).size === 1, heights.join(', '));
+      // As many lifts as the page says get full analysis (the build counts them in the library), each with its chip.
+      const stated = Number(/on (\d+) lifts/.exec(await page.textContent('.lifts-label'))?.[1]);
+      report.heroHeights = { ...report.heroHeights, [width]: heights };
+      check(`${width} px: the hero keeps one height for all ${stated} lifts`, stated >= 2 && heights.length === stated && new Set(heights).size === 1, heights.join(', '));
       await ctx.close();
     }
     {
@@ -695,7 +708,12 @@ async function main() {
       // smoothly, so a moment after the change), and the page itself never scrolls.
       const chips = new Map();
       const t0 = Date.now();
-      while (Date.now() - t0 < 34_000 && !chips.has('barbell-row')) {
+      // Through to the last lift (the far end of the row): two reps of each (src/landing/hero.ts), from the page's own timings.
+      const tour = await page.evaluate(() => {
+        const lifts = JSON.parse(document.getElementById('hero-data').textContent).lifts;
+        return { n: lifts.length, ms: lifts.reduce((t, l) => t + 2 * l.tl.total * 1000 + 250, 0) };
+      });
+      while (Date.now() - t0 < tour.ms + 6000 && chips.size < tour.n) {
         const id = await page.evaluate(() => document.querySelector('.chip[aria-pressed="true"]').dataset.lift);
         if (!chips.has(id)) {
           await sleep(900);
@@ -716,7 +734,11 @@ async function main() {
       const cls = await page.evaluate(() => window.__cls);
       report.cls['390 touring'] = cls;
       check('390 px, the hero half in view while it tours the lifts: no layout shift', before.showing !== after.showing && cls < 0.01, `CLS ${cls.toFixed(4)}, ${before.showing} → ${after.showing}`);
-      check('390 px: each lift the tour moves on to has its chip wholly in view in the sideways row, and the page never scrolls', chips.size >= 4 && [...chips.values()].every(Boolean) && y0 === y1, [...chips].map(([id, ok]) => `${id} ${ok ? 'in view' : 'NOT in view'}`).join(', '));
+      check(
+        '390 px: each lift the tour moves on to has its chip wholly in view in the sideways row (all of them, the last too), and the page never scrolls',
+        chips.size === tour.n && [...chips.values()].every(Boolean) && y0 === y1,
+        [...chips].map(([id, ok]) => `${id} ${ok ? 'in view' : 'NOT in view'}`).join(', '),
+      );
       await ctx.close();
     }
     {
@@ -859,6 +881,29 @@ async function main() {
       const pause = await page.evaluate(() => getComputedStyle(document.querySelector('.demo-pause')).display);
       check('reduced motion: the start and the turnaround side by side, nothing plays', a.still && a.svgs === 2 && a.markup === b.markup && pause === 'none');
       await page.locator('.stage').screenshot({ path: path.join(SHOTS, 'hero-reduced-motion.png') });
+      // A lift drawn wider than tall (the push-up, on the floor): its stills one above the other, each the stage's width,
+      // rather than side by side at half of it; the stage keeps its height.
+      const wide = await page.evaluate(() => JSON.parse(document.getElementById('hero-data').textContent).lifts.filter((l) => l.box.w > l.box.h).map((l) => l.id));
+      const stacked = [];
+      for (const id of wide) {
+        await page.click(`.chip[data-lift="${id}"]`);
+        await sleep(400);
+        const st = await page.evaluate(() => {
+          const f = document.querySelector('.stage-figure').getBoundingClientRect();
+          const r = [...document.querySelectorAll('.still')].map((e) => e.getBoundingClientRect());
+          return { ok: r.length === 2 && r.every((x) => x.width >= f.width - 1) && r[1].top >= r[0].bottom, height: document.querySelector('.stage').getBoundingClientRect().height };
+        });
+        stacked.push({ id, ...st });
+        await page.locator('.stage').screenshot({ path: path.join(SHOTS, `hero-reduced-motion-${id}.png`) });
+      }
+      await page.click('.chip[data-lift="back-squat"]');
+      await sleep(400);
+      const h0 = (await heroState(page)).height;
+      check(
+        'reduced motion, 390 px: a lift drawn wider than tall has its start and turnaround one above the other, each the stage’s width, at the same stage height',
+        wide.length >= 1 && stacked.every((x) => x.ok && Math.abs(x.height - h0) < 0.5),
+        stacked.map((x) => `${x.id} ${x.ok ? 'stacked' : 'NOT stacked'}, ${x.height.toFixed(1)} px`).join('; ') + ` (others ${h0.toFixed(1)} px)`,
+      );
       // Switched off and on again while the page is open: the demo plays (with its pause button), then stops again.
       const motion = async () => {
         const x = await heroState(page);

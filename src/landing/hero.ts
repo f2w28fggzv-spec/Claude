@@ -98,6 +98,8 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
   const pictures = () => [...figure.querySelectorAll<SVGSVGElement>('svg')];
   const layout = () => {
     const box = viewBoxOf(lift().box);
+    // A lift drawn wider than tall (the push-up, on the floor): on a phone its stills stack (landing.css).
+    figure.classList.toggle('is-wide', lift().box.w > lift().box.h);
     if (!still) {
       // The page's own frame, or (back from the stills) a new one.
       const svg = figure.querySelector<SVGSVGElement>(':scope > svg');
