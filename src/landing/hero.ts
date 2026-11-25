@@ -4,7 +4,9 @@
 // exercise page. It paints only while it's on screen and the page is visible.
 // Until the visitor picks a lift (or pauses), it moves on to the next lift
 // every two reps. With reduced motion it shows the start and the turnaround
-// side by side instead, and nothing plays.
+// side by side instead, and nothing plays. On a phone (or a small processor)
+// it paints at most 30 frames a second: each frame rewrites the figure's SVG,
+// and half the frames halve that work while the movement reads the same.
 //
 // The stage never changes height: every lift's legend and name are already
 // in the page (written at build time, stacked in one place), and this only
@@ -20,12 +22,22 @@ import type { HeroData, HeroLift } from './types';
 
 /** Reps of one lift before the tour moves on to the next. */
 const REPS_PER_LIFT = 2;
+/** The shortest time between two painted frames: about 30 a second on phones and small processors, else every frame. */
+const MIN_FRAME_MS = lowPower() ? 1000 / 30 - 2 : 0;
 const AT_START: Moment = { phase: 'start', s: 0, u: 0, action: 'holding' };
 const AT_FAR: Moment = { phase: 'far', s: 1, u: 0, action: 'holding' };
 
 function reducedMotion(): boolean {
   try {
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
+function lowPower(): boolean {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4;
   } catch {
     return false;
   }
@@ -157,18 +169,23 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
   // The animation loop: only while the demo is on screen and the page is visible.
   let raf = 0;
   let last = 0;
+  let lastPaint = 0;
   let visible = true;
   const tick = (now: number) => {
     // Long gaps (a tab in the background) don't jump the animation ahead.
     if (last) clock += Math.min(0.1, (now - last) / 1000);
     last = now;
     if (touring && !swap && clock >= REPS_PER_LIFT * lift().tl.total) show((index + 1) % data.lifts.length, true);
-    else if (!swap) paint();
+    else if (!swap && now - lastPaint >= MIN_FRAME_MS) {
+      lastPaint = now;
+      paint();
+    }
     raf = requestAnimationFrame(tick);
   };
   const start = () => {
     if (raf || still || !playing || !visible || document.hidden) return;
     last = 0;
+    lastPaint = 0;
     raf = requestAnimationFrame(tick);
   };
   const stop = () => {
@@ -184,9 +201,9 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
   }
   document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
 
+  // A button that says what it does (its label and icon change with it), not a toggle that is "pressed".
   const setPlaying = (on: boolean) => {
     playing = on;
-    pause.setAttribute('aria-pressed', String(!on));
     pause.setAttribute('aria-label', on ? 'Pause the demo' : 'Play the demo');
     stage.classList.toggle('is-paused', !on);
     if (on) start();
@@ -200,6 +217,9 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
       if (next >= 0) show(next, next !== index);
       if (!still && !playing) setPlaying(true);
     });
+    // On a phone the chips scroll sideways: a chip that gets keyboard focus comes fully into view (with its
+    // neighbour peeking in, from the row's scroll-padding), as the browser doesn't always scroll it there itself.
+    c.addEventListener('focus', () => c.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
   }
   const pick = (r: HTMLButtonElement) => {
     const next: BodyKind = r.dataset.bodyPick === 'male' ? 'male' : 'female';

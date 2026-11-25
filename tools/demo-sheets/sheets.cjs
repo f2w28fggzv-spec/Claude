@@ -87,7 +87,8 @@ body{margin:0;font-family:system-ui,sans-serif}
     console.error('This tool needs Playwright (npm i -g playwright, then npx playwright install chromium).');
     process.exit(1);
   }
-  const browser = await chromium.launch();
+  // Cut off from every site but this machine: the sheets are drawn from local markup only.
+  const browser = await require('../offline-check/local-only.cjs').launchLocalOnly(chromium);
   const errors = [];
   for (const theme of themes) {
     const tab = await browser.newPage({ viewport: { width: 2200, height: 900 }, deviceScaleFactor: 1 });

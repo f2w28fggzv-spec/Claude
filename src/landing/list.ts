@@ -11,12 +11,14 @@
 // With it: the address is checked here, with the error in words next to the
 // field (aria-invalid, announced) rather than the browser's bubble; an
 // offline phone is told so before anything is sent; and a 'frame' service
-// gets the post in a hidden, sandboxed frame, so the visitor stays here. The
-// page can't read the service's answer, so its message only says what
-// happens next if the sign-up went through, never that it did; a slow or
-// missing answer says so, and "try again" brings the form back.
+// gets the post in a sandboxed frame under the form, where the visitor reads
+// its answer. The page can't read that answer, and whatever loads there looks
+// the same from outside (the service's thank-you, its error page, or the
+// browser's own "can't be reached"), so the page never says the sign-up went
+// through: it shows what came back, says what happens next if it did, and
+// keeps the form there to try again. A slow or missing answer says so.
 
-/** How long to wait for the service's answer in the hidden frame. */
+/** How long to wait for the service's answer in the frame. */
 export const ANSWER_TIMEOUT_MS = 20_000;
 const FRAME_NAME = 'fitee-signup';
 /** Something@something.tld: what the services accept (the browser's own check allows "a@b"). */
@@ -40,7 +42,8 @@ export function startList(doc: Document): void {
   const status = form.querySelector<HTMLElement>('.signup-status');
   if (!input || !button || !status) return;
   const panel = form.closest<HTMLElement>('.panel') ?? form.parentElement!;
-  const thanks = panel.querySelector<HTMLElement>('.thanks');
+  // Where the service's answer shows ('frame' services only), and what the page says about it (written at build time).
+  const answer = form.querySelector<HTMLElement>('.answer');
   const mode = form.dataset.mode === 'page' ? 'page' : 'frame';
   // Our own messages instead of the browser's bubbles.
   form.noValidate = true;
@@ -71,29 +74,29 @@ export function startList(doc: Document): void {
   }
 
   let frame: HTMLIFrameElement | null = null;
-  if (mode === 'frame' && thanks) {
+  if (mode === 'frame' && answer) {
     frame = doc.createElement('iframe');
     frame.name = FRAME_NAME;
-    frame.title = 'Sign-up service’s answer';
-    // The answer loads here with no scripts and no way to move this page.
+    frame.title = answer.dataset.title || 'What came back from the sign-up service';
+    // The answer loads here with no scripts, no forms, no pop-ups and no way to move this page.
     frame.setAttribute('sandbox', '');
-    frame.hidden = true;
-    frame.tabIndex = -1;
-    frame.setAttribute('aria-hidden', 'true');
-    panel.append(frame);
+    answer.append(frame);
     form.target = FRAME_NAME;
   }
 
-  let sending = false;
+  /** A post is on its way: the button waits (until the answer, or the timeout). */
+  let busy = false;
+  /** The next page the frame loads is the answer to a post (even one that comes after the timeout). */
+  let awaiting = false;
   let timer = 0;
-  const done = () => {
+  const ready = () => {
     window.clearTimeout(timer);
-    sending = false;
+    busy = false;
     button.disabled = false;
   };
 
   form.addEventListener('submit', (e) => {
-    if (sending) return e.preventDefault();
+    if (busy) return e.preventDefault();
     const email = input.value.trim();
     input.value = email;
     if (!email) {
@@ -110,32 +113,25 @@ export function startList(doc: Document): void {
     }
     // 'page': the browser goes on to the service's own page.
     if (!frame) return say('Opening the sign-up page…');
-    sending = true;
+    busy = true;
+    awaiting = true;
     say('Sending…');
     // Disabled only after the browser has read the form for this post.
-    window.setTimeout(() => (button.disabled = sending), 0);
+    window.setTimeout(() => (button.disabled = busy), 0);
     timer = window.setTimeout(() => {
-      done();
-      say('The sign-up service didn’t answer. Check your connection, then try again.', true);
+      ready();
+      say('No answer from the sign-up service yet. Check your connection, then try again.', true);
     }, ANSWER_TIMEOUT_MS);
   });
 
   frame?.addEventListener('load', () => {
     // The empty frame loads once when it's added; only an answer to a post counts.
-    if (!sending) return;
-    done();
-    // An error page loads too: going offline meanwhile is the one case the page can tell.
+    if (!awaiting || !answer) return;
+    awaiting = false;
+    ready();
+    // Going offline meanwhile is the one case the page can tell (the frame then holds the browser's offline page).
     if (navigator.onLine === false) return say('You’re offline. Connect to the internet, then try again.', true);
-    say('');
-    form.hidden = true;
-    thanks!.hidden = false;
-    thanks!.focus();
-  });
-
-  thanks?.querySelector<HTMLButtonElement>('[data-again]')?.addEventListener('click', () => {
-    thanks.hidden = true;
-    form.hidden = false;
-    input.focus();
-    input.select();
+    answer.hidden = false;
+    say(answer.dataset.say ?? '');
   });
 }

@@ -82,6 +82,7 @@ const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const { createServer } = require('./server.cjs');
+const { launchLocalOnly, proveLocalOnly } = require('./local-only.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const argv = process.argv.slice(2);
@@ -346,7 +347,10 @@ async function main() {
   const server = createServer({ port: PORT });
   server.setRoot(builds.a);
   await server.listen();
-  const browser = await chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+  // Cut off from every site but this machine (local-only.cjs), so a request to another site fails here rather than going out.
+  const browser = await launchLocalOnly(chromium, { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
+  const cutOff = await proveLocalOnly(browser).then((m) => ({ ok: true, m }), (e) => ({ ok: false, m: e.message }));
+  check("the check's browser can't reach another site (a request to one fails on this machine)", cutOff.ok, cutOff.m);
   const requests = [];
   const pageErrors = [];
   const track = (context, label) => {

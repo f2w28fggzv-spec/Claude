@@ -24,6 +24,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { createServer } = require('../offline-check/server.cjs');
+const { launchLocalOnly } = require('../offline-check/local-only.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const argv = process.argv.slice(2);
@@ -303,7 +304,8 @@ async function encode(browser) {
   const server = createServer({ port: PORT });
   server.setRoot(APP);
   await server.listen();
-  const browser = await chromium.launch();
+  // Cut off from every site but this machine (a request to another site fails here, and is still reported).
+  const browser = await launchLocalOnly(chromium);
   const offsite = [];
   try {
     await shootApp(browser, offsite);

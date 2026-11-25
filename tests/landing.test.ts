@@ -14,10 +14,11 @@ import { timeline } from '../src/demo/timeline';
 import { heroFrame } from '../src/landing/frame';
 import { LIFTS } from '../src/landing/lifts';
 import { conditionals, heroData, libraryCounts, moltenTokens, renderPage, stageMarkup, toHtml } from '../src/landing/prerender';
-import { landingCsp, PRESETS, SIGNUP, signupTarget, testSignupTarget, type SignupService } from '../src/landing/signup';
+import { landingCsp, PRESETS, SIGNUP, signupTarget, testSignupTarget, type SignupConfig, type SignupService } from '../src/landing/signup';
 import { buildManifest, isListed, LANDING_DIR } from '../src/offline/manifest';
+import { formatMB } from '../src/offline/state';
 import { listFiles } from '../scripts/offline-build.ts';
-import { buildLanding } from '../scripts/landing-build.ts';
+import { buildLanding, landingFolder, notOwnCode, poseBytes } from '../scripts/landing-build.ts';
 
 const ROOT = join(__dirname, '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -38,6 +39,14 @@ const walk = (dir: string): string[] =>
 const directives = (csp: string) => Object.fromEntries(csp.split(';').map((d) => d.trim().split(/\s+/)).map(([name, ...v]) => [name, v.join(' ')]));
 /** http(s) URLs in a text. */
 const urls = (text: string) => [...text.matchAll(/https?:\/\/[^\s"'`)<>\\]+/g)].map((m) => m[0].replace(/[;,.]+$/, ''));
+/** What the build reads from its own files (the pose model's size), as a test page needs it. */
+const FACTS = { poseBytes: 24_198_980 };
+/** A valid config for each service (Formspree needs a contact address). */
+const CONFIGS: Record<SignupService, SignupConfig> = {
+  buttondown: { service: 'buttondown', id: 'fitee' },
+  mailerlite: { service: 'mailerlite', id: '123456/987654' },
+  formspree: { service: 'formspree', id: 'xyzabcd', contact: 'list@fitee.example' },
+};
 
 describe('the page’s Content-Security-Policy follows the sign-up config', () => {
   it('allows only this site’s own files, and no form target or frame while the list is closed', () => {
@@ -57,10 +66,9 @@ describe('the page’s Content-Security-Policy follows the sign-up config', () =
     });
   });
 
-  it('opens form-action (and frame-src for the hidden frame) to the connected service’s origin only', () => {
-    const ids: Record<SignupService, string> = { buttondown: 'fitee', mailerlite: '123456/987654', formspree: 'xyzabcd' };
+  it('opens form-action (and frame-src when the answer shows in the frame) to the connected service’s origin only', () => {
     for (const service of Object.keys(PRESETS) as SignupService[]) {
-      const target = signupTarget({ service, id: ids[service] })!;
+      const target = signupTarget(CONFIGS[service])!;
       expect(new URL(target.action).origin).toBe(PRESETS[service].origin);
       const d = directives(landingCsp(target));
       expect(d['form-action']).toBe(PRESETS[service].origin);
@@ -68,19 +76,36 @@ describe('the page’s Content-Security-Policy follows the sign-up config', () =
       expect(d['connect-src']).toBe("'self'");
       expect(d['script-src']).toBe("'self'");
       // A mode of the user's choosing changes the frame rule with it.
-      const page = landingCsp(signupTarget({ service, id: ids[service], mode: 'page' }));
+      const page = landingCsp(signupTarget({ ...CONFIGS[service], mode: 'page' }));
       expect(directives(page)['frame-src']).toBe("'none'");
-      const frame = landingCsp(signupTarget({ service, id: ids[service], mode: 'frame' }));
+      if (!PRESETS[service].framable) continue;
+      const frame = landingCsp(signupTarget({ ...CONFIGS[service], mode: 'frame' }));
       expect(directives(frame)['frame-src']).toBe(PRESETS[service].origin);
     }
-    // Formspree posts top-level by default (a CAPTCHA would be lost in a hidden frame); the mailing lists into the frame.
-    expect(signupTarget({ service: 'formspree', id: 'abc' })!.mode).toBe('page');
-    expect(signupTarget({ service: 'buttondown', id: 'abc' })!.mode).toBe('frame');
-    expect(signupTarget({ service: 'mailerlite', id: '1/2' })!.field).toBe('fields[email]');
+    // Buttondown and Formspree post top-level (their own page says what happened, and can show a check);
+    // MailerLite answers with JSON, which shows in the sandboxed frame under the form.
+    expect(signupTarget(CONFIGS.buttondown)!.mode).toBe('page');
+    expect(signupTarget(CONFIGS.formspree)!.mode).toBe('page');
+    expect(signupTarget(CONFIGS.mailerlite)!.mode).toBe('frame');
+    expect(signupTarget(CONFIGS.mailerlite)!.field).toBe('fields[email]');
+  });
+
+  it('never posts Formspree into the frame (its CAPTCHA can’t run there), and gives a way to leave before any email', () => {
+    expect(() => signupTarget({ ...CONFIGS.formspree, mode: 'frame' })).toThrow(/frame/);
+    // Formspree sends no email of its own: without a contact address there would be no way to leave the list.
+    expect(() => signupTarget({ service: 'formspree', id: 'xyzabcd' })).toThrow(/contact/);
+    expect(signupTarget(CONFIGS.formspree)!.leave).toContain('write to list@fitee.example');
+    // The mailing lists' emails carry an unsubscribe link; a contact address adds a way to ask.
+    expect(signupTarget(CONFIGS.buttondown)!.leave).toBe('Every email from the list has a link to unsubscribe.');
+    expect(signupTarget({ ...CONFIGS.buttondown, contact: 'hello@fitee.example' })!.leave).toContain('write to hello@fitee.example');
+    // An address, nothing else (the page shows it as text).
+    for (const contact of ['not an address', 'https://example.com', 'a@b', '<x>@y.example']) {
+      expect(() => signupTarget({ ...CONFIGS.buttondown, contact }), contact).toThrow(/contact/);
+    }
   });
 
   it('never allows inline code, eval, data: URLs or any site', () => {
-    for (const target of [null, signupTarget({ service: 'buttondown', id: 'x' }), signupTarget({ service: 'formspree', id: 'x' })]) {
+    for (const target of [null, ...Object.values(CONFIGS).map((c) => signupTarget(c))]) {
       const csp = landingCsp(target);
       expect(csp).not.toMatch(/unsafe-|data:|blob:|\*|http:/);
     }
@@ -215,33 +240,66 @@ describe('the page’s template', () => {
   });
 
   it('with the list closed: no form, nothing to type into, and a privacy note that says no email is collected', () => {
-    const html = renderPage(TEMPLATE, null);
+    const html = renderPage(TEMPLATE, null, FACTS);
     expect(html).not.toMatch(/<form|<input|<iframe/);
-    expect(html).toContain('Sign-ups open soon');
+    expect(html).toMatch(/Sign-ups<\/span> open soon/);
     expect(html).toContain('No email is collected yet');
     expect(html).toContain('makes no requests to other sites');
+    // It promises only what the connected note says: the service, the use, and how to leave.
+    expect(html).toContain('this note will name the service that keeps the list, and say what your email is used for (only news about fitee) and how to leave the list');
     expect(html).toContain('class="soon-pill"');
     expect(html).not.toContain('data-join');
     expect(html).not.toMatch(/\{\{|<!--fitee:/);
   });
 
+  it('says the pose model’s size as the app does, from the files the build ships', () => {
+    expect(renderPage(TEMPLATE, null, FACTS)).toContain(`its ${formatMB(FACTS.poseBytes)} pose model`);
+    expect(formatMB(FACTS.poseBytes)).toBe('24\u00a0MB');
+    expect(() => renderPage(TEMPLATE, null, { poseBytes: 0 })).toThrow(/fetch-assets/);
+    // From public/mediapipe: the runtime most browsers use and the full model.
+    expect(poseBytes()).toBeGreaterThan(10e6);
+  });
+
   it('once connected: a plain form post to the service, its name in the privacy note and the footer', () => {
-    const target = signupTarget({ service: 'buttondown', id: 'fitee' })!;
-    const html = renderPage(TEMPLATE, target);
-    expect(html).toContain(`<form class="signup" action="${target.action}" method="post" data-mode="frame">`);
+    const target = signupTarget(CONFIGS.buttondown)!;
+    const html = renderPage(TEMPLATE, target, FACTS);
+    expect(html).toContain(`<form class="signup" action="${target.action}" method="post" data-mode="page">`);
     expect(html).toMatch(/<label class="field-label" for="signup-email">Email<\/label>/);
     expect(html).toContain(`name="${target.field}"`);
     expect(html).toContain('<input type="hidden" name="embed" value="1" />');
     expect(html).toContain('aria-describedby="signup-status signup-fine"');
     expect(html).toContain('Sign-ups are handled by Buttondown.');
     expect(html).toContain('the form sends your email address to Buttondown');
+    // What any form post gives the service, and that it may set its own cookies.
+    expect(html).toContain('Buttondown also receives your IP address and browser details, and it may set its own cookies');
     expect(html).not.toContain('makes no requests to other sites');
-    expect(html).toContain('If your sign-up went through');
-    // A hedged message only: the page can't know whether the address arrived.
-    expect(html).not.toMatch(/you(’|')re on the list\.|subscribed|success/i);
-    const formspree = renderPage(TEMPLATE, signupTarget({ service: 'formspree', id: 'abc' }));
-    expect(formspree).toContain('data-mode="page"');
-    expect(formspree).not.toContain('class="thanks"');
+    expect(html).toContain('you’ll see its own page when you join');
+    // Posted top-level: no frame, and nothing on the page that says what happened.
+    expect(html).not.toContain('class="answer"');
+    expect(html).not.toMatch(/Check your inbox|you(’|')re on the list|subscribed|success/i);
+  });
+
+  it('with the answer in the frame: the service’s own answer under the form, never a done state of the page’s own', () => {
+    const target = signupTarget(CONFIGS.mailerlite)!;
+    const html = renderPage(TEMPLATE, target, FACTS);
+    expect(html).toContain('data-mode="frame"');
+    const answer = /<div class="answer" hidden data-title="([^"]*)" data-say="([^"]*)"><\/div>/.exec(html);
+    expect(answer?.[1]).toBe('What came back from MailerLite');
+    // Neutral words: the page can't read the answer, and an error page loads there too.
+    // (A service that can't be reached leaves the frame blank: the browser's own error page needs script, which the frame doesn't run.)
+    expect(answer?.[2]).toBe('Here’s what came back. If it says your sign-up went through, an email is on its way so you can confirm your address (look in your spam folder too). If it’s blank, the sign-up service couldn’t be reached: try again later.');
+    expect(html).not.toMatch(/Check your inbox|class="thanks"|data-again|you(’|')re on the list|subscribed|success/i);
+    expect(html).toContain('its answer shows here when you join');
+    // A service that sends no confirmation (the test stand-in can be one) says so.
+    const quiet = renderPage(TEMPLATE, { ...target, confirms: false }, FACTS);
+    expect(quiet).toContain('If it says your sign-up went through, we’ll email you when you can try fitee. If it’s blank,');
+    expect(quiet).not.toContain('confirm your address');
+  });
+
+  it('names the contact address in the privacy note, where the config gives one', () => {
+    const html = renderPage(TEMPLATE, signupTarget(CONFIGS.formspree), FACTS);
+    expect(html).toContain('To leave the list at any time, or to ask about it, write to list@fitee.example.');
+    expect(html).toContain('data-mode="page"');
   });
 
   it('gives the panel the Molten tokens, the same as the pinned dark theme', () => {
@@ -253,16 +311,61 @@ describe('the page’s template', () => {
     expect(molten.split(';').filter((d) => d.trim().startsWith('--')).length).toBeGreaterThan(50);
     expect(read('src/landing/landing.css')).toContain('/* fitee:molten-tokens */');
   });
+
+  it('keeps the panel dark where color-mix() isn’t understood, with the app’s own panel text on it', () => {
+    const css = read('src/landing/landing.css');
+    const panel = /\n\.panel \{([\s\S]*?)\n\}/.exec(css)![1];
+    // A var() in a declaration a browser can't parse voids the whole declaration: the panel's colour stands on its own,
+    // so only the glow (background-image, with color-mix) can fail.
+    expect(panel).toMatch(/\bbackground-color: var\(--panel-bg\);/);
+    expect(panel).toMatch(/\bbackground-image: radial-gradient\([^;]*color-mix\(/);
+    expect(panel).not.toMatch(/\bbackground:/);
+    // Text as on the app's "Log a workout" panel (its panel text tokens, from the page's theme), after the Molten set.
+    expect(panel.indexOf('--text: var(--panel-ink)')).toBeGreaterThan(panel.indexOf('/* fitee:molten-tokens */'));
+    expect(css).toMatch(/\.list \.wrap \{[^}]*--panel-ink: var\(--panel-text\);[^}]*--panel-ink-muted: var\(--panel-muted\);/);
+  });
+});
+
+describe('the page’s build', () => {
+  it('never builds into the repo itself (replacing about/ there would delete the template)', () => {
+    expect(() => landingFolder(ROOT)).toThrow(/repo/);
+    expect(() => landingFolder(join(ROOT, '.'))).toThrow(/repo/);
+    expect(landingFolder(join(ROOT, 'dist'))).toBe(join(ROOT, 'dist', 'about'));
+    expect(landingFolder('/tmp/x')).toBe(join('/tmp/x', 'about'));
+  });
+
+  it('refuses code from outside this repo (the page shares the app’s origin)', () => {
+    const src = (f: string) => join(ROOT, 'src', f);
+    expect(notOwnCode({ modules: [join(ROOT, 'about', 'index.html'), src('landing/main.ts'), src('landing/landing.css')], sources: ['public/favicon.svg', 'node_modules/@fontsource-variable/bricolage-grotesque/files/x.woff2', 'src/landing/screens/a.webp'] })).toEqual([]);
+    expect(notOwnCode({ modules: [join(ROOT, 'node_modules', 'left-pad', 'index.js'), '\0virtual:thing', src('landing/main.ts')], sources: ['node_modules/some-icons/a.svg', 'scripts/x.png'] })).toEqual([
+      'node_modules/left-pad/index.js',
+      '\0virtual:thing',
+      'node_modules/some-icons/a.svg',
+      'scripts/x.png',
+    ]);
+    // Styles: only the app's font and its own tokens are imported (postcss inlines them, so they aren't modules).
+    const imports = [...read('src/landing/landing.css').matchAll(/@import\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
+    expect(imports).toEqual(['@fontsource-variable/bricolage-grotesque/opsz.css', '../tokens.css']);
+  });
 });
 
 describe('the built page', () => {
   let out = '';
   let html = '';
+  let built: Awaited<ReturnType<typeof buildLanding>>;
   beforeAll(async () => {
     out = tmp('fitee-landing-build-');
-    await buildLanding(out);
+    built = await buildLanding(out);
     html = readFileSync(join(out, 'about', 'index.html'), 'utf8');
   }, 60_000);
+
+  it('is made of this repo’s own code: every module of its script from src/', () => {
+    const js = built.modules.filter((m) => /\.[cm]?[jt]sx?$/.test(m));
+    expect(js.length).toBeGreaterThan(10);
+    for (const m of js) expect(relative(join(ROOT, 'src'), m), m).not.toMatch(/^\.\.|node_modules/);
+    expect(notOwnCode(built)).toEqual([]);
+    expect(built.files.every((f) => f.startsWith('about/'))).toBe(true);
+  });
 
   it('has the CSP, before anything it governs', () => {
     const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html);
@@ -304,5 +407,6 @@ describe('the built page', () => {
     expect(html).toContain(stageMarkup(heroData()).figure);
     expect(html).toContain(`data-state="${SIGNUP ? 'open' : 'closed'}"`);
     expect(/<form/.test(html)).toBe(SIGNUP !== null);
+    expect(html).toContain(`its ${formatMB(poseBytes())} pose model`);
   });
 });

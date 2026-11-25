@@ -8,18 +8,23 @@
 // To connect a service, set SIGNUP to ONE of these, then deploy:
 //   export const SIGNUP: SignupConfig | null = { service: 'buttondown', id: 'your-username' };
 //   export const SIGNUP: SignupConfig | null = { service: 'mailerlite', id: 'ACCOUNT_ID/FORM_ID' };
-//   export const SIGNUP: SignupConfig | null = { service: 'formspree', id: 'FORM_ID' };
+//   export const SIGNUP: SignupConfig | null = { service: 'formspree', id: 'FORM_ID', contact: 'list@your-domain.example' };
 // The build (scripts/landing-build.ts) turns it into the form (its endpoint
-// and field names), the page's CSP (form-action and frame-src: that one
-// service's origin) and the page's privacy note, which then names the
-// service. Check the preset against the service's current embed code first
-// (endpoints and field names change), and set the service up as its preset
-// says (double opt-in on, no CAPTCHA in a hidden frame).
+// and field names), the page's CSP (form-action, and frame-src when the
+// answer shows in a frame: that one service's origin) and the page's privacy
+// note, which then names the service. Check the preset against the service's
+// current embed code first (endpoints and field names change), and set the
+// service up as its preset says (double opt-in on; for MailerLite, its
+// reCAPTCHA off, since the frame its answer shows in runs no scripts).
 //
 // The form is a plain HTML form POST, never fetch(): this page shares its
 // origin with the app, whose service worker answers any fetch to another site
 // with a network error (form posts are navigations, which it never touches).
 // Nothing is stored on the device.
+//
+// The page can't read the service's answer, so it never says the sign-up
+// went through: the visitor sees the service's own answer, as its own page
+// ('page') or in a sandboxed frame under the form ('frame').
 //
 // Pure: no DOM, no Node. The build, the tests and the page's own script read it.
 
@@ -29,7 +34,19 @@ export interface SignupConfig {
   service: SignupService;
   /** Buttondown: your username. MailerLite: "ACCOUNT_ID/FORM_ID". Formspree: the form's id. */
   id: string;
-  /** Instead of the preset's way to post: 'frame' (a hidden frame; the page shows its own message) or 'page' (the service's own page). */
+  /**
+   * An email address people can write to about the list, to leave it or to
+   * ask about it: a project or list address, not a personal one (the page
+   * shows it). Formspree needs one (it sends no email of its own, so writing
+   * is the only way to leave before fitee writes to you); optional otherwise.
+   */
+  contact?: string;
+  /**
+   * Instead of the preset's way to post: 'page' (the visitor goes to the
+   * service's own page) or 'frame' (the service's answer shows in a
+   * sandboxed frame under the form; not for Formspree, whose CAPTCHA can't
+   * run there).
+   */
   mode?: 'frame' | 'page';
 }
 
@@ -49,15 +66,17 @@ export interface SignupTarget {
   /** Hidden fields the service's own embed form sends. */
   extra: Record<string, string>;
   /**
-   * 'frame': into a hidden, sandboxed iframe, so the visitor stays on the page
-   * and sees its own message (which can't know whether the address arrived:
-   * the page can't read the service's answer). 'page': a normal post, and the
-   * visitor sees the service's own page (its thank-you page, or a CAPTCHA).
+   * 'page': a normal post, and the visitor sees the service's own page (its
+   * confirmation or error, or a CAPTCHA). 'frame': the post goes into a
+   * sandboxed iframe under the form (no scripts, no way to move the page), and
+   * the visitor reads the service's answer there. Either way the page itself
+   * never says the sign-up went through: it can't read the answer, and
+   * whatever loads (an error page too) looks the same from outside.
    */
   mode: 'frame' | 'page';
   /** The service emails a link to confirm the address (double opt-in). */
   confirms: boolean;
-  /** How to leave the list, for the privacy note. */
+  /** How to leave the list, for the privacy note and the fine print. */
   leave: string;
 }
 
@@ -70,9 +89,17 @@ interface Preset {
   field: string;
   extra: Record<string, string>;
   mode: 'frame' | 'page';
+  /** Whether its answer can be shown in the sandboxed frame (a CAPTCHA can't). */
+  framable: boolean;
   confirms: boolean;
-  leave: string;
+  /** How to leave the list, given the contact address (if any). */
+  leave: (contact: string | undefined) => string;
+  /** Whether the config must give a contact address. */
+  needsContact: boolean;
 }
+
+const unsubscribe = (contact: string | undefined) =>
+  `Every email from the list has a link to unsubscribe.${contact ? ` To leave at any time, or to ask about the list, write to ${contact}.` : ''}`;
 
 /**
  * The three services offered for later. Endpoints and field names as their
@@ -82,8 +109,9 @@ interface Preset {
 export const PRESETS: Record<SignupService, Preset> = {
   // Buttondown: the embed form posts `email` (and `embed=1`) to
   // https://buttondown.com/api/emails/embed-subscribe/<username>, and
-  // Buttondown emails a link to confirm. Check against Buttondown's current
-  // embed code when connecting.
+  // Buttondown emails a link to confirm. Posted top-level: the visitor sees
+  // Buttondown's own page, which says what happened (and can show any check
+  // it asks for). Check against Buttondown's current embed code when connecting.
   buttondown: {
     name: 'Buttondown',
     origin: 'https://buttondown.com',
@@ -91,16 +119,22 @@ export const PRESETS: Record<SignupService, Preset> = {
     id: /^[A-Za-z0-9_-]+$/,
     field: 'email',
     extra: { embed: '1' },
-    mode: 'frame',
+    mode: 'page',
+    framable: true,
     confirms: true,
-    leave: 'Every email from the list has a link to unsubscribe.',
+    leave: unsubscribe,
+    needsContact: false,
   },
   // MailerLite: the embedded form posts `fields[email]` (with `ml-submit=1`
   // and `anticsrf=true`) to
   // https://assets.mailerlite.com/jsonp/<account>/forms/<form>/subscribe and
-  // answers with JSON, which lands in the hidden frame. Turn on double opt-in
-  // for the form and leave its reCAPTCHA off (a hidden frame can't show it).
-  // Check against MailerLite's current embed code when connecting.
+  // answers with a short JSON message (its embed form's script reads it), so
+  // the answer shows in the sandboxed frame under the form rather than as a
+  // page of its own. Turn on double opt-in for the form and leave its
+  // reCAPTCHA off (the frame runs no scripts). Check against MailerLite's
+  // current embed code when connecting, and that its answer shows in the
+  // frame (a service that refuses to be framed shows the browser's
+  // "refused to connect" there instead).
   mailerlite: {
     name: 'MailerLite',
     origin: 'https://assets.mailerlite.com',
@@ -112,14 +146,17 @@ export const PRESETS: Record<SignupService, Preset> = {
     field: 'fields[email]',
     extra: { 'ml-submit': '1', anticsrf: 'true' },
     mode: 'frame',
+    framable: true,
     confirms: true,
-    leave: 'Every email from the list has a link to unsubscribe.',
+    leave: unsubscribe,
+    needsContact: false,
   },
   // Formspree: a plain form posts `email` to https://formspree.io/f/<form id>
   // and the visitor sees Formspree's own page, which can ask for a CAPTCHA
-  // (so it posts top-level, not into a hidden frame). It's a form inbox: it
-  // sends no confirmation email. Check against Formspree's current docs when
-  // connecting.
+  // (so it always posts top-level, never into the frame). It's a form inbox:
+  // it sends no confirmation email and no email of its own, so the config
+  // must give a contact address to leave the list by. Check against
+  // Formspree's current docs when connecting.
   formspree: {
     name: 'Formspree',
     origin: 'https://formspree.io',
@@ -128,10 +165,15 @@ export const PRESETS: Record<SignupService, Preset> = {
     field: 'email',
     extra: {},
     mode: 'page',
+    framable: false,
     confirms: false,
-    leave: 'Reply to any email from us and we’ll take you off the list.',
+    leave: (contact) => `To leave the list at any time, or to ask about it, write to ${contact}.`,
+    needsContact: true,
   },
 };
+
+/** An address the page can show: something@domain.tld, nothing else (no URL, no markup). */
+const CONTACT = /^[^\s@<>"'`]+@[^\s@<>"'`.]+(\.[^\s@<>"'`.]+)+$/;
 
 /** The form's target for a config, or null while the list isn't connected. Throws on a config the build can't use. */
 export function signupTarget(config: SignupConfig | null): SignupTarget | null {
@@ -141,15 +183,24 @@ export function signupTarget(config: SignupConfig | null): SignupTarget | null {
   const id = config.id.trim();
   if (!preset.id.test(id)) throw new Error(`landing sign-up: "${id}" isn't a valid ${preset.name} id`);
   if (config.mode !== undefined && config.mode !== 'frame' && config.mode !== 'page') throw new Error(`landing sign-up: mode must be 'frame' or 'page'`);
+  const mode = config.mode ?? preset.mode;
+  if (mode === 'frame' && !preset.framable) {
+    throw new Error(`landing sign-up: ${preset.name} can't post into the frame (its CAPTCHA can't run there): leave mode out`);
+  }
+  const contact = config.contact?.trim();
+  if (contact !== undefined && !CONTACT.test(contact)) throw new Error(`landing sign-up: contact must be an email address, like list@your-domain.example`);
+  if (preset.needsContact && !contact) {
+    throw new Error(`landing sign-up: ${preset.name} sends no email of its own, so set contact: an address people can write to to leave the list (a project or list address)`);
+  }
   return {
     name: preset.name,
     action: preset.endpoint(id),
     origin: preset.origin,
     field: preset.field,
     extra: { ...preset.extra },
-    mode: config.mode ?? preset.mode,
+    mode,
     confirms: preset.confirms,
-    leave: preset.leave,
+    leave: preset.leave(contact),
   };
 }
 
@@ -183,7 +234,7 @@ export function testSignupTarget(raw: string): SignupTarget {
  * Only this site's own scripts, styles, fonts and images; no inline script
  * or style; no plugins; no <base>. form-action and frame-src are 'none'
  * until a service is connected, then only that service's origin (frame-src
- * only when the form posts into the hidden frame).
+ * only when its answer shows in the frame).
  */
 export function landingCsp(target: SignupTarget | null): string {
   const form = target ? target.origin : "'none'";

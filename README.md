@@ -109,11 +109,16 @@ list; it doesn't link to the app. `npm run build` builds it into
 `dist/about/` as a build of its own: the app's files and `sw.js` come out the
 same with or without it, and the app's offline copy leaves `about/` out, so
 editing the page never updates the app on anyone's phone. The deploy workflow
-publishes it with the app, unchanged.
+publishes it with the app, unchanged. (The page is inside the app's
+service-worker scope, though, so for someone who uses the app, opening the
+page lets the browser check for a new version of the app and install it in
+the background, as opening the app does. It only ever fetches this site's own
+files.)
 
 The page shares the app's origin, so it runs only its own files (no
 third-party scripts, styles, fonts, images or analytics, no cookies) and reads
-none of the app's data. Its Content Security Policy is written at build time.
+none of the app's data; its build fails if the page's script takes in code
+from outside `src/`. Its Content Security Policy is written at build time.
 
 **The interest list** isn't connected yet: it says sign-ups open soon and
 collects nothing. To open it, set `SIGNUP` in `src/landing/signup.ts` to one
@@ -121,7 +126,8 @@ of the presets and deploy:
 
 ```ts
 export const SIGNUP: SignupConfig | null = { service: 'buttondown', id: 'your-username' };
-// or { service: 'mailerlite', id: 'ACCOUNT_ID/FORM_ID' }, or { service: 'formspree', id: 'FORM_ID' }
+// or { service: 'mailerlite', id: 'ACCOUNT_ID/FORM_ID' },
+// or { service: 'formspree', id: 'FORM_ID', contact: 'list@your-domain.example' }
 ```
 
 The build then writes the form (a plain HTML form post to that service, never
@@ -129,12 +135,15 @@ The build then writes the form (a plain HTML form post to that service, never
 controls), opens the page's CSP to that one service, and names the service in
 the page's privacy note and footer. Check the preset's endpoint and field
 names against the service's current embed code first (MailerLite: turn on
-double opt-in, leave reCAPTCHA off). Buttondown and MailerLite post into a
-hidden frame and the page asks the visitor to check their inbox; Formspree
-shows its own page.
+double opt-in, leave reCAPTCHA off). The page can't read the service's
+answer, so it never says the sign-up went through: Buttondown and Formspree
+show their own page, and MailerLite's answer shows in a sandboxed frame under
+the form. Formspree sends no email of its own, so it needs `contact`, an
+address people can write to to leave the list (a project or list address: the
+page shows it).
 
-Check it end to end (Chromium via Playwright; a stand-in sign-up service runs
-on port + 1):
+Check it end to end (Chromium via Playwright, cut off from every site but
+this machine; a stand-in sign-up service runs on port + 1):
 
 ```sh
 npm run landing:check -- --work /tmp/landing-check --port 4402

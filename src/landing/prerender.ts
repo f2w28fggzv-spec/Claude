@@ -19,6 +19,7 @@ import type { BodyKind } from '../demo/body';
 import { ROLE_LABEL, levelsAt, type Engagement, type Levels } from '../demo/engagement';
 import { demoBounds, viewBoxOf } from '../demo/render';
 import { timeline } from '../demo/timeline';
+import { formatMB } from '../offline/state';
 import { legendOrder, musclesInWords } from '../screens/ExerciseDemo';
 import { THEME_COLOR } from '../theme';
 import { LogoMark } from '../ui/Logo';
@@ -199,6 +200,24 @@ export function libraryCounts(): { exercises: number; full: number } {
   return { exercises: EXERCISES.length, full: full.length };
 }
 
+/** What the page says that comes from the build's own files rather than the code. */
+export interface PageFacts {
+  /** The bytes a technique check loads and the installed app saves: the pose runtime (SIMD) and the full model, from public/mediapipe. */
+  poseBytes: number;
+}
+
+/**
+ * How wide the pictures in steps 4 and 5 show, for their `sizes` (the phone's
+ * screen and the card laid over it; src/landing/landing.css, .duo): measured
+ * at 320 to 1440 px so a sharp screen fetches the smaller file when it's enough.
+ */
+export const DUO_SIZES = {
+  // 56% of the step's width less its bezel, up to 250 px less the bezel.
+  phone: '(min-width: 518px) 234px, calc(56vw - 57px)',
+  // 84% of the step's width on phones (at least 236 px), up to the card's own 358 px; 230 px beside the phone.
+  card: '(min-width: 720px) 230px, (min-width: 498px) 358px, (min-width: 353px) calc(84vw - 61px), 236px',
+};
+
 /**
  * The page's HTML from its template (about/index.html):
  *   <!--fitee:head-->              the CSP and the browser-bar colours
@@ -211,9 +230,12 @@ export function libraryCounts(): { exercises: number; full: number } {
  *   {{SIGNUP_ACTION}}, {{SIGNUP_FIELD}}, {{SIGNUP_NAME}}, {{SIGNUP_MODE}},
  *   {{SIGNUP_LEAVE}}, {{LIST_STATE}} (closed or open), <!--fitee:signup-extra-->
  *   {{EXERCISE_COUNT}}, {{FULL_COUNT}}: from the library
+ *   {{POSE_MB}}: the pose model's size, as the app says it (formatMB)
+ *   {{DUO_PHONE_SIZES}}, {{DUO_CARD_SIZES}}: the `sizes` of steps 4 and 5's pictures
  * Throws if anything is left unfilled.
  */
-export function renderPage(template: string, target: SignupTarget | null): string {
+export function renderPage(template: string, target: SignupTarget | null, facts: PageFacts): string {
+  if (!(facts.poseBytes > 1e6)) throw new Error(`landing: the pose model's size (${facts.poseBytes} bytes) can't be right: run npm run fetch-assets`);
   const data = heroData();
   const stage = stageMarkup(data);
   const counts = libraryCounts();
@@ -261,6 +283,9 @@ export function renderPage(template: string, target: SignupTarget | null): strin
     LIST_STATE: target ? 'open' : 'closed',
     EXERCISE_COUNT: String(counts.exercises),
     FULL_COUNT: String(counts.full),
+    POSE_MB: formatMB(facts.poseBytes),
+    DUO_PHONE_SIZES: DUO_SIZES.phone,
+    DUO_CARD_SIZES: DUO_SIZES.card,
   };
   html = html.replace(/\{\{([A-Z_]+)\}\}/g, (m, name: string) => {
     if (!(name in values)) throw new Error(`landing: unknown value ${m}`);
