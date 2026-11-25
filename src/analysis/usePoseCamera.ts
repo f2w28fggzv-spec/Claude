@@ -6,6 +6,8 @@ import { closeCamera, openCamera, type Facing } from '../camera';
 import { drawSkeleton } from '../draw';
 import type { ModelVariant, Delegate } from '../pose';
 import type { PoseFrame } from '../engine/types';
+import { offlineAvailable, poseFilesNotKept, poseFilesSaved } from '../offline/client';
+import { modelErrorMessage } from '../offline/state';
 import { currentModel, detect, loadModel, toPoseFrame } from './runner';
 
 export interface LiveFrame {
@@ -35,7 +37,8 @@ export function cameraErrorMessage(err: unknown): string {
 
 export function usePoseCamera(
   onFrame?: (f: LiveFrame) => void,
-  opts: { initialFacing?: Facing; onFacingChange?: (f: Facing) => void } = {},
+  /** `choosable`: the page offers both models (the camera test), so a failed one can point to the other. */
+  opts: { initialFacing?: Facing; onFacingChange?: (f: Facing) => void; choosable?: boolean } = {},
 ) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,6 +48,9 @@ export function usePoseCamera(
   const [running, setRunning] = useState(false);
   const [facing, setFacing] = useState<Facing>(opts.initialFacing ?? 'environment');
   const [error, setError] = useState('');
+  /** Why the pose model didn't load (e.g. offline before it was saved). */
+  const [modelError, setModelError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   const [stats, setStats] = useState<CameraStats | null>(null);
   const cb = useRef(onFrame);
   cb.current = onFrame;
@@ -61,13 +67,39 @@ export function usePoseCamera(
   useEffect(() => {
     let cancelled = false;
     setReady(false);
+    setModelError('');
+    setStats(null); // the readout names the model; a new one fills it in
     loadModel(variant)
       .then(() => !cancelled && setReady(true))
-      .catch((err) => !cancelled && setError(`Failed to load pose model: ${(err as Error).message ?? err}`));
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        console.warn('Pose model failed to load', err);
+        const other: ModelVariant = variant === 'full' ? 'lite' : 'full';
+        const choice = opts.choosable && poseFilesSaved(other) ? { variant, saved: other } : undefined;
+        setModelError(
+          modelErrorMessage({
+            online: navigator.onLine,
+            saved: poseFilesSaved(variant),
+            offlineAvailable: offlineAvailable(),
+            error: err,
+            choice,
+            notKept: poseFilesNotKept(variant),
+          }),
+        );
+      });
     return () => {
       cancelled = true;
     };
-  }, [variant]);
+  }, [variant, attempt]);
+
+  // Back online after a failed load: try again by itself.
+  useEffect(() => {
+    if (!modelError) return;
+    const retry = () => setAttempt((n) => n + 1);
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [modelError]);
+  const retryModel = () => setAttempt((n) => n + 1);
 
   const stop = () => {
     const st = s.current;
@@ -171,5 +203,5 @@ export function usePoseCamera(
   /** The live camera stream (for recording a set to memory), while running. */
   const getStream = () => s.current.stream;
 
-  return { videoRef, canvasRef, stageRef, ready, running, facing, error, stats, variant, setVariant, start, stop, flip, choose, getStream };
+  return { videoRef, canvasRef, stageRef, ready, running, facing, error, modelError, retryModel, stats, variant, setVariant, start, stop, flip, choose, getStream };
 }

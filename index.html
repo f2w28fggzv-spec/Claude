@@ -6,13 +6,20 @@
     <meta name="theme-color" content="#F4ECE2" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#141518" media="(prefers-color-scheme: dark)" />
     <meta name="color-scheme" content="light dark" />
+    <!-- Added to the home screen it opens on its own, like an app (manifest.webmanifest).
+         Status bar style "default": the page starts below the iPhone status bar, so the
+         header never sits under it; the bottom bars pad for the home indicator. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="fitee" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" sizes="180x180" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <!-- Nothing may be sent off the device: connect-src only allows this site.
          'unsafe-eval' is only there so older Safari (before 'wasm-unsafe-eval'
-         support) can still compile the MediaPipe WebAssembly. -->
+         support) can still compile the MediaPipe WebAssembly. worker-src 'self'
+         lets the app register its own service worker (sw.js, offline use). -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; connect-src 'self' blob: data:; img-src 'self' blob: data:; media-src 'self' blob: mediastream:; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'"

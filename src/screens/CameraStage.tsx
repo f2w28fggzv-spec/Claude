@@ -21,7 +21,8 @@ export function ModelPicker({ cam }: { cam: Cam }) {
   return (
     <label class="inline">
       Model
-      <select value={cam.variant} disabled={!cam.ready} onChange={(e) => cam.setVariant(e.currentTarget.value as ModelVariant)}>
+      {/* Locked only while a model loads: after a failed one, the other can be chosen. */}
+      <select value={cam.variant} disabled={!cam.ready && !cam.modelError} onChange={(e) => cam.setVariant(e.currentTarget.value as ModelVariant)}>
         <option value="lite">Lite (faster)</option>
         <option value="full">Full (more accurate)</option>
       </select>

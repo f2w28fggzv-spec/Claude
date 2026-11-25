@@ -24,6 +24,82 @@ npm test         # run tests
 
 The camera only works over HTTPS, so plain `http://<ip>` will not work.
 
+## Install on your phone
+
+Open https://f2w28fggzv-spec.github.io/Claude/ and add it to your home screen:
+
+- **iPhone or iPad (Safari):** tap *Share*, then *Add to Home Screen*, then
+  open it once while you're online and leave it open until it has saved the
+  pose model (about 24 MB; it shows how far it has got, and *Settings* says
+  *Ready to use offline*): the home-screen app has its own storage, apart
+  from Safari, so it saves itself (and the pose model) on that first launch.
+  To bring your plans and log, use *Settings → Back up my data* in Safari,
+  then *Restore from a backup* in the app.
+- **Android (Chrome):** *Settings → Install and offline → Install fitee*, or
+  the browser menu's *Install app* / *Add to Home screen*.
+
+It then opens like an app, on its own, without the browser bars.
+
+## Offline use
+
+A service worker (`src/offline/`, written into the build as `sw.js`) keeps a
+copy of the app in the browser's cache, so it opens and every screen works
+with no signal. Technique checks also need the pose model (about 24 MB): the
+installed app saves it by itself on its first launch online, once the terms
+are accepted (not where the browser reports Data Saver; iPhones don't report
+Low Data Mode to websites); in a browser tab it's saved the first time you
+use a technique check, or with *Settings → Install and offline → Save for
+offline use*. While it saves, every screen says so (keep the app open until
+it's done). Settings shows what is saved, and says so if the phone couldn't
+keep the pose model: any refused store of a file that downloaded and matched
+counts (`QuotaExceededError`, or `UnknownError` on a really full disk in
+Chromium, whose storage estimate shows a fixed headroom however full the disk
+is, so the estimate is only a first check). The service worker remembers a
+file the phone couldn't keep with an empty cache named for the file and the
+time (`fitee-unkept-<hash>-<time>`, so it survives the worker stopping and new
+versions): for a week (a day for the app's own files, which are small) nothing
+downloads it again by itself (a technique check gets it through the HTTP
+cache, unsaved; the installed app doesn't save it; an update that needs it
+doesn't download it), until a save asks to try again. On a nearly full disk
+even that marker can be lost when the browser restarts, and the file may then
+be downloaded again sooner (the privacy policy says so). An
+update that changes a pose file the phone had saved installs only once the new
+copy is kept, so it never leaves the phone without it: until there's room, the
+current version keeps running (offline too), and Settings says how much free
+space the new version needs (all it writes: Chromium's estimate can't show the
+shortfall), with *Try again*. If a new version is waiting,
+*Update and save* applies it first and carries on saving after the reload
+(never on the old version); the installed app's own save waits for an update
+on its way. When the site already serves a newer version that the phone hasn't
+found yet, *Try again* looks for it and downloads nothing until it's here.
+
+Nothing leaves the device: the service worker only loads this site's own files,
+never follows a redirect, and refuses every request to another origin (on top
+of `src/privacy.ts` and the page's Content Security Policy). The offline copy
+holds none of your data. Before downloading a file it looks in the browser's
+own HTTP cache, keeping a copy only if its SHA-256 matches the build's list,
+and it downloads each file once however many requests ask for it. New versions
+download in the background (only the files that changed; each pose file has a
+cache of its own, so a new model doesn't copy the rest) and apply the next time
+you open the app, or with *Update now* in Settings. A version that fails to
+download leaves the current one working; the browser tries again later. If the
+very first save fails, Settings says so (and when the phone had no room for
+it, says that instead of blaming the connection) and offers *Try again*.
+
+Keep `sw.js` at its URL: a 404 or a redirect there leaves installed phones on
+their old version. To retire offline use (or before moving the app to another
+address), deploy a `sw.js` that deletes the `fitee-*` caches and unregisters
+itself, with no fetch handler.
+
+Check it end to end (Chromium via Playwright, fake camera):
+
+```sh
+npm run offline:check -- --work /tmp/offline-check --port 4180
+```
+
+The service worker is only registered in production builds, so `npm run dev`
+always serves fresh files.
+
 ## Deploy (GitHub Pages)
 
 `.github/workflows/deploy.yml` builds and deploys on every push to `main`

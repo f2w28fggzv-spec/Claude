@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import { Logo } from '../ui/Logo';
 import { Icon, type IconName } from './icons';
+import { OfflineSaveNote } from './OfflineSection';
 
 export type Tab = 'plan' | 'log' | 'exercises';
 
@@ -16,6 +17,8 @@ interface ScreenProps {
   subtitle?: string;
   /** Small button next to the title (e.g. rename). */
   titleAction?: ComponentChildren;
+  /** Leave out the "Saving for offline use" note (Settings shows its own). */
+  noSaveNote?: boolean;
   children: ComponentChildren;
 }
 
@@ -52,6 +55,7 @@ export function Screen(props: ScreenProps) {
             {props.subtitle && <p class="subtitle">{props.subtitle}</p>}
           </div>
         </header>
+        {!props.noSaveNote && <OfflineSaveNote />}
         {props.children}
       </main>
       {props.action && <div class="action-bar">{props.action}</div>}

@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { refreshOffline } from './offline/client';
 import { loadProfile, termsAccepted } from './profile';
 import { useRoute } from './router';
 import { PrivacyScreen, TermsScreen, Welcome } from './screens/Legal';
@@ -37,7 +38,17 @@ export function App() {
   return (
     <>
       <div class="page" key={gate ? 'welcome' : `${route.path.join('/')}?${route.query}`}>
-        {gate ? <Welcome onDone={() => rerender((n) => n + 1)} /> : <Routes {...route} />}
+        {gate ? (
+          <Welcome
+            onDone={() => {
+              rerender((n) => n + 1);
+              // An app on the home screen may now save the pose model (the terms describe it).
+              void refreshOffline();
+            }}
+          />
+        ) : (
+          <Routes {...route} />
+        )}
       </div>
       <ToastHost />
     </>

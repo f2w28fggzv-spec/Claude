@@ -1,0 +1,12 @@
+{
+  // The service worker runs in a worker, not a page: it gets the WebWorker
+  // library instead of the DOM. `npm run typecheck` checks it with this file;
+  // the app's tsconfig leaves sw.ts out.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "WebWorker"],
+    "types": []
+  },
+  "include": ["sw.ts"],
+  "exclude": []
+}

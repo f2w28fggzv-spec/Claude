@@ -8,13 +8,14 @@
     "postinstall": "node scripts/fetch-assets.mjs",
     "fetch-assets": "node scripts/fetch-assets.mjs",
     "dev": "vite --host",
-    "build": "tsc --noEmit && tsc --noEmit -p tests && vite build",
+    "build": "tsc --noEmit && tsc --noEmit -p tests && tsc --noEmit -p src/offline && vite build",
     "preview": "vite preview --host",
     "test": "vitest run",
     "fixtures": "node scripts/make-fixtures.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tests",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tests && tsc --noEmit -p src/offline",
     "demo:sheets": "node tools/demo-sheets/sheets.cjs",
-    "demo:contact": "DEMO_TOOL=tools/demo-sheets/contact.tool.ts vitest run --config tools/demo-sheets/vitest.config.ts --silent=false"
+    "demo:contact": "DEMO_TOOL=tools/demo-sheets/contact.tool.ts vitest run --config tools/demo-sheets/vitest.config.ts --silent=false",
+    "offline:check": "node tools/offline-check/check.cjs"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",

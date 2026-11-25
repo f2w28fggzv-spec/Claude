@@ -87,3 +87,16 @@ describe('your own exercises', () => {
     expect(loadCustomExercises().some((x) => x.id === c.id && x.archived)).toBe(true);
   });
 });
+
+describe('backups', () => {
+  it('leave out what is about this phone rather than the user', () => {
+    mem.set('formcheck.v1.device.example', '1764000000000');
+    mem.set('formcheck.v1.unit', '"kg"');
+    const backup = exportAll() as { data: Record<string, unknown> };
+    expect(Object.keys(backup.data)).toContain('formcheck.v1.unit');
+    expect(Object.keys(backup.data).some((k) => k.startsWith('formcheck.v1.device.'))).toBe(false);
+    mem.delete('formcheck.v1.device.example');
+    importAll({ app: 'fitee', data: { ...backup.data, 'formcheck.v1.device.example': 1 } });
+    expect(mem.has('formcheck.v1.device.example')).toBe(false);
+  });
+});

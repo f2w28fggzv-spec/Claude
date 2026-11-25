@@ -5,6 +5,7 @@ import { render } from 'preact';
 import '@fontsource-variable/bricolage-grotesque/opsz.css';
 import './style.css';
 import { App } from './app';
+import { startOffline } from './offline/client';
 import { applyTheme } from './theme';
 
 // Light or dark as chosen in Settings (default: follow the phone).
@@ -15,3 +16,6 @@ applyTheme();
 if ('startViewTransition' in document) document.documentElement.classList.add('vt');
 
 render(<App />, document.getElementById('app')!);
+
+// Install and offline use: the service worker (production builds only).
+startOffline();

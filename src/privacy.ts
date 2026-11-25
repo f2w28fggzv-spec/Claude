@@ -1,7 +1,9 @@
 // The app must not send anything off the device. Everything it needs is
 // served from its own origin, so any request to another origin is refused
 // here before it leaves the phone. index.html adds a Content Security Policy
-// (connect-src 'self') as a second, browser-enforced layer.
+// (connect-src 'self') as a second, browser-enforced layer, and the service
+// worker (src/offline/sw.ts) answers any request to another origin with a
+// network error as a third.
 //
 // Why: MediaPipe tasks-vision creates a usage logger for every task that
 // POSTs to odml.pa.googleapis.com every 60 s, with no option to turn it off.

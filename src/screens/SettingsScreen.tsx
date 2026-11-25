@@ -11,6 +11,7 @@ import { downloadJson } from '../ui/download';
 import { showToast } from '../ui/toast';
 import { Icon, type IconName } from './icons';
 import { PRIVACY, Screen, type Tab } from './Layout';
+import { OfflineSection } from './OfflineSection';
 
 export const APP_VERSION = '0.8';
 
@@ -71,7 +72,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <Screen title="Settings" back={from} tab={TAB_OF[from]}>
+    <Screen title="Settings" back={from} tab={TAB_OF[from]} noSaveNote>
       <h2 class="field">Weight unit</h2>
       <div class="segmented-2">
         {(['kg', 'lb'] as const).map((u) => (
@@ -136,6 +137,8 @@ export function SettingsScreen() {
         </button>
       )}
 
+      <OfflineSection />
+
       <h2 class="field">Your data</h2>
       <p class="muted small">
         {PRIVACY} Your plan, log, profile and settings live only in this browser. Back them up to a file to move them to another phone (saved videos and replays aren’t included in backups).
@@ -152,7 +155,11 @@ export function SettingsScreen() {
           type="button"
           class="link danger center"
           onClick={() => {
-            if (confirm('Delete your plans, workout log, profile, saved sets and videos, and settings from this phone? This can’t be undone.')) {
+            if (
+              confirm(
+                'Delete your plans, workout log, profile, saved sets and videos, and settings from this phone? This can’t be undone. The app’s offline copy stays: it holds none of your data.',
+              )
+            ) {
               deleteAll();
               void deleteAllRecordings();
               void deleteAllSets();
