@@ -167,7 +167,7 @@ export function testSignupTarget(raw: string): SignupTarget {
   }
   const mode = v.mode === 'page' ? 'page' : 'frame';
   return {
-    name: 'a stand-in sign-up service (test build)',
+    name: 'Stand-in Service',
     action: url.href,
     origin: url.origin,
     field: typeof v.field === 'string' && v.field ? v.field : 'email',

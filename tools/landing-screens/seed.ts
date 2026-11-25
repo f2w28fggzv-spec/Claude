@@ -199,7 +199,8 @@ const at = (daysAgo: number, hour: number, min = 0) => {
   return d;
 };
 
-function summaryOf(e: Exercise, result: AnalysisResult) {
+/** What the app saves to the log about a technique check (faults per rep, clean reps). */
+function summaryOf(result: AnalysisResult) {
   const faults: Record<string, number> = {};
   for (const r of result.reps) for (const c of r.checks) if (c.status === 'fail' && c.fault) faults[c.fault] = (faults[c.fault] ?? 0) + 1;
   const cleanReps = result.reps.filter((r) => r.checks.every((c) => c.status !== 'fail')).length;
@@ -207,9 +208,8 @@ function summaryOf(e: Exercise, result: AnalysisResult) {
 }
 
 async function saveCheck(e: Exercise, seq: PoseSequence, when: Date, id: string) {
-  // (seq: the landmarks only; the sample video, if any, is added afterwards)
   const result = analyze(e, seq);
-  const { faults, cleanReps } = summaryOf(e, result);
+  const { faults, cleanReps } = summaryOf(result);
   const iso = when.toISOString();
   saveTechnique({ exerciseId: e.id, at: iso, reps: result.reps.length, faults, cleanReps, setId: id });
   await saveSet(
