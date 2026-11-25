@@ -10,9 +10,9 @@ import { useEffect, useState } from 'preact/hooks';
 import { DEVICE_KEYS_PREFIX, loadActiveWorkout } from '../log/store';
 import { loadProfile, termsAccepted } from '../profile';
 import { showToast } from '../ui/toast';
-import type { PoseVariant } from './manifest';
-import { canApplyUpdate, mayAutoSave, noRoomSince, poseSaved, poseToSave, RESUME_AFTER_MS, type OfflineOff, type SaveProblem, type WorkerState } from './state';
-import type { ToWorker, WorkerStatus } from './worker';
+import { isUnkeptCache, type PoseVariant } from './manifest';
+import { canApplyUpdate, mayAutoSave, poseSaved, poseToSave, poseUnkeptAt, RESUME_AFTER_MS, type OfflineOff, type SaveProblem, type WorkerState } from './state';
+import type { FromWorker, ToWorker, WorkerStatus } from './worker';
 
 /** Chrome's install prompt (not in the DOM typings). */
 interface InstallPromptEvent extends Event {
@@ -31,10 +31,15 @@ export interface OfflineInfo {
   simd: boolean;
   /** Pose files being saved: bytes so far and in all. */
   saving?: { done: number; total: number };
-  /** Why the last try didn't save the pose model (or that a technique check couldn't keep it). */
+  /** Why the pose model isn't saved, when something went wrong (the phone couldn't keep it: from the worker's status). */
   problem?: SaveProblem;
   /** A new version has installed and is waiting. */
   updateReady: boolean;
+  /** A new version couldn't install for lack of room on the phone (the worker said so): what it still needed, in bytes. */
+  updateHeld?: number;
+  /** The first save of the app failed for lack of room on the phone: what it still needed, in bytes. */
+  installNoRoom?: number;
+  /** Switching to a new version, or looking for one. */
   updating: boolean;
   online: boolean;
   /** Running as an installed app (home screen). */
@@ -93,48 +98,22 @@ export function useOffline(): OfflineInfo {
 
 /** Whether the pose files for a technique check with this model are saved. */
 export const poseFilesSaved = (variant: PoseVariant) => poseSaved(info.status, info.simd, variant);
+/** Whether the phone couldn't keep the pose files for a technique check with this model (the service worker remembers). */
+export const poseFilesNotKept = (variant: PoseVariant) => poseUnkeptAt(info.status, info.simd, variant) !== undefined;
 /** Whether this browser can keep the app offline at all. */
 export const offlineAvailable = () => !info.off;
 
 /**
- * When the phone first couldn't keep the pose model (about this phone, not
- * the user: deleted with all data, never in a backup). The app doesn't save
- * it by itself for a week after, so a full phone doesn't download it at
- * every launch.
+ * Forgets which files the phone couldn't keep (the service worker's empty
+ * marker caches), so the next try downloads them again: Try again, after
+ * freeing up space, for a new version or the app's first save, whose
+ * worker isn't running to ask.
  */
-const NO_ROOM_KEY = `${DEVICE_KEYS_PREFIX}offlineNoRoom`;
-
-function noRoomAt(): number | undefined {
+async function forgetUnkept(): Promise<void> {
   try {
-    const at = Number(localStorage.getItem(NO_ROOM_KEY));
-    return at > 0 ? at : undefined;
+    for (const name of await caches.keys()) if (isUnkeptCache(name)) await caches.delete(name);
   } catch {
-    return undefined;
-  }
-}
-
-/**
- * The phone couldn't keep the pose model (a save, or a technique check that
- * loaded it): say so, and start the week without saving it by itself, from
- * the first failure (later ones don't push it back).
- */
-function noteNoRoom(): void {
-  try {
-    const at = noRoomAt();
-    const since = noRoomSince(at, Date.now());
-    if (since !== at) localStorage.setItem(NO_ROOM_KEY, String(since));
-  } catch {
-    // Storage blocked: only this visit knows.
-  }
-  set({ problem: 'no-room' });
-}
-
-/** The pose model is saved: no back-off any more. */
-function clearNoRoom(): void {
-  try {
-    localStorage.removeItem(NO_ROOM_KEY);
-  } catch {
-    // Storage blocked: nothing was kept.
+    // No Cache Storage here: nothing was remembered.
   }
 }
 
@@ -152,6 +131,14 @@ function rememberSaveAfterUpdate(): void {
   }
 }
 
+function forgetSaveAfterUpdate(): void {
+  try {
+    sessionStorage.removeItem(SAVE_AFTER_UPDATE_KEY);
+  } catch {
+    // Storage blocked: nothing was kept.
+  }
+}
+
 /** Whether a save was asked for before the reload; removed as it's read, so it runs once. */
 function takeSaveAfterUpdate(): boolean {
   try {
@@ -163,21 +150,6 @@ function takeSaveAfterUpdate(): boolean {
   }
 }
 
-/**
- * Whether the phone has room for this many more bytes, by the browser's own
- * estimate (true when it can't tell). Only a first check: Chromium reports a
- * fixed headroom however full the disk is; then the worker's refused store
- * says so.
- */
-async function roomFor(bytes: number): Promise<boolean> {
-  try {
-    const estimate = await navigator.storage?.estimate?.();
-    return estimate?.quota === undefined || estimate.usage === undefined || estimate.quota - estimate.usage >= bytes;
-  } catch {
-    return true;
-  }
-}
-
 let registration: ServiceWorkerRegistration | undefined;
 let installPrompt: InstallPromptEvent | undefined;
 let simdKnown: Promise<boolean> = Promise.resolve(true);
@@ -185,6 +157,8 @@ let launchedAt = 0;
 let hiddenAt = 0;
 let lastUpdateCheck = 0;
 let reloadWhenActive = false;
+/** After "Update and save" reloaded the page before the new version took over: waiting for it, then the page reloads and saves. */
+let waitingToSave = false;
 let autoSaveTried = false;
 /** A save asked for just before an update reloaded the page: runs once the worker has said what's saved. */
 let saveAfterUpdate = false;
@@ -199,7 +173,6 @@ export function startOffline(): void {
   set({
     online: navigator.onLine,
     standalone: isStandalone(),
-    problem: noRoomAt() !== undefined ? 'no-room' : undefined,
     worker: navigator.serviceWorker?.controller ? 'active' : 'unknown',
   });
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -214,9 +187,11 @@ export function startOffline(): void {
   });
   window.addEventListener('online', () => {
     set({ online: true });
-    // Saving the app failed (e.g. the connection dropped): try again now.
-    if (info.worker === 'failed') retryOffline();
-    else void refresh();
+    // Saving the app failed (e.g. the connection dropped): try again now. Not
+    // when the phone had no room for it: then at the next launch, or Try again.
+    if (info.worker === 'failed') {
+      if (info.installNoRoom === undefined) void retryOffline(false);
+    } else void refresh();
   });
   window.addEventListener('offline', () => set({ online: false }));
   document.addEventListener('visibilitychange', onVisibility);
@@ -243,6 +218,9 @@ export function startOffline(): void {
       location.reload();
     } else void refresh();
   });
+  // Why an install failed, when it was for lack of room (the worker tells every open page).
+  navigator.serviceWorker.addEventListener('message', (e) => void onWorkerMessage(e.data as FromWorker | null));
+  navigator.serviceWorker.startMessages?.();
   // After the page has loaded, so saving the app doesn't slow its first start.
   if (document.readyState === 'complete') void register();
   else window.addEventListener('load', () => void register(), { once: true });
@@ -286,7 +264,7 @@ const alive = (w: ServiceWorker | null) => !!w && w.state !== 'redundant';
  */
 function noteWorker(reg: ServiceWorkerRegistration): void {
   const worker: WorkerState = alive(reg.active) ? 'active' : alive(reg.installing) || alive(reg.waiting) ? 'installing' : 'failed';
-  if (worker !== info.worker) set({ worker });
+  if (worker !== info.worker) set(worker === 'active' ? { worker, installNoRoom: undefined } : { worker });
 }
 
 function watch(reg: ServiceWorkerRegistration, worker: ServiceWorker | null): void {
@@ -300,11 +278,72 @@ function watch(reg: ServiceWorkerRegistration, worker: ServiceWorker | null): vo
   });
 }
 
-/** Saving the app for offline use failed: try again ("Try again" in Settings, or back online). */
-export function retryOffline(): void {
+/**
+ * A version couldn't install for lack of room (the worker says so, and how
+ * much it needed, just before the install fails). With a version running,
+ * that's an update: it waits, and Settings says how much room it needs.
+ * Without one, the app's first save failed: Settings says why, and it isn't
+ * tried again by itself until the next launch.
+ */
+async function onWorkerMessage(msg: FromWorker | null): Promise<void> {
+  if (msg?.type !== 'install-no-room' || typeof msg.bytes !== 'number') return;
+  const reg = registration ?? (await navigator.serviceWorker.getRegistration().catch(() => undefined));
+  if (reg?.active || navigator.serviceWorker.controller) set({ updateHeld: msg.bytes });
+  else set({ installNoRoom: msg.bytes });
+}
+
+/**
+ * Saving the app for offline use failed: try again ("Try again" in Settings,
+ * `byUser`, which also forgets which files the phone couldn't keep, as the
+ * user may have made room; or by itself when back online).
+ */
+export async function retryOffline(byUser = true): Promise<void> {
   if (info.off || info.worker !== 'failed') return;
-  set({ worker: 'installing' });
+  set({ worker: 'installing', installNoRoom: undefined });
+  if (byUser) await forgetUnkept();
   void register();
+}
+
+/**
+ * Looks for a new version now and waits for it to install: true if one is
+ * then waiting (it may have been waiting already). An install that fails
+ * for lack of room says so first (`updateHeld`).
+ */
+async function findUpdate(): Promise<boolean> {
+  const reg = registration;
+  if (!reg) return false;
+  try {
+    await reg.update();
+  } catch {
+    return !!reg.waiting;
+  }
+  const installing = reg.installing;
+  if (installing)
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(done, 120_000);
+      function done() {
+        if (installing!.state === 'installing') return;
+        clearTimeout(timer);
+        installing!.removeEventListener('statechange', done);
+        resolve();
+      }
+      installing.addEventListener('statechange', done);
+      done();
+    });
+  return !!reg.waiting;
+}
+
+/**
+ * "Try again" for a new version that couldn't install for lack of room:
+ * forgets which files the phone couldn't keep (the user may have made room),
+ * looks for it again, and applies it once it's saved, like "Update now".
+ */
+export async function retryUpdate(): Promise<void> {
+  if (info.updating) return;
+  set({ updating: true, updateHeld: undefined });
+  await forgetUnkept();
+  if (await findUpdate()) return applyUpdate();
+  set({ updating: false });
 }
 
 const typing = () => {
@@ -314,7 +353,7 @@ const typing = () => {
 
 /** A new version is waiting: apply it now if that's safe, else offer it in Settings. */
 function onUpdateReady(): void {
-  set({ updateReady: true });
+  set({ updateReady: true, updateHeld: undefined });
   const safe = canApplyUpdate({
     hash: location.hash,
     activeWorkout: loadActiveWorkout() !== null,
@@ -340,16 +379,40 @@ export function applyUpdate(byUser = true): void {
   set({ updating: true });
   waiting.postMessage({ type: 'skip-waiting' } satisfies ToWorker);
   setTimeout(() => {
-    if (!reloadWhenActive) return;
-    // The switch didn't happen (e.g. an even newer version replaced it).
-    // From the button, reload anyway; by itself, stand down, so a later
-    // switch can't reload the page in the middle of something.
+    if (!reloadWhenActive || waitingToSave) return;
+    // The switch didn't happen (e.g. an even newer version replaced it, or
+    // the running version is busy). From the button, reload anyway; by
+    // itself, stand down, so a later switch can't reload the page in the
+    // middle of something.
     if (byUser) location.reload();
     else {
       reloadWhenActive = false;
       set({ updating: false });
     }
   }, 5000);
+}
+
+/**
+ * "Update and save" reloaded the page, but the new version hasn't taken
+ * over (the running one was busy, e.g. sending a file to another tab): the
+ * save mustn't run on this version, which can't keep a pose file the update
+ * changed. Asks the new version again and waits for it to take over; then
+ * the page reloads into it and saves. If it still hasn't after a minute,
+ * stands down, and the button offers it again.
+ */
+function updateThenSave(waiting: ServiceWorker): void {
+  rememberSaveAfterUpdate();
+  waitingToSave = true;
+  reloadWhenActive = true;
+  set({ updateReady: true, updating: true });
+  waiting.postMessage({ type: 'skip-waiting' } satisfies ToWorker);
+  setTimeout(() => {
+    if (!waitingToSave) return;
+    waitingToSave = false;
+    reloadWhenActive = false;
+    forgetSaveAfterUpdate();
+    set({ updating: false });
+  }, 60_000);
 }
 
 function onVisibility(): void {
@@ -360,7 +423,11 @@ function onVisibility(): void {
   const away = hiddenAt ? Date.now() - hiddenAt : 0;
   // Back after a long time: like opening the app again.
   if (away >= RESUME_AFTER_MS) launchedAt = performance.now();
-  if (info.worker === 'failed' && navigator.onLine) return retryOffline();
+  // The app's first save failed (not for lack of room: then at the next launch, or Try again).
+  if (info.worker === 'failed' && navigator.onLine) {
+    if (info.installNoRoom === undefined) void retryOffline(false);
+    return;
+  }
   if (registration && navigator.onLine && Date.now() - lastUpdateCheck > UPDATE_CHECK_MS) {
     lastUpdateCheck = Date.now();
     void registration.update().catch(() => {});
@@ -406,16 +473,17 @@ async function refresh(timeoutMs = 5000): Promise<WorkerStatus | undefined> {
 
 async function noteStatus(status: WorkerStatus): Promise<void> {
   set({ status });
-  if (poseSaved(status, await simdKnown)) {
+  const simd = await simdKnown;
+  if (poseSaved(status, simd)) {
     // Saved since (e.g. by a technique check): an earlier problem is old news.
-    if (info.problem || noRoomAt() !== undefined) {
-      clearNoRoom();
-      set({ problem: undefined });
-    }
-  } else if (status.noRoom && !saveRunning) {
-    // Outside a save, e.g. a technique check whose files the phone couldn't
-    // keep: the same week without saving by itself as after a save.
-    noteNoRoom();
+    if (info.problem) set({ problem: undefined });
+  } else if (!saveRunning) {
+    // The worker remembers when the phone couldn't keep them (a save, a
+    // technique check, an earlier visit): say so. A newer version on the
+    // site says more (update first).
+    const notKept = poseUnkeptAt(status, simd) !== undefined;
+    if (notKept && info.problem !== 'newer') set({ problem: 'no-room' });
+    else if (!notKept && info.problem === 'no-room') set({ problem: undefined });
   }
 }
 
@@ -426,10 +494,13 @@ async function noteStatus(status: WorkerStatus): Promise<void> {
 function afterStatus(): void {
   if (!info.status) return;
   if (saveAfterUpdate) {
-    // Not while the Welcome screen shows (the new version may bring new terms): once they're accepted.
-    if (!termsAccepted(loadProfile())) return;
+    // Not while the Welcome screen shows (the new version may bring new terms):
+    // once they're accepted; and only once it's known whether the update applied.
+    if (!termsAccepted(loadProfile()) || !registration) return;
     saveAfterUpdate = false;
-    void savePoseFiles('after-update');
+    const waiting = registration.waiting;
+    if (waiting) updateThenSave(waiting);
+    else void savePoseFiles('after-update');
   } else maybeAutoSave();
 }
 
@@ -453,7 +524,8 @@ function maybeAutoSave(): void {
     online: navigator.onLine,
     saveData: nav().connection?.saveData === true,
     termsAccepted: termsAccepted(loadProfile()),
-    noRoomAt: noRoomAt(),
+    // From the worker, which remembers it across restarts and launches (a technique check in a tab counts too).
+    noRoomAt: poseUnkeptAt(info.status, info.simd),
     now: Date.now(),
   });
   if (!may) return;
@@ -502,15 +574,18 @@ type SaveStart = 'button' | 'auto' | 'after-update';
  * each file is loaded through the service worker, which keeps a copy. Shows
  * progress in Settings. From the button while a new version waits, it
  * switches to that version first and carries on after the reload ("Update
- * and save"): this one couldn't keep a pose file the update changed.
+ * and save"): this one couldn't keep a pose file the update changed. When
+ * the site already serves a newer version that this phone hasn't found yet,
+ * the button looks for it instead, and downloads nothing until it's here.
  */
 export async function savePoseFiles(start: SaveStart = 'button'): Promise<void> {
-  if (saveRunning || !info.status) return;
+  if (saveRunning || !info.status || info.updating) return;
   // A save carried on after the reload never applies an update again, so it can't loop.
   if (start === 'button' && info.updateReady) {
     rememberSaveAfterUpdate();
     return applyUpdate();
   }
+  if (start === 'button' && info.problem === 'newer') return saveNewVersion();
   if (start === 'auto' && updateOnItsWay()) {
     autoSaveTried = false; // tried again once the update has applied, or if it fails
     return;
@@ -524,19 +599,44 @@ export async function savePoseFiles(start: SaveStart = 'button'): Promise<void> 
   }
 }
 
+/**
+ * The site serves a newer version than this one (its files changed): look
+ * for it, and once it's here, "Update and save". If it isn't on this phone
+ * yet (GitHub Pages' CDN can serve the old sw.js for a few minutes after a
+ * deploy), nothing is downloaded and Settings says to try again later; if it
+ * couldn't install for lack of room, Settings says so.
+ */
+async function saveNewVersion(): Promise<void> {
+  set({ updating: true });
+  // The user may have made room since a try that couldn't keep its files.
+  if (info.updateHeld !== undefined) {
+    set({ updateHeld: undefined });
+    await forgetUnkept();
+  }
+  // Remembered now: the update may apply by itself as it arrives (just after the app opened).
+  rememberSaveAfterUpdate();
+  if (await findUpdate()) return applyUpdate();
+  forgetSaveAfterUpdate();
+  set({ updating: false });
+}
+
 async function saveNow(): Promise<void> {
   if (!(await controlled())) return set({ problem: 'failed' });
   const simd = await simdKnown;
   const todo = poseToSave(info.status, simd);
   if (!todo.length) return;
   const total = todo.reduce((n, p) => n + p.size, 0);
+  const version = info.status?.version;
   // The worker stops trying to keep files the phone couldn't keep (they go
-  // through the HTTP cache instead): ask it to try again.
-  await ask<true>({ type: 'save' }, 3000);
-  // A full phone by the browser's own estimate: say so, rather than download
-  // what can't be kept. (Often it can't tell; then the worker's refused
-  // store says so after the download.)
-  if (!(await roomFor(total))) return noteNoRoom();
+  // through the HTTP cache instead, for a week): ask it to try once more. It
+  // says first if the browser's own estimate shows there's no room, rather
+  // than download what can't be kept. (Often it can't tell; then the
+  // worker's refused store says so after the download.)
+  const begun = await ask<{ go?: boolean } | true>({ type: 'save', urls: todo.map((f) => f.url) }, 3000);
+  if (typeof begun === 'object' && begun.go === false) {
+    await refresh();
+    return set({ problem: 'no-room' });
+  }
   let done = 0;
   let shownAt = 0;
   set({ saving: { done, total }, problem: undefined });
@@ -563,18 +663,21 @@ async function saveNow(): Promise<void> {
   // if the phone couldn't keep one, or if the site already has a newer version.
   const status = await refresh(30_000);
   if (poseSaved(status, simd)) {
-    clearNoRoom();
     set({ saving: undefined, problem: undefined });
     showToast('Ready to use offline');
     void persist();
-  } else if (status?.noRoom) {
-    set({ saving: undefined });
-    noteNoRoom();
+  } else if (status && version && status.version !== version) {
+    // A newer version took over during the save (e.g. from another window):
+    // this page still runs the old one, so a reload shows it ("Update and save").
+    set({ saving: undefined, problem: 'newer', updateReady: true });
   } else if (status?.newer) {
-    // This version's files are gone from the site: fetch the new version, then "Update and save".
+    // This version's files are gone from the site (whatever room the phone
+    // has, this version can't save them): fetch the new version, then
+    // "Update and save".
     set({ saving: undefined, problem: 'newer' });
     void registration?.update().catch(() => {});
-  } else set({ saving: undefined, problem: 'failed' });
+  } else if (poseUnkeptAt(status, simd) !== undefined) set({ saving: undefined, problem: 'no-room' });
+  else set({ saving: undefined, problem: 'failed' });
 }
 
 /** In an installed app, asks the browser to keep the saved files even when space runs low. */

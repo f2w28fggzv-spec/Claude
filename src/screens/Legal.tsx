@@ -142,11 +142,14 @@ export function PrivacyScreen() {
         </ul>
         <p>
           The app also keeps a copy of its own files and of the pose-detection model in this browser’s cache on your device (Cache Storage), so it opens and
-          works without a connection. This copy holds no data about you: it is the same for everyone who uses the app. The app itself is saved the first time
-          you open it. The pose model (about 24 MB) is saved the first time you use a technique check or the camera test, when you tap “Save for offline use”
-          in Settings, or by itself when you open the app from your home screen while online, once you’ve accepted this policy. It isn’t downloaded by itself
-          when your browser reports that data saver is on (Chrome on Android reports it; iPhones and iPads don’t report Low Data Mode to websites, so they
-          download it either way), or for a week after your device couldn’t keep it (usually for lack of space).
+          works without a connection. This copy holds no data about you: it is the same for everyone who uses the app, apart from a note of which of its files
+          your device couldn’t keep (usually for lack of space) and when. The app itself is saved the first time you open it. The pose model (about 24 MB) is
+          saved the first time you use a technique check or the camera test, when you tap “Save for offline use” in Settings, or by itself when you open the
+          app from your home screen while online, once you’ve accepted this policy, except when your browser reports that data saver is on (Chrome on Android
+          reports it; iPhones and iPads don’t report Low Data Mode to websites, so they download it either way). When an update of the app changes a file of
+          the pose model that’s saved on your device, the update downloads the new copy by itself, data saver or not, so technique checks keep working
+          offline; until your device has room for it, the version you have keeps working. A file your device couldn’t keep isn’t downloaded by itself again
+          for a week (for a day if it’s one of the app’s own files, which are small).
         </p>
         <p>None of this is sent to the developers or any third party. We can’t see it, and we can’t recover it for you.</p>
 

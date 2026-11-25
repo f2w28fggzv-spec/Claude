@@ -132,6 +132,50 @@ export const cachesToDelete = (existing: readonly string[], keep: readonly strin
   existing.filter((name) => name.startsWith(CACHE_PREFIX) && !keep.includes(name));
 
 /**
+ * After the phone couldn't keep a pose file (the browser refused to store it,
+ * or its own estimate showed no room), nothing downloads that file again by
+ * itself for this long: not the installed app's own save, not an update.
+ */
+export const NO_ROOM_RETRY_MS = 7 * 24 * 60 * 60_000;
+/**
+ * The same for one of the app's own files (an update that couldn't keep its
+ * new code): they're small (about 0.9 MB in all), and an update shouldn't
+ * wait a week once the phone has room again.
+ */
+export const APP_NO_ROOM_RETRY_MS = 24 * 60 * 60_000;
+
+/** How long nothing downloads a file again by itself after the phone couldn't keep it. */
+export const noRoomRetryMs = (e: PrecacheEntry) => (e.url.startsWith(POSE_DIR) ? NO_ROOM_RETRY_MS : APP_NO_ROOM_RETRY_MS);
+
+const UNKEPT_PREFIX = `${CACHE_PREFIX}unkept-`;
+
+/**
+ * An empty cache whose name remembers that the phone couldn't keep a file,
+ * and when: `fitee-unkept-<file hash>-<time in ms>`. It holds nothing; its
+ * name outlives the service worker (which the browser stops when idle) and
+ * a new version installing, which a note in memory wouldn't.
+ */
+export const unkeptCacheName = (hash: string, at: number) => `${UNKEPT_PREFIX}${hash}-${Math.max(0, Math.round(at))}`;
+
+/** The file hash and time an unkept marker names, or undefined for any other cache. */
+export function parseUnkept(name: string): { hash: string; at: number } | undefined {
+  const m = /^fitee-unkept-([0-9a-f]{16})-(\d+)$/.exec(name);
+  return m ? { hash: m[1], at: Number(m[2]) } : undefined;
+}
+
+/** Whether a cache is one of those markers (not a cache of files). */
+export const isUnkeptCache = (name: string) => name.startsWith(UNKEPT_PREFIX);
+
+/**
+ * Whether the phone couldn't keep a file recently enough (within `period`: a
+ * week for a pose file) that nothing downloads it again by itself yet. A
+ * time ahead of now (a clock that has since been put back) doesn't count: it
+ * would hold back for longer than that.
+ */
+export const unkeptRecently = (at: number | undefined, now: number, period = NO_ROOM_RETRY_MS): at is number =>
+  at !== undefined && now >= at && now - at < period;
+
+/**
  * Where to download a file from: a query with its hash gets past any copy in
  * the HTTP cache or on the CDN (GitHub Pages caches for 10 minutes) that is
  * older than this version. The copy is stored under the clean URL.

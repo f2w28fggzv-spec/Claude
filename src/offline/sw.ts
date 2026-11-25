@@ -10,9 +10,9 @@
 // network), it never follows a redirect (which could lead to another site),
 // and it answers every request to another origin with a network error, a
 // third layer after src/privacy.ts and the page's CSP. No analytics, logging
-// or beacons.
+// or beacons. The only messages it sends go to the app's own open pages.
 import type { PrecacheManifest } from './manifest';
-import { activate, beginSave, install, respond, routeRequest, status, type ToWorker, type WorkerEnv } from './worker';
+import { activate, beginSave, install, respond, routeRequest, status, type FromWorker, type ToWorker, type WorkerEnv } from './worker';
 
 /** Filled in by the build: every file of this version with its hash. */
 declare const __FITEE_PRECACHE__: PrecacheManifest;
@@ -21,7 +21,7 @@ const worker = self as unknown as ServiceWorkerGlobalScope;
 const manifest = __FITEE_PRECACHE__;
 const base = new URL('./', worker.location.href).href;
 const saving: WorkerEnv['saving'] = new Map();
-const state: WorkerEnv['state'] = { noRoom: new Set(), newer: false };
+const state: WorkerEnv['state'] = { unkept: new Map(), retry: new Set(), newer: false };
 
 /** The only way this worker loads anything: this site's own files, never through a redirect. */
 async function ownFetch(url: string, init: RequestInit): Promise<Response> {
@@ -42,7 +42,23 @@ async function room(): Promise<number | undefined> {
   return estimate?.quota !== undefined && estimate.usage !== undefined ? estimate.quota - estimate.usage : undefined;
 }
 
-const env = (waitUntil: (p: Promise<unknown>) => void): WorkerEnv => ({ manifest, base, caches: worker.caches, fetch: ownFetch, waitUntil, saving, room, state });
+/** Tells every open page of the app (in this worker's scope, those loaded past it too). */
+async function notify(msg: FromWorker): Promise<void> {
+  for (const client of await worker.clients.matchAll({ type: 'window', includeUncontrolled: true })) client.postMessage(msg);
+}
+
+const env = (waitUntil: (p: Promise<unknown>) => void): WorkerEnv => ({
+  manifest,
+  base,
+  caches: worker.caches,
+  fetch: ownFetch,
+  waitUntil,
+  saving,
+  room,
+  now: () => Date.now(),
+  notify,
+  state,
+});
 
 worker.addEventListener('install', (event) => {
   // A new version waits until the app is next opened, or "Update now".
@@ -67,9 +83,9 @@ worker.addEventListener('message', (event) => {
   if (msg?.type === 'skip-waiting') void worker.skipWaiting();
   else if (msg?.type === 'claim') event.waitUntil(worker.clients.claim());
   else if (msg?.type === 'save') {
-    // The page is about to load the pose files to save them: keep them if the phone can.
-    beginSave({ state });
-    event.ports[0]?.postMessage(true);
+    // The page is about to load these pose files to save them: try once more to keep them, if the phone has room.
+    const port = event.ports[0];
+    event.waitUntil(beginSave(env((p) => event.waitUntil(p)), Array.isArray(msg.urls) ? msg.urls : []).then((go) => port?.postMessage({ go })));
   } else if (msg?.type === 'status') {
     const port = event.ports[0];
     event.waitUntil(status(env((p) => event.waitUntil(p))).then((s) => port?.postMessage(s)));

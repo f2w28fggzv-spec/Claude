@@ -89,14 +89,14 @@ describe('your own exercises', () => {
 });
 
 describe('backups', () => {
-  it('leave out what is about this phone rather than the user (e.g. that the pose model didn’t fit)', () => {
-    mem.set('formcheck.v1.device.offlineNoRoom', '1764000000000');
+  it('leave out what is about this phone rather than the user', () => {
+    mem.set('formcheck.v1.device.example', '1764000000000');
     mem.set('formcheck.v1.unit', '"kg"');
     const backup = exportAll() as { data: Record<string, unknown> };
     expect(Object.keys(backup.data)).toContain('formcheck.v1.unit');
     expect(Object.keys(backup.data).some((k) => k.startsWith('formcheck.v1.device.'))).toBe(false);
-    mem.delete('formcheck.v1.device.offlineNoRoom');
-    importAll({ app: 'fitee', data: { ...backup.data, 'formcheck.v1.device.offlineNoRoom': 1 } });
-    expect(mem.has('formcheck.v1.device.offlineNoRoom')).toBe(false);
+    mem.delete('formcheck.v1.device.example');
+    importAll({ app: 'fitee', data: { ...backup.data, 'formcheck.v1.device.example': 1 } });
+    expect(mem.has('formcheck.v1.device.example')).toBe(false);
   });
 });

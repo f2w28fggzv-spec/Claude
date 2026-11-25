@@ -54,12 +54,21 @@ it's done). Settings shows what is saved, and says so if the phone couldn't
 keep the pose model: any refused store of a file that downloaded and matched
 counts (`QuotaExceededError`, or `UnknownError` on a really full disk in
 Chromium, whose storage estimate shows a fixed headroom however full the disk
-is, so the estimate is only a first check). A file the phone couldn't keep is
-then fetched through the HTTP cache until a save asks the service worker to
-try again, and the installed app doesn't download it by itself for a week.
-If a new version is waiting, *Update and save* applies it first and carries
-on saving after the reload; the installed app's own save waits for an update
-on its way.
+is, so the estimate is only a first check). The service worker remembers a
+file the phone couldn't keep with an empty cache named for the file and the
+time (`fitee-unkept-<hash>-<time>`, so it survives the worker stopping and new
+versions): for a week (a day for the app's own files, which are small) nothing
+downloads it again by itself (a technique check gets it through the HTTP
+cache, unsaved; the installed app doesn't save it; an update that needs it
+doesn't download it), until a save asks to try again. An
+update that changes a pose file the phone had saved installs only once the new
+copy is kept, so it never leaves the phone without it: until there's room, the
+current version keeps running (offline too), and Settings says how much more
+space the new version needs, with *Try again*. If a new version is waiting,
+*Update and save* applies it first and carries on saving after the reload
+(never on the old version); the installed app's own save waits for an update
+on its way. When the site already serves a newer version that the phone hasn't
+found yet, *Try again* looks for it and downloads nothing until it's here.
 
 Nothing leaves the device: the service worker only loads this site's own files,
 never follows a redirect, and refuses every request to another origin (on top
@@ -69,11 +78,10 @@ own HTTP cache, keeping a copy only if its SHA-256 matches the build's list,
 and it downloads each file once however many requests ask for it. New versions
 download in the background (only the files that changed; each pose file has a
 cache of its own, so a new model doesn't copy the rest) and apply the next time
-you open the app, or with *Update now* in Settings. A changed pose file the
-phone can't keep is skipped (saved later) rather than holding the update back.
-A version that fails to download leaves the current one working; the browser
-tries again later. If the very first save fails, Settings says so and offers
-*Try again*.
+you open the app, or with *Update now* in Settings. A version that fails to
+download leaves the current one working; the browser tries again later. If the
+very first save fails, Settings says so (and when the phone had no room for
+it, says that instead of blaming the connection) and offers *Try again*.
 
 Keep `sw.js` at its URL: a 404 or a redirect there leaves installed phones on
 their old version. To retire offline use (or before moving the app to another

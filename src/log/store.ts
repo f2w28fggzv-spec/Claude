@@ -129,8 +129,9 @@ export function saveCustomExercise(c: CustomExercise): boolean {
 /** Every key this app stores, for backup / restore / delete-all. */
 export const ALL_KEYS_PREFIX = 'formcheck.v1.';
 /**
- * Keys about this phone rather than the user's data (e.g. that the pose model
- * didn't fit on it): deleted with everything else, never backed up or restored.
+ * Keys about this phone rather than the user's data: deleted with everything
+ * else, never backed up or restored. (What the phone couldn't keep for
+ * offline use is the service worker's to remember, not a key here.)
  */
 export const DEVICE_KEYS_PREFIX = `${ALL_KEYS_PREFIX}device.`;
 const backedUp = (k: string) => k.startsWith(ALL_KEYS_PREFIX) && !k.startsWith(DEVICE_KEYS_PREFIX);

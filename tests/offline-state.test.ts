@@ -1,9 +1,11 @@
 // The app side of offline use (src/offline/state.ts): install hints, what the
-// offline row in Settings shows (its problem, message and button), the
-// pose-model message, when the app saves the pose model by itself and when
-// an update may apply by itself.
+// offline row in Settings shows (its problem, heading, message and button),
+// a new version that needs more room, the pose-model message, when the app
+// saves the pose model by itself and when an update may apply by itself.
 import { describe, expect, it } from 'vitest';
 import {
+  appFailedMessage,
+  appOnlyHeading,
   appOnlyMessage,
   canApplyUpdate,
   formatMB,
@@ -13,13 +15,16 @@ import {
   mayAutoSave,
   modelErrorMessage,
   NO_ROOM_RETRY_MS,
-  noRoomSince,
   offlineView,
   POSE_NEEDS_CONNECTION,
+  POSE_NOT_KEPT,
   POSE_NOT_SAVED,
   poseSaved,
   poseToSave,
+  poseUnkeptAt,
   saveButtonLabel,
+  UPDATE_HELD_HEADING,
+  updateHeldMessage,
   variantNotSaved,
   type OfflineFacts,
 } from '../src/offline/state';
@@ -71,6 +76,8 @@ const status = (saved: string[], appSaved = 3): WorkerStatus => ({
   ].map((p) => ({ ...p, saved: saved.some((s) => p.url.endsWith(s)) })),
 });
 const SIMD_FULL = ['pose_landmarker_full.task', 'vision_wasm_internal.js', 'vision_wasm_internal.wasm'];
+/** "24 MB", with the no-break space formatMB puts between the number and the unit. */
+const MB = (n: string) => `${n}\u00a0MB`;
 const NOSIMD_FULL = ['pose_landmarker_full.task', 'vision_wasm_nosimd_internal.js', 'vision_wasm_nosimd_internal.wasm'];
 
 describe('offline state', () => {
@@ -88,18 +95,33 @@ describe('offline state', () => {
     expect(view({})).toEqual({ kind: 'checking' });
     expect(view({ worker: 'unknown' })).toEqual({ kind: 'checking' });
   });
-  it('says so when saving the app failed, instead of saving forever', () => {
+  it('says so when saving the app failed, instead of saving forever, and why when the phone had no room for it', () => {
     expect(view({ worker: 'failed' })).toEqual({ kind: 'app-failed', online: true });
     expect(view({ worker: 'failed', online: false })).toEqual({ kind: 'app-failed', online: false });
+    expect(view({ worker: 'failed', installNoRoom: 716_727 })).toEqual({ kind: 'app-failed', online: true, noRoomBytes: 716_727 });
+    expect(appFailedMessage({ online: true })).toBe('The connection may have dropped. Try again, or it tries by itself the next time you open fitee.');
+    expect(appFailedMessage({ online: false })).toBe('It tries again when you’re back online. Until then, fitee needs a connection to open.');
+    // Not the connection: the phone had no room (it isn't retried by itself on every return to the app).
+    for (const online of [true, false])
+      expect(appFailedMessage({ online, noRoomBytes: 716_727 })).toBe(
+        `This phone couldn’t keep it (${MB('0.7')}), most likely for lack of space. Free up some space, then try again.`,
+      );
   });
   it('has the app but not the pose model, with what saving it downloads', () => {
-    expect(view({ status: status([]) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, updateWaiting: false, online: true });
-    expect(view({ status: status(['vision_wasm_internal.js']) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980 - 334_128, updateWaiting: false, online: true });
+    expect(view({ status: status([]) })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, updateWaiting: false, updateHeld: false, online: true });
+    expect(view({ status: status(['vision_wasm_internal.js']) })).toEqual({
+      kind: 'app-only',
+      poseBytes: 24_198_980 - 334_128,
+      updateWaiting: false,
+      updateHeld: false,
+      online: true,
+    });
     expect(view({ status: status([]), simd: false, problem: 'failed', online: false })).toEqual({
       kind: 'app-only',
       poseBytes: 22_647_530,
       problem: 'failed',
       updateWaiting: false,
+      updateHeld: false,
       online: false,
     });
     // The no-SIMD runtime doesn't help a SIMD browser, and the lite model isn't the default.
@@ -108,22 +130,54 @@ describe('offline state', () => {
   });
   it('says why the last try didn’t save the pose model: the connection, a phone that couldn’t keep it, or a newer version on the site', () => {
     for (const problem of ['failed', 'no-room', 'newer'] as const)
-      expect(view({ status: status([]), problem })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, problem, updateWaiting: false, online: true });
+      expect(view({ status: status([]), problem })).toEqual({ kind: 'app-only', poseBytes: 24_198_980, problem, updateWaiting: false, updateHeld: false, online: true });
     // Once it's saved (e.g. by a technique check), a problem from before doesn't show.
     expect(view({ status: status(SIMD_FULL), problem: 'no-room' }).kind).toBe('ready');
   });
-  it('says when a new version is waiting (saving applies it first)', () => {
+  it('says when a new version is waiting (saving applies it first), or couldn’t install for lack of room', () => {
     expect(view({ status: status([]), updateReady: true })).toMatchObject({ kind: 'app-only', updateWaiting: true });
     expect(view({ status: status([]), updateReady: true, problem: 'newer' })).toMatchObject({ kind: 'app-only', updateWaiting: true, problem: 'newer' });
+    expect(view({ status: status([]), updateHeld: 9_398_199 })).toMatchObject({ kind: 'app-only', updateWaiting: false, updateHeld: true });
   });
-  it('words each problem, with the real size of what is missing', () => {
-    expect(appOnlyMessage({ poseBytes: 24_198_980 })).toBe('Technique checks need the pose model. Save it (24 MB) to check your technique with no signal.');
+  it('words each problem, with the real size of what is missing, and names it in the heading', () => {
+    expect(appOnlyHeading({})).toBe('The app works offline');
+    for (const problem of ['failed', 'no-room', 'newer'] as const) expect(appOnlyHeading({ problem })).toBe('The pose model isn’t saved');
+    expect(appOnlyMessage({ poseBytes: 24_198_980 })).toBe(`Technique checks need the pose model. Save it (${MB('24')}) to check your technique with no signal.`);
     expect(appOnlyMessage({ poseBytes: 23_864_852, problem: 'no-room' })).toBe(
-      'This phone couldn’t keep the pose model (24 MB), most likely for lack of space. Free up some space, then try again.',
+      `This phone couldn’t keep the pose model (${MB('24')}), most likely for lack of space. Free up some space, then try again.`,
     );
-    expect(appOnlyMessage({ poseBytes: 9_398_198, problem: 'no-room' })).toContain('(9.4 MB)');
-    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'newer' })).toBe('A new version of fitee is out. Update it, then save the pose model.');
-    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'failed' })).toBe('Couldn’t save the pose model. Check your connection and try again.');
+    expect(appOnlyMessage({ poseBytes: 9_398_198, problem: 'no-room' })).toContain(`(${MB('9.4')})`);
+    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'failed' })).toBe('Couldn’t save the pose model. Check your connection, then try again.');
+    // The site already serves a newer version, not on this phone yet: nothing to save until it is.
+    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'newer' })).toBe(
+      'The pose model has changed online, but the new version of fitee isn’t on this phone yet. Try again in a few minutes.',
+    );
+    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'newer', updateHeld: true })).toBe(
+      'The new version has a new pose model, and it needs more space on this phone first. Free up some space, then try again.',
+    );
+  });
+  it('with a new version waiting, points to the button there is (“Update and save”), and names the new version only in its own row', () => {
+    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'no-room', updateWaiting: true })).toBe(
+      `This phone couldn’t keep the pose model (${MB('24')}), most likely for lack of space. Free up some space, then tap Update and save.`,
+    );
+    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'failed', updateWaiting: true })).toBe(
+      'Couldn’t save the pose model. Check your connection, then tap Update and save.',
+    );
+    expect(appOnlyMessage({ poseBytes: 24_198_980, problem: 'newer', updateWaiting: true })).toBe(
+      'The new version has a new pose model: tap Update and save to get it.',
+    );
+    for (const problem of [undefined, 'failed', 'no-room', 'newer'] as const) {
+      const text = appOnlyMessage({ poseBytes: 24_198_980, problem, updateWaiting: true });
+      expect(text).not.toMatch(/is out|is ready|Update it/);
+      expect(saveButtonLabel({ problem, updateWaiting: true })).toBe('Update and save');
+      if (problem) expect(text).toMatch(/Update and save/);
+    }
+  });
+  it('says how much more room a new version needs', () => {
+    expect(UPDATE_HELD_HEADING).toBe('A new version needs more space');
+    expect(updateHeldMessage(9_398_199)).toBe(
+      `It needs about ${MB('9.4')} more on this phone. Until then this version keeps working, offline too. Free up some space, then try again.`,
+    );
   });
   it('labels the button “Update and save” whenever a new version waits, else “Try again” after a problem, else “Save for offline use”', () => {
     expect(saveButtonLabel({ updateWaiting: false })).toBe('Save for offline use');
@@ -146,10 +200,30 @@ describe('offline state', () => {
     expect(poseSaved(status(SIMD_FULL), false)).toBe(false);
     expect(poseSaved(undefined, true)).toBe(false);
   });
-  it('formats sizes for people', () => {
-    expect(formatMB(906_000)).toBe('0.9 MB');
-    expect(formatMB(24_198_980)).toBe('24 MB');
-    expect(formatMB(25_098_980)).toBe('25 MB');
+  it('formats sizes for people, keeping the unit with its number', () => {
+    expect(formatMB(906_000)).toBe(MB('0.9'));
+    expect(formatMB(24_198_980)).toBe(MB('24'));
+    expect(formatMB(25_098_980)).toBe(MB('25'));
+    expect(formatMB(24_198_980)).not.toContain(' ');
+    // Something small is never “0.0 MB”.
+    expect(formatMB(21_000)).toBe(MB('0.1'));
+    expect(formatMB(0)).toBe(MB('0.0'));
+  });
+  it('knows when the phone last couldn’t keep a file a technique check needs, from the worker', () => {
+    const s = status([]);
+    expect(poseUnkeptAt(s, true)).toBeUndefined();
+    const at = (url: string, t: number) => (s.pose.find((p) => p.url.endsWith(url))!.unkeptAt = t);
+    at('pose_landmarker_lite.task', 500); // not one the default check needs
+    expect(poseUnkeptAt(s, true)).toBeUndefined();
+    expect(poseUnkeptAt(s, true, 'lite')).toBe(500);
+    at('vision_wasm_internal.wasm', 100);
+    at('pose_landmarker_full.task', 300);
+    expect(poseUnkeptAt(s, true)).toBe(300);
+    expect(poseUnkeptAt(s, false)).toBe(300);
+    // A file kept since doesn't count.
+    s.pose.find((p) => p.url.endsWith('pose_landmarker_full.task'))!.saved = true;
+    expect(poseUnkeptAt(s, true)).toBe(100);
+    expect(poseUnkeptAt(undefined, true)).toBeUndefined();
   });
 });
 
@@ -166,6 +240,15 @@ describe('pose model message', () => {
     expect(POSE_NOT_SAVED).toBe(
       'The pose model isn’t saved on this phone yet. Connect to the internet and keep fitee open while it loads; after that, technique checks work offline.',
     );
+  });
+  it('says plainly where the phone couldn’t keep the model, instead of promising it will work offline', () => {
+    expect(msg({ online: false, notKept: true })).toBe(POSE_NOT_KEPT);
+    expect(msg({ notKept: true })).toBe(POSE_NOT_KEPT);
+    expect(POSE_NOT_KEPT).toBe(
+      'This phone couldn’t keep the pose model (most likely for lack of space), so technique checks need a connection here. Free up some space, then save it in Settings.',
+    );
+    expect(msg({ online: false, notKept: true, offlineAvailable: false })).toBe(POSE_NEEDS_CONNECTION);
+    expect(msg({ online: false, notKept: true, choice: { variant: 'lite', saved: 'full' } })).toBe(variantNotSaved('lite', 'full'));
   });
   it('points to the saved model where people choose one (the camera test)', () => {
     expect(msg({ online: false, choice: { variant: 'lite', saved: 'full' } })).toBe(variantNotSaved('lite', 'full'));
@@ -208,13 +291,8 @@ describe('when an installed app saves the pose model by itself', () => {
     expect(may({ noRoomAt: NOW - NO_ROOM_RETRY_MS + 1 })).toBe(false);
     expect(may({ noRoomAt: NOW - NO_ROOM_RETRY_MS })).toBe(true);
   });
-  it('counts that week from the first failure: later ones in it don’t push it back; one after it starts a new week', () => {
-    expect(noRoomSince(undefined, NOW)).toBe(NOW);
-    expect(noRoomSince(NOW - 60_000, NOW)).toBe(NOW - 60_000);
-    expect(noRoomSince(NOW - NO_ROOM_RETRY_MS + 1, NOW)).toBe(NOW - NO_ROOM_RETRY_MS + 1);
-    expect(noRoomSince(NOW - NO_ROOM_RETRY_MS, NOW)).toBe(NOW);
-    // A time from a clock that has since been put back doesn't hold the app back for longer than a week.
-    expect(noRoomSince(NOW + 3 * NO_ROOM_RETRY_MS, NOW)).toBe(NOW);
+  it('a time from a clock that has since been put back doesn’t hold the app back for longer than a week', () => {
+    expect(may({ noRoomAt: NOW + 60_000 })).toBe(true);
     expect(may({ noRoomAt: NOW + 3 * NO_ROOM_RETRY_MS })).toBe(true);
   });
 });

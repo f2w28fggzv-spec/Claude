@@ -1,10 +1,22 @@
 // Settings → Install and offline: how to add fitee to the home screen, what
-// is saved for offline use (with "Save for offline use"), and a waiting new
-// version ("Update now"). Also the note every other screen shows while the
-// pose model is being saved. State comes from src/offline/client.ts.
+// is saved for offline use (with "Save for offline use"), and a new version:
+// waiting ("Update now"), or needing more room on the phone ("Try again").
+// Also the note every other screen shows while the pose model is being
+// saved. State comes from src/offline/client.ts.
 import { useEffect } from 'preact/hooks';
-import { applyUpdate, promptInstall, refreshOffline, retryOffline, savePoseFiles, useOffline } from '../offline/client';
-import { appOnlyMessage, formatMB, installHint, offlineView, saveButtonLabel, type OfflineView } from '../offline/state';
+import { applyUpdate, promptInstall, refreshOffline, retryOffline, retryUpdate, savePoseFiles, useOffline } from '../offline/client';
+import {
+  appFailedMessage,
+  appOnlyHeading,
+  appOnlyMessage,
+  formatMB,
+  installHint,
+  offlineView,
+  saveButtonLabel,
+  UPDATE_HELD_HEADING,
+  updateHeldMessage,
+  type OfflineView,
+} from '../offline/state';
 import { Icon } from './icons';
 
 export function OfflineSection() {
@@ -67,7 +79,7 @@ export function OfflineSection() {
         <li class="status-row" data-offline={view.kind}>
           <OfflineRow view={view} updating={info.updating} />
         </li>
-        {info.updateReady && (
+        {info.updateReady ? (
           <li class="status-row" data-update="ready">
             <span class="row-main">
               <strong>A new version is ready</strong>
@@ -77,6 +89,18 @@ export function OfflineSection() {
               {info.updating ? 'Updating…' : 'Update now'}
             </button>
           </li>
+        ) : (
+          info.updateHeld !== undefined && (
+            <li class="status-row" data-update="no-room">
+              <span class="row-main">
+                <strong>{UPDATE_HELD_HEADING}</strong>
+                <small class="warn">{updateHeldMessage(info.updateHeld)}</small>
+              </span>
+              <button type="button" class="small-btn secondary" disabled={info.updating || !info.online} onClick={() => void retryUpdate()}>
+                {info.updating ? 'Updating…' : 'Try again'}
+              </button>
+            </li>
+          )
         )}
       </ul>
       <p class="muted small">
@@ -121,13 +145,9 @@ function OfflineRow({ view, updating }: { view: OfflineView; updating: boolean }
         <>
           <span class="row-main">
             <strong>Couldn’t save the app for offline use</strong>
-            <small>
-              {view.online
-                ? 'The connection may have dropped. Try again, or it tries by itself the next time you open fitee.'
-                : 'It tries again when you’re back online. Until then, fitee needs a connection to open.'}
-            </small>
+            <small class="warn">{appFailedMessage(view)}</small>
           </span>
-          <button type="button" class="small-btn secondary" disabled={!view.online} onClick={retryOffline}>
+          <button type="button" class="small-btn secondary" disabled={!view.online} onClick={() => void retryOffline()}>
             <Icon name="download" size={18} /> Try again
           </button>
         </>
@@ -148,12 +168,12 @@ function OfflineRow({ view, updating }: { view: OfflineView; updating: boolean }
       return (
         <>
           <span class="row-main">
-            <strong>The app works offline</strong>
-            <small>{appOnlyMessage(view)}</small>
+            <strong>{appOnlyHeading(view)}</strong>
+            <small class={view.problem ? 'warn' : undefined}>{appOnlyMessage(view)}</small>
           </span>
           {/* With a new version waiting, it updates first and saves after the reload. */}
           <button type="button" class="small-btn secondary" disabled={!view.online || updating} onClick={() => void savePoseFiles()}>
-            <Icon name="download" size={18} /> {saveButtonLabel(view)}
+            <Icon name="download" size={18} /> {updating ? 'Updating…' : saveButtonLabel(view)}
           </button>
           {!view.online && <small class="muted">Connect to the internet to save it.</small>}
         </>

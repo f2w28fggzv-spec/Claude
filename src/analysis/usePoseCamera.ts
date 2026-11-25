@@ -6,7 +6,7 @@ import { closeCamera, openCamera, type Facing } from '../camera';
 import { drawSkeleton } from '../draw';
 import type { ModelVariant, Delegate } from '../pose';
 import type { PoseFrame } from '../engine/types';
-import { offlineAvailable, poseFilesSaved } from '../offline/client';
+import { offlineAvailable, poseFilesNotKept, poseFilesSaved } from '../offline/client';
 import { modelErrorMessage } from '../offline/state';
 import { currentModel, detect, loadModel, toPoseFrame } from './runner';
 
@@ -76,7 +76,16 @@ export function usePoseCamera(
         console.warn('Pose model failed to load', err);
         const other: ModelVariant = variant === 'full' ? 'lite' : 'full';
         const choice = opts.choosable && poseFilesSaved(other) ? { variant, saved: other } : undefined;
-        setModelError(modelErrorMessage({ online: navigator.onLine, saved: poseFilesSaved(variant), offlineAvailable: offlineAvailable(), error: err, choice }));
+        setModelError(
+          modelErrorMessage({
+            online: navigator.onLine,
+            saved: poseFilesSaved(variant),
+            offlineAvailable: offlineAvailable(),
+            error: err,
+            choice,
+            notKept: poseFilesNotKept(variant),
+          }),
+        );
       });
     return () => {
       cancelled = true;

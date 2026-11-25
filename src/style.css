@@ -1176,6 +1176,7 @@ svg.anatomy { display: block; }
 .status-row .row-main strong { display: inline-flex; align-items: center; gap: 6px; }
 .status-row .row-main strong svg.icon { color: var(--good-text); }
 .status-row .row-main small svg.icon { display: inline-block; vertical-align: -3px; color: var(--text); }
+.status-row .row-main small.warn { color: var(--warn-text); }
 .status-row .small-btn { align-self: flex-start; gap: 6px; }
 .status-row .small-btn svg.icon { color: inherit; }
 .status-row progress { margin: 0; }
