@@ -279,6 +279,8 @@ describe('the page’s template', () => {
     // A plain push-up or reverse lunge progresses by reps (src/log/coach.ts, formGated): no check gates that.
     expect(html).toContain('Once every set reaches the top of your rep range, it adds weight, or asks for more reps or a harder variation on a bodyweight move with none added. On a lift with full analysis, it adds weight only after your latest check on that lift was clean.');
     expect(html).not.toMatch(/lifts with full analysis, it also waits/);
+    // Repeated faults: about 10% lighter on a loaded set, fewer reps on a plain one (suggest()'s technique branch).
+    expect(html).toContain('The same fault in two of your last three checks? A lighter load, or fewer reps on a bodyweight move with none added, plus an exercise that helps.');
   });
 
   it('says the pose model’s size as the app does, from the files the build ships', () => {

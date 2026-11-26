@@ -1,6 +1,6 @@
 import { useMemo } from 'preact/hooks';
 import { getExercise } from '../data/exercises';
-import { CLEAN_SHARE, FORM_WINDOW_DAYS, formGated, formState, techniqueTrend } from '../log/coach';
+import { CLEAN_SHARE, FORM_WINDOW_DAYS, techniqueSection, techniqueTrend } from '../log/coach';
 import { exerciseInfo } from '../log/exercises';
 import { exerciseHistory, formatSet, formatSetShort, formatWeight, personalRecords, toUnit } from '../log/stats';
 import { loadBodyweight, loadTechnique, loadUnit, loadWorkouts } from '../log/store';
@@ -16,9 +16,9 @@ export function ProgressScreen({ id }: { id: string }) {
   const history = useMemo(() => exerciseHistory(loadWorkouts(), id), [id]);
   const technique = useMemo(() => loadTechnique().filter((t) => t.exerciseId === id), [id]);
   const trend = techniqueTrend(technique, id);
-  const gate = formState(technique, id);
-  // The form gate's status only where the coach gates (the same rule as suggest()): not on a plain bodyweight set.
-  const gated = !!ex && formGated(ex, history[history.length - 1]);
+  // The form gate's status only where the coach gates (formGated, the rule suggest() uses): not on a plain bodyweight set.
+  const section = ex ? techniqueSection(ex, history, technique) : undefined;
+  const gate = section?.gate;
   const pct = (v: number) => `${Math.round(v * 100)}%`;
   const rec = personalRecords(history);
   const bw = !!info?.bodyweight;
@@ -119,7 +119,7 @@ export function ProgressScreen({ id }: { id: string }) {
           ))}
         </tbody>
       </table>
-      {ex && (trend.points.length > 0 || ex.analysis === 'full') && (
+      {ex && section?.show && (
         <>
           <header class="day-head section-head">
             <h2>Technique</h2>
@@ -127,6 +127,7 @@ export function ProgressScreen({ id }: { id: string }) {
               <Icon name="camera" size={16} /> Check technique
             </a>
           </header>
+          {!gate && section.noChecks && <p class="muted small">No technique checks yet.</p>}
           {trend.points.length >= 2 && (
             <ProgressChart
               title="Reps with no faults, per check (%)"
@@ -135,7 +136,7 @@ export function ProgressScreen({ id }: { id: string }) {
               points={trend.points.map((p) => ({ date: p.at, value: p.share * 100, detail: `${p.clean} of ${p.reps} reps clean` }))}
             />
           )}
-          {gated && (
+          {gate && (
             <p class={`form-gate ${gate.state}`}>
               <strong>{gate.state === 'clean' ? 'Form ✓' : gate.state === 'faults' ? 'Form: hold weight' : 'Form: check needed'}</strong>
               <span>

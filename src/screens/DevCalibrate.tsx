@@ -3,6 +3,8 @@ import { EXERCISES, getExercise } from '../data/exercises';
 import type { Check } from '../data/types';
 import type { ThresholdOverrides } from '../engine/types';
 import {
+  caughtByAnother,
+  expectedFail,
   exportFixtures,
   exportThresholds,
   samplesFor,
@@ -228,8 +230,11 @@ export function DevCalibrate({ exerciseId }: { exerciseId?: string }) {
                   <ul class="verdicts">
                     {rep.checks.map((v) => {
                       const check = exercise.checks.find((c) => c.id === v.checkId)!;
-                      const agrees =
-                        !faults || v.status === 'unknown' ? null : (v.status === 'fail') === faults.includes(check.fault);
+                      // Not scored, as in scoreRecordings: unlabelled, couldn't judge, or passed while another
+                      // check with the same fault caught the labelled fault (the fault was at its end of the rep).
+                      const unscored =
+                        !faults || v.status === 'unknown' || (v.status === 'pass' && expectedFail(check, faults) && caughtByAnother(check, rep.checks));
+                      const agrees = unscored ? null : (v.status === 'fail') === expectedFail(check, faults);
                       return (
                         <li class={`${v.status} ${agrees === null ? '' : agrees ? 'agree' : 'disagree'}`}>
                           <span class="icon">{ICON[v.status]}</span>

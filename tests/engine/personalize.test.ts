@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getExercise } from '../../src/data/exercises';
+import { EXERCISES, getExercise } from '../../src/data/exercises';
 import { analyze } from '../../src/engine/analyze';
 import type { Reader } from '../../src/engine/landmarks';
 import {
@@ -9,6 +9,7 @@ import {
   adjustmentDeg,
   mergeProportions,
   squatLeanDeg,
+  usesProportions,
 } from '../../src/engine/personalize';
 import type { PoseSequence } from '../../src/engine/types';
 import { fixture } from '../fixtures/load';
@@ -88,5 +89,13 @@ describe('personalized torso check', () => {
   it('leaves checks without a personalization rule alone', () => {
     const r = analyze(squat, seq, { proportions: { thigh: 1.1, shin: 0.85, measuredAt: at } });
     expect(r.reps[0].checks.filter((c) => c.adjustment).map((c) => c.checkId)).toEqual(['torso-bottom']);
+  });
+});
+
+describe('asking to stand tall for the proportions', () => {
+  it('only on lifts whose checks use them (the live setup list, src/screens/Analyze.tsx)', () => {
+    // The push-up's setup is in the push-up position: standing up would take the shoulders out of its frame.
+    expect(EXERCISES.filter(usesProportions).map((e) => e.id)).toEqual(['back-squat']);
+    expect(usesProportions(getExercise('push-up')!)).toBe(false);
   });
 });

@@ -235,6 +235,22 @@ export function techniqueTrend(technique: TechniqueSummary[], exerciseId: string
   };
 }
 
+/**
+ * What the progress page's Technique section shows for an exercise: whether it
+ * shows at all (a full-analysis lift, or any lift with checks), the form gate's
+ * state where the coach gates (formGated, the rule suggest() uses: not on a
+ * plain push-up or lunge), and whether no check has been saved yet (then, with
+ * no gate to show, it says so).
+ */
+export function techniqueSection(ex: Exercise, history: SessionSummary[], technique: TechniqueSummary[], now = new Date()) {
+  const checks = technique.filter((t) => t.exerciseId === ex.id && t.reps > 0).length;
+  return {
+    show: checks > 0 || ex.analysis === 'full',
+    gate: formGated(ex, history[history.length - 1]) ? formState(technique, ex.id, now) : undefined,
+    noChecks: checks === 0,
+  };
+}
+
 /** Easier week: about half the sets and about 10% lighter, for 7 days. */
 export const EASY_WEEK = { setShare: 0.5, load: 0.9, days: 7 } as const;
 

@@ -34,6 +34,9 @@ const mb = (bytes: number) => `${Math.max(0.1, bytes / 1e6).toFixed(bytes < 1e7 
 
 export function Results({ exercise, seq, shots, video, onAgain }: Props) {
   const [overrides, setOverrides] = useState(loadOverrides);
+  // The margins saved when the results opened: a depth slider's range takes in one saved outside it once,
+  // from these, and isn't re-stretched while the thumb moves (each move saves a new margin).
+  const [openedWith] = useState(overrides);
   const proportions = useMemo(loadProportions, []);
   const result = useMemo(() => analyze(exercise, seq, { proportions: proportions ?? undefined, overrides }), [exercise, seq, overrides]);
 
@@ -171,8 +174,9 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
           {depthChecks.map((c) => {
             const saved = overrides[exercise.id]?.[c.id]?.margin;
             const value = saved ?? c.margin;
-            // Centred on this check's own margin (the reverse lunge's is −1.2), so a first touch only nudges it.
-            const range = marginRange(c, saved);
+            // Centred on this check's own margin (the reverse lunge's is −1.2), so a first touch only nudges it;
+            // stretched to a margin saved outside it as the results opened, not to the one being dragged.
+            const range = marginRange(c, openedWith[exercise.id]?.[c.id]?.margin);
             return (
               <label class="slider">
                 <span>
@@ -201,7 +205,7 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
       {saved && (
         <section class="card keep-set">
           <p class="saved-note">
-            <Icon name="check" size={16} /> Saved to your log with a skeleton replay. The coach uses it to adjust your weights.
+            <Icon name="check" size={16} /> Saved to your log with a skeleton replay. The coach uses it to adjust your plan.
           </p>
           {video && videoState !== 'saved' && (
             <button type="button" class={`secondary ${videoState === 'saving' ? 'loading' : ''}`} disabled={!setId || videoState === 'saving'} onClick={() => void keepVideo()}>

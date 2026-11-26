@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCorrective, easyWeekActive, formGated, formState, insights, loadStep, nextDayIndex, repeatedFaults, startEasyWeek, suggest, techniqueTrend } from '../src/log/coach';
+import { addCorrective, easyWeekActive, formGated, formState, insights, loadStep, nextDayIndex, repeatedFaults, startEasyWeek, suggest, techniqueSection, techniqueTrend } from '../src/log/coach';
 import {
   e1rm,
   exerciseHistory,
@@ -175,6 +175,25 @@ describe('coach: next weights', () => {
       expect(out.form !== undefined, `${id} ${JSON.stringify(s[0])}`).toBe(gated(id, s));
       if (gated(id, s)) expect(out).toMatchObject({ kind: 'check', form: 'unchecked' });
     }
+  });
+
+  it('shows the progress page’s form gate by the same rule, and says when there’s no check yet (techniqueSection)', () => {
+    const bw = (added: number | undefined, ...reps: number[]): SetEntry[] => reps.map((r) => ({ bw: true, weight: added, reps: r, done: true }));
+    const at = new Date('2026-10-03T12:00:00');
+    const section = (id: string, s?: SetEntry[], tech: TechniqueSummary[] = []) =>
+      techniqueSection(getExercise(id)!, s ? hist([workout('2026-10-01', [{ id, sets: s }])], id) : [], tech, at);
+    for (const id of ['push-up', 'reverse-lunge']) {
+      // A plain push-up or lunge: no gate to show, so a line says there's no check yet.
+      expect(section(id)).toEqual({ show: true, gate: undefined, noChecks: true });
+      expect(section(id, bw(undefined, 20, 20, 20))).toEqual({ show: true, gate: undefined, noChecks: true });
+      // With added weight the coach gates it, and the section shows the gate instead.
+      expect(section(id, bw(10, 20, 20, 20))).toMatchObject({ show: true, gate: { state: 'unchecked' }, noChecks: true });
+    }
+    expect(section('back-squat')).toMatchObject({ show: true, gate: { state: 'unchecked' } });
+    expect(section('back-squat', sets(100, 10, 10, 10), [check('back-squat', '2026-10-02', {})])).toMatchObject({ show: true, gate: { state: 'clean' }, noChecks: false });
+    // Basic analysis: shown once it has checks, never gated.
+    expect(section('dumbbell-curl', sets(12, 12, 12, 12)).show).toBe(false);
+    expect(section('dumbbell-curl', sets(12, 12, 12, 12), [check('dumbbell-curl', '2026-10-02', {})])).toEqual({ show: true, gate: undefined, noChecks: false });
   });
 
   it('reads the form gate from the latest recent check', () => {

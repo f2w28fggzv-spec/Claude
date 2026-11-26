@@ -3,7 +3,7 @@ import { getExercise } from '../data/exercises';
 import type { Exercise, Placement } from '../data/types';
 import { analyze } from '../engine/analyze';
 import { point, type Reader } from '../engine/landmarks';
-import { ProportionMeter, mergeProportions } from '../engine/personalize';
+import { ProportionMeter, mergeProportions, usesProportions } from '../engine/personalize';
 import { OnlineRepCounter } from '../engine/reps';
 import { SetupStabilizer, checkSetup, type SetupStatus } from '../engine/setup';
 import { median } from '../engine/signal';
@@ -498,7 +498,9 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
                 <span>{i.label}</span>
               </li>
             ))}
-            {exercise.placement.view === 'side' && (
+            {/* Only where a check uses the proportions (the back squat): the meter still measures on every side
+                view, but a push-up's setup is in the push-up position, where standing up leaves the frame. */}
+            {exercise.placement.view === 'side' && usesProportions(exercise) && (
               <li class={measuredLegs ? 'pass' : 'unknown'}>
                 <span class="icon">{measuredLegs ? '✓' : '…'}</span>
                 <span>{measuredLegs ? 'Body proportions measured' : 'Stand tall for a moment to measure your proportions'}</span>

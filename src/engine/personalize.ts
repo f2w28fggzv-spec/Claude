@@ -1,7 +1,7 @@
 // Limb proportions measured during the setup check, and the threshold
 // adjustments they justify. Only rules with a clear mechanical basis live
 // here; exercise configs opt in by name (TorsoAngleCheck.personalize).
-import type { PersonalizationRule } from '../data/types';
+import type { Exercise, PersonalizationRule } from '../data/types';
 import { angleDeg, dist, fromVerticalDeg } from './geometry';
 import { JUDGE_VISIBILITY, point, type Reader } from './landmarks';
 import { median } from './signal';
@@ -36,6 +36,13 @@ export function squatLeanDeg(thigh: number, shin: number, shinDeg = 30): number 
 
 /** Largest adjustment allowed in either direction, in degrees. */
 export const MAX_ADJUSTMENT_DEG = 12;
+
+/**
+ * Whether one of the exercise's checks adjusts for limb proportions (today the
+ * back squat's torso lean). Only then does the live setup ask the lifter to
+ * stand tall for the meter; it measures on every side view all the same.
+ */
+export const usesProportions = (e: Exercise) => e.checks.some((c) => c.type === 'torsoAngle' && !!c.personalize);
 
 /** Degrees to add to the check's limits, or null if the rule can't apply. */
 export function adjustmentDeg(rule: PersonalizationRule, p: BodyProportions | undefined): number | null {
