@@ -2,6 +2,7 @@
 // demos through the engine. A rep: pause at the start, move out, pause at the
 // turnaround, move back.
 import type { Exercise } from '../data/types';
+import { TEMPO_MEASURED_SHARE } from '../data/sources';
 
 export interface Timeline {
   /** Seconds per segment: [pause at start, out, pause at turnaround, back]. */
@@ -11,8 +12,8 @@ export interface Timeline {
 
 const ECCENTRIC = 2.0;
 const CONCENTRIC = 1.2;
-/** Share of a phase the engine counts as moving (it trims the slow ends). */
-const MEASURED_SHARE = 0.65;
+/** Share of a smooth phase the engine's tempo check counts as moving (it trims the slow ends; see src/data/sources.ts). */
+const MEASURED_SHARE = TEMPO_MEASURED_SHARE;
 
 export function timeline(exercise: Exercise, pauseFar = 0): Timeline {
   if (exercise.tracking.kind === 'hold') return { segments: [1, 0, 0, 0], total: 1 };

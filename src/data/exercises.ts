@@ -1,11 +1,11 @@
 // Exercise library. One entry per exercise; add new ones here without touching
 // engine code. Schema: ./types.ts. Builders: ./helpers.ts.
 //
-// Thresholds for the six full-analysis lifts (back squat, bench press,
-// deadlift, overhead press, barbell row, Romanian deadlift) come from written
-// standards cited next to each check (sources in ./sources.ts). 'basic'
-// entries only carry range-of-motion (or hold alignment) checks with draft
-// values. Every threshold stays 'unvalidated' until Phase 4 calibration.
+// Thresholds for the full-analysis lifts (back squat, bench press, deadlift,
+// overhead press, barbell row, Romanian deadlift, push-up, reverse lunge) come
+// from written standards cited next to each check (sources in ./sources.ts).
+// 'basic' entries only carry range-of-motion (or hold alignment) checks with
+// draft values. Every threshold stays 'unvalidated' until Phase 4 calibration.
 import { C, F, PLACEMENTS as P, ex } from './helpers';
 import * as D from '../demo/patterns';
 import { LOCKOUT_DEG, MIN_ECCENTRIC_SEC, SRC, cite } from './sources';
@@ -202,11 +202,71 @@ const DRAFT_EXERCISES: Exercise[] = [
     equipment: ['bodyweight'],
     role: 'compound',
     unilateral: true,
+    analysis: 'full',
     demo: D.lunge({ rear: 'floor', step: 'back', lean: 10 }),
-    placement: P.sideStanding,
+    // 3–3.5 m: from 3 m both feet stay in a portrait frame for lifters 1.55–1.95 m tall as the back foot
+    // steps back (at 2.5 m a tall lifter's back foot leaves it). The setup check's "Close enough" advice
+    // (it doesn't block) shows for everyone at 4 m, at 3.5 m with a wide front camera, and at 3 m with one
+    // for a 1.55 m lifter. A body turned toward the phone still passes the setup check but shifts the depth
+    // reading by about 0.07 torso lengths per 10°, more with the phone higher, hence the note.
+    placement: {
+      ...P.sideStanding,
+      distanceM: [3, 3.5],
+      notes:
+        'Stand exactly side-on: feet and hips pointing across the frame, not turned toward the phone. Keep the phone at hip height, not higher. Stand a little off centre toward the way you face, so your back foot stays in view when you step back. Either leg can lead.',
+    },
     tracking: down('hip'),
-    checks: [C.rom('knee', 60)],
-    faults: [F.partialRange('split-squat', 'Lower until your back knee nearly touches the floor.')],
+    requiredLandmarks: ['nose', 'knee', 'ankle', 'toe'],
+    checks: [
+      // NSCA (forward lunge): "Lower the trailing knee—still slightly flexed—until it is 1-2 in (3-5 cm)
+      // above the floor", with the weight on "the ball of the trailing foot and the whole lead foot" and
+      // the torso upright; Farrokhi et al. 2008 lowered until the trail knee was "approximately 2 to 3 cm
+      // short of contacting the ground". With the back thigh about upright, the hip joint is then a thigh
+      // length (0.245 of height, Winter 2009) above the back knee joint, which sits about 8–10 cm up:
+      // 0.29–0.30 of height, or 1.0–1.05 torso lengths (0.288 of height) above the floor. Both feet have
+      // their toes on the floor at the bottom (the front foot flat, the back one on its ball), so with the
+      // camera exactly side-on the near toe marks the floor whichever leg leads (a body turned toward the
+      // phone shifts it; see the placement). −1.2 allows 0.15–0.2 torso lengths for 2D landmark error and
+      // leg proportions (numeric limit derived, not published): on the demo's path a rep stopping with the
+      // back knee's centre about 13 cm up passes (1.11) and one stopping about 19 cm up fails (1.21).
+      // Wade et al. 2023 found camera-side joint centres off by 0.05 (hip) and 0.12 (Wade's MTP row: toe
+      // keypoints measured against the MTP joint, used here for the toe) torso lengths on average
+      // (OpenPose, walking): in random directions that flags about 2–5% of correct reps, and about half
+      // if both errors push the same way, so the margin is a starting value to calibrate.
+      cite(
+        C.height('depth', 'Depth: hips down to about knee height', 'hip', 'toe', 'atOrBelow', 'bottom', -1.2, 'partialRange'),
+        `${SRC.nsca}; ${SRC.farrokhi2008} (numeric limit derived, not published, with segment lengths from ${SRC.winter2009}); tolerance from ${SRC.wade2023}`,
+      ),
+      // NSCA: "Keep the torso erect as the lead foot moves forward" and "perpendicular to the floor by
+      // 'sitting back' on the trailing leg". 25° from vertical allows a slight lean (the demo leans 10°)
+      // plus the same 15° for 2D landmark error as a lockout (numeric limit derived, not published). For
+      // what a deliberate lean looks like: reaching the arms past the front knee, Farrokhi et al. 2008
+      // measured 20° more lead-hip flexion (107.9 ± 9.7° against 87.4 ± 11.8° with the trunk erect).
+      // Uses only the near shoulder and hip, so the leading leg doesn't matter.
+      cite(
+        C.torso('bottom', { maxDeg: 25 }, 'forwardLean', 'Torso upright at the bottom'),
+        `${SRC.nsca} (numeric limit derived, not published); tolerance from ${SRC.wade2023}`,
+      ),
+      // NSCA: "Stand erect in the beginning position, pause, then alternate lead legs". Standing with the
+      // feet together both knees are straight, so the near knee is too whichever leg stepped. The stepping
+      // foot often lands just after the hips reach the top; the largest angle within 0.3 s either side of
+      // the top counts (src/engine/checks.ts). 165° allows for 2D landmark error.
+      cite(C.lockout('knee', LOCKOUT_DEG), `${SRC.nsca}; tolerance from ${SRC.wade2023}`),
+      // NSCA: "Allow the lead hip and knee to slowly flex". The Army's bodyweight rear lunge lowers slowly
+      // too: ATP 7-22.02 runs it "at a slow cadence" (para 3-4, p. 3-2), 50 counts a minute (para 1-17,
+      // p. 1-7), so the step back and down takes 1.2 s; FM 7-22 (2012), which it superseded, says it "is
+      // always performed at a slow cadence. On counts 1 and 3, move into position in a slow, controlled
+      // manner" (p. 8-5). (The Army's push-up drill runs at a moderate cadence, so the push-up has no
+      // tempo check.) ACSM moderate tempo 1–2 s. Timed on the hip, so it includes the step back and needs
+      // neither leg.
+      cite(C.eccentric(MIN_ECCENTRIC_SEC), `${SRC.nsca}; ${SRC.atp72202}; ${SRC.acsm2009}`),
+    ],
+    faults: [
+      F.partialRange('split-squat', 'Lower until your back knee nearly touches the floor.'),
+      F.forwardLean('goblet-squat', 'Keep your chest up and your torso upright over your hips.'),
+      F.noLockout('glute-bridge', 'Stand all the way up between reps, feet together, before you step back again.'),
+      F.rushedLowering('split-squat'),
+    ],
   }),
   ex({
     id: 'step-up',
@@ -757,17 +817,74 @@ const DRAFT_EXERCISES: Exercise[] = [
   ex({
     id: 'push-up',
     name: 'Push-up',
-    summary: 'Body straight, lower the chest to the floor and push back up.',
+    summary: 'Body straight, lower until your upper arms are level with the floor, then push back up.',
     primary: ['chest'],
     secondary: ['triceps', 'shoulders', 'core'],
     equipment: ['bodyweight'],
     role: 'compound',
+    analysis: 'full',
     demo: D.pushUp({ variant: 'standard' }),
-    placement: P.sideFloor,
+    // Level on the floor 2–2.5 m from the lifter's side: from 2 m a 1.95 m lifter's shoulders stay in a
+    // landscape frame at the top; past 2.5 m (2.25 m with a wide front camera) a 1.55 m lifter fills less
+    // of the frame than the setup check's "Close enough" asks. A standing lifter's shoulders are above a
+    // frame shot from the floor, so the setup check passes in the push-up position. Off centre, the
+    // setup check can take the lifter for turned; a tilted phone shifts the depth reading.
+    placement: {
+      ...P.sideFloor,
+      distanceM: [2, 2.5],
+      notes:
+        'You will be horizontal, so turn the phone sideways and prop it up on the floor. Centre the phone on your body and keep it level. Get into the top of the push-up for the setup check: your hands and feet need to be in view.',
+    },
     tracking: down('shoulder'),
-    checks: [C.rom('elbow', 60)],
+    checks: [
+      // FM 7-22 (Appendix A, the Army push-up test) and FM 21-20: lower "until your upper arms are at
+      // least parallel to the ground". The landmarks are joint centres: the upper arm is parallel when
+      // the shoulder's centre is level with the elbow's (a height difference changes far less than an
+      // elbow angle seen from the side with how far the elbows flare toward the camera: with the phone on
+      // the floor, about 0.02 torso lengths for a 15 cm flare and 0.03 for 20 cm, toward passing). Where that
+      // happens depends on where the hands are: with the hands under the shoulders the upper arm only
+      // reaches parallel as the chest nears the floor, so a rep to full depth can read just past level,
+      // within the camera's error (about 0.02–0.07 torso lengths in a 3D arm model; the demo reads 0.08).
+      // So, as for the bench press, the shoulder's centre may stay up to 10% of torso length above the
+      // elbow's (tolerance derived, not published). On the demo's path the limit falls with the chest
+      // about 10 cm off the floor: a rep that stops with it about 12 cm up (70% of the way down) reads
+      // −0.16 and still fails.
+      cite(
+        C.height('depth', 'Depth: upper arms parallel or lower', 'shoulder', 'elbow', 'atOrBelow', 'bottom', -0.1, 'partialRange'),
+        `${SRC.fm722}; ${SRC.fm2120} (tolerance derived, not published)`,
+      ),
+      // FM 7-22: "raising your entire body until your arms are fully extended"; ATP 7-22.01: "Failing to
+      // fully extend the elbows in the up position" is an error; CPFA (p. 23): "not achieving the
+      // straight arm position during the up phase". 165° allows for 2D landmark error.
+      cite(C.lockout('elbow', LOCKOUT_DEG), `${SRC.fm722}; ${SRC.atp72201}; ${SRC.cpfa}; tolerance from ${SRC.wade2023}`),
+      // FM 7-22 and FM 21-20: "When viewed from the side, your body should form a generally straight line
+      // from your shoulders to your ankles" and it "must remain rigid in a generally straight line";
+      // ATP 7-22.01: "Failing to maintain a straight body alignment from the head to the ankles
+      // throughout the repetition". The angle at the hip between shoulder and ankle reads how far the
+      // hips sag or pike off that line (there are no spine landmarks). Straight = 180°, less the same 15°
+      // for 2D landmark error as a lockout (numeric limit derived, not published): about 8 cm of hip
+      // offset for a 1.75 m adult. Judged at both ends of the rep; a sag or pike only in the middle of
+      // the rep isn't seen.
+      cite(
+        C.angle('body', 'bottom', { min: LOCKOUT_DEG }, 'bodyLine', 'Body straight at the bottom'),
+        `${SRC.fm722}; ${SRC.fm2120}; ${SRC.atp72201} (numeric limit derived, not published); tolerance from ${SRC.wade2023}`,
+      ),
+      cite(
+        C.angle('body', 'top', { min: LOCKOUT_DEG }, 'bodyLine', 'Body straight at the top'),
+        `${SRC.fm722}; ${SRC.fm2120}; ${SRC.atp72201} (numeric limit derived, not published); tolerance from ${SRC.wade2023}`,
+      ),
+      // No tempo check. The Army's own push-up drill lowers in one count at a moderate cadence, 80 counts
+      // a minute, so in 0.75 s (FM 7-22, 2012: "Cadence: MODERATE", count 1 "Bend the elbows, lowering
+      // the body until the upper arms are parallel with the ground", p. 8-14; MODERATE "80 counts per
+      // minute", para 7-25, p. 7-11; the same in ATP 7-22.02, which superseded those chapters in 2020:
+      // para 3-13, pp. 3-8 to 3-9, and para 1-17, p. 1-7): a minimum of roughly 1 s in all would fault
+      // the push-up's own standard. And ACSM 2009's "1–2 s ECC" goes with heavy loads; for sets of 15–25
+      // reps or more it recommends moderate to fast velocities, and the builder gives push-ups up to 20
+      // or 25 reps a set. (The reverse lunge keeps its check: its standards lower slowly.)
+    ],
     faults: [
-      F.partialRange('incline-push-up', 'Lower until your chest nearly touches the floor.'),
+      F.partialRange('incline-push-up', 'Lower until your upper arms are level with the floor or lower.'),
+      F.noLockout('knee-push-up', 'Push up until your arms are straight.'),
       F.bodyLine('plank'),
     ],
   }),

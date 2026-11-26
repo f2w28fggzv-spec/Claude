@@ -2,13 +2,14 @@
 // page's static HTML. Never part of the page's script. scripts/landing-build.ts
 // runs it in Node through Vite's module runner, and the tests call it too.
 //
-//   - the hero's data for the six full-analysis lifts, from the library
+//   - the hero's data for every full-analysis lift, from the library
 //     (src/data/exercises.ts, src/data/engagement.ts), written into the page
 //     as JSON for src/landing/hero.ts;
 //   - the hero's first frame as static SVG (the frame the animation starts
 //     from, so the figure is there before any script runs, and without one);
 //   - every lift's legend and name, stacked in place so the hero keeps one
 //     height whichever lift it shows;
+//   - the library's counts and its full-analysis lifts by name, for the text;
 //   - the logo mark (src/ui/Logo.tsx), the browser-bar colours
 //     (src/theme.ts) and the Content-Security-Policy (src/landing/signup.ts);
 //   - the interest list in its closed or connected form.
@@ -34,7 +35,7 @@ export const FIRST_BODY: BodyKind = 'female';
 /** As the app's exercise page says it (src/screens/ExerciseDemo.tsx). */
 const viewOf = (e: Exercise) => (e.demo.view === 'side' ? 'side view' : e.placement.tiltDown ? 'front view from above' : 'front view');
 
-/** The hero's six lifts, from the library. Throws if one is missing or isn't a full-analysis lift. */
+/** The hero's lifts, from the library. Throws if one is missing or isn't a full-analysis lift. */
 export function heroData(): HeroData {
   const lifts = LIFTS.map((lift): HeroLift => {
     const e = EXERCISES_BY_ID.get(lift.id);
@@ -196,8 +197,28 @@ export function conditionals(html: string, when: Record<string, boolean>): strin
 export function libraryCounts(): { exercises: number; full: number } {
   const full = EXERCISES.filter((e) => e.analysis === 'full');
   const missing = full.filter((e) => !LIFTS.some((l) => l.id === e.id));
-  if (missing.length) throw new Error(`landing: add ${missing.map((e) => e.id).join(', ')} to src/landing/lifts.ts (and the page's text): every full-analysis lift is in the hero`);
+  if (missing.length) throw new Error(`landing: add ${missing.map((e) => e.id).join(', ')} to src/landing/lifts.ts: every full-analysis lift is in the hero (and the page's text names them all: fullList)`);
   return { exercises: EXERCISES.length, full: full.length };
+}
+
+/** Names that keep their capital inside a sentence. */
+const PROPER = /^(Romanian|Bulgarian)\b/;
+
+/**
+ * The library's full-analysis lifts named in a sentence, as the hero's chips
+ * name them and in the hero's order: "Back squat, bench press, … and reverse
+ * lunge". Throws, as libraryCounts does, if one isn't in the hero.
+ */
+export function fullList(): string {
+  libraryCounts();
+  const order = (id: string) => LIFTS.findIndex((l) => l.id === id);
+  const names = EXERCISES.filter((e) => e.analysis === 'full')
+    .sort((a, b) => order(a.id) - order(b.id))
+    .map((e, i) => {
+      const short = LIFTS[order(e.id)].short;
+      return i === 0 || PROPER.test(short) ? short : short[0].toLowerCase() + short.slice(1);
+    });
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : (names[0] ?? '');
 }
 
 /** What the page says that comes from the build's own files rather than the code. */
@@ -229,7 +250,7 @@ export const DUO_SIZES = {
  *     service emails a link to confirm), if frame / if page (how the form posts)
  *   {{SIGNUP_ACTION}}, {{SIGNUP_FIELD}}, {{SIGNUP_NAME}}, {{SIGNUP_MODE}},
  *   {{SIGNUP_LEAVE}}, {{LIST_STATE}} (closed or open), <!--fitee:signup-extra-->
- *   {{EXERCISE_COUNT}}, {{FULL_COUNT}}: from the library
+ *   {{EXERCISE_COUNT}}, {{FULL_COUNT}}, {{FULL_LIST}}: from the library (fullList)
  *   {{POSE_MB}}: the pose model's size, as the app says it (formatMB)
  *   {{DUO_PHONE_SIZES}}, {{DUO_CARD_SIZES}}: the `sizes` of steps 4 and 5's pictures
  * Throws if anything is left unfilled.
@@ -283,6 +304,7 @@ export function renderPage(template: string, target: SignupTarget | null, facts:
     LIST_STATE: target ? 'open' : 'closed',
     EXERCISE_COUNT: String(counts.exercises),
     FULL_COUNT: String(counts.full),
+    FULL_LIST: fullList(),
     POSE_MB: formatMB(facts.poseBytes),
     DUO_PHONE_SIZES: DUO_SIZES.phone,
     DUO_CARD_SIZES: DUO_SIZES.card,

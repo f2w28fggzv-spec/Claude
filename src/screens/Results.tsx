@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { getExercise } from '../data/exercises';
+import { describeMargin, marginRange } from '../data/describe';
 import { jointsOf } from '../data/helpers';
 import type { Check, Exercise, RelativeHeightCheck } from '../data/types';
 import { analyze } from '../engine/analyze';
@@ -8,6 +9,7 @@ import type { AnalysisResult, CheckResult, PoseSequence } from '../engine/types'
 import { drawSkeleton } from '../draw';
 import { nearestShot } from '../analysis/snapshots';
 import { loadOverrides, loadProportions, saveOverride } from '../storage';
+import { faultReps } from '../log/form';
 import { saveTechnique } from '../log/store';
 import { newSetId, saveSet, saveSetVideo } from '../sets/sets';
 import { showToast } from '../ui/toast';
@@ -32,6 +34,9 @@ const mb = (bytes: number) => `${Math.max(0.1, bytes / 1e6).toFixed(bytes < 1e7 
 
 export function Results({ exercise, seq, shots, video, onAgain }: Props) {
   const [overrides, setOverrides] = useState(loadOverrides);
+  // The margins saved when the results opened: a depth slider's range takes in one saved outside it once,
+  // from these, and isn't re-stretched while the thumb moves (each move saves a new margin).
+  const [openedWith] = useState(overrides);
   const proportions = useMemo(loadProportions, []);
   const result = useMemo(() => analyze(exercise, seq, { proportions: proportions ?? undefined, overrides }), [exercise, seq, overrides]);
 
@@ -47,10 +52,8 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
     if (result.reps.length === 0 && !result.hold) return;
     const id = newSetId();
     const at = new Date().toISOString();
-    const faults: Record<string, number> = {};
-    for (const list of result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks)) {
-      for (const c of list) if (c.status === 'fail' && c.fault) faults[c.fault] = (faults[c.fault] ?? 0) + 1;
-    }
+    // Reps with each fault (a rep failing two checks with the same fault counts once).
+    const faults = faultReps(result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks));
     const cleanReps = result.hold
       ? Number(result.hold.checks.every((c) => c.status !== 'fail'))
       : result.reps.filter((r) => r.checks.every((c) => c.status !== 'fail')).length;
@@ -88,9 +91,7 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
     }
   };
 
-  const faultsSeen = new Map<string, number>();
-  const checks = result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks);
-  for (const list of checks) for (const c of list) if (c.status === 'fail' && c.fault) faultsSeen.set(c.fault, (faultsSeen.get(c.fault) ?? 0) + 1);
+  const faultsSeen = Object.entries(faultReps(result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks)));
 
   const depthChecks = exercise.checks.filter((c): c is RelativeHeightCheck => c.type === 'relativeHeight');
   const far = exercise.tracking.kind === 'reps' && exercise.tracking.firstMove === 'down' ? 'Bottom' : 'Top';
@@ -103,11 +104,11 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
         <p class="note">{w}</p>
       ))}
 
-      {faultsSeen.size > 0 && (
+      {faultsSeen.length > 0 && (
         <section class="card">
           <h2>What to work on</h2>
           <ul class="tips">
-            {[...faultsSeen].map(([id, n]) => {
+            {faultsSeen.map(([id, n]) => {
               const f = exercise.faults.find((x) => x.id === id);
               if (!f) return null;
               const corrective = getExercise(f.corrective);
@@ -171,7 +172,11 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
         <details class="more">
           <summary>Adjust depth strictness</summary>
           {depthChecks.map((c) => {
-            const value = overrides[exercise.id]?.[c.id]?.margin ?? c.margin;
+            const saved = overrides[exercise.id]?.[c.id]?.margin;
+            const value = saved ?? c.margin;
+            // Centred on this check's own margin (the reverse lunge's is −1.2), so a first touch only nudges it;
+            // stretched to a margin saved outside it as the results opened, not to the one being dragged.
+            const range = marginRange(c, openedWith[exercise.id]?.[c.id]?.margin);
             return (
               <label class="slider">
                 <span>
@@ -179,11 +184,11 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
                 </span>
                 <input
                   type="range"
-                  min={-0.2}
-                  max={0.2}
-                  step={0.01}
+                  min={range.min}
+                  max={range.max}
+                  step={range.step}
                   value={value}
-                  onInput={(e) => setOverrides(saveOverride(exercise.id, c.id, 'margin', Number(e.currentTarget.value)))}
+                  onInput={(e) => setOverrides(saveOverride(exercise.id, c.id, 'margin', Math.round(Number(e.currentTarget.value) * 100) / 100))}
                 />
                 <span class="muted small">Left is more forgiving, right is stricter. Saved on this phone.</span>
                 {value !== c.margin && (
@@ -200,7 +205,7 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
       {saved && (
         <section class="card keep-set">
           <p class="saved-note">
-            <Icon name="check" size={16} /> Saved to your log with a skeleton replay. The coach uses it to adjust your weights.
+            <Icon name="check" size={16} /> Saved to your log with a skeleton replay. The coach uses it to adjust your plan.
           </p>
           {video && videoState !== 'saved' && (
             <button type="button" class={`secondary ${videoState === 'saving' ? 'loading' : ''}`} disabled={!setId || videoState === 'saving'} onClick={() => void keepVideo()}>
@@ -232,13 +237,6 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
       </div>
     </div>
   );
-}
-
-function describeMargin(m: number, c: RelativeHeightCheck): string {
-  const pct = Math.round(Math.abs(m) * 100);
-  if (pct === 0) return `${c.point} level with ${c.reference} counts`;
-  const dir = c.relation === 'atOrBelow' ? 'below' : 'above';
-  return m > 0 ? `${c.point} must be ${pct}% of torso ${dir} ${c.reference}` : `${c.point} may stop ${pct}% of torso short`;
 }
 
 function Summary({ exercise, result }: { exercise: Exercise; result: AnalysisResult }) {

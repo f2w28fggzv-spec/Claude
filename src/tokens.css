@@ -22,7 +22,7 @@
   --line-strong: #dccdbf;
   --text: #1e1412;
   --muted: #6a5d55;
-  --placeholder: #9a8b80;
+  --placeholder: #766960;
   --amber: #f2a21a;
   /* Muscle heat ramp, half way from rest to amber: on dark a copper ember, so faint work glows warm instead of olive. */
   --heat-glow: color-mix(in oklab, var(--amber) 50%, var(--an-muscle));
@@ -99,7 +99,7 @@
     --line-strong: #3d4047;
     --text: #d9dde1;
     --muted: #9a9ea6;
-    --placeholder: #6e727a;
+    --placeholder: #8b8f97;
     --amber: #f7b23b;
     --heat-glow: #ae653a;
     --orange: #f48a32;
@@ -169,7 +169,7 @@
   --line-strong: #3d4047;
   --text: #d9dde1;
   --muted: #9a9ea6;
-  --placeholder: #6e727a;
+  --placeholder: #8b8f97;
   --amber: #f7b23b;
   --heat-glow: #ae653a;
   --orange: #f48a32;

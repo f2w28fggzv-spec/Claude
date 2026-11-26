@@ -13,7 +13,7 @@ import { demoBounds, frameMarkup, viewBoxOf } from '../src/demo/render';
 import { timeline } from '../src/demo/timeline';
 import { heroFrame } from '../src/landing/frame';
 import { LIFTS } from '../src/landing/lifts';
-import { conditionals, heroData, libraryCounts, moltenTokens, renderPage, stageMarkup, toHtml } from '../src/landing/prerender';
+import { conditionals, fullList, heroData, libraryCounts, moltenTokens, renderPage, stageMarkup, toHtml } from '../src/landing/prerender';
 import { landingCsp, PRESETS, SIGNUP, signupTarget, testSignupTarget, type SignupConfig, type SignupService } from '../src/landing/signup';
 import { buildManifest, isListed, LANDING_DIR } from '../src/offline/manifest';
 import { formatMB } from '../src/offline/state';
@@ -259,6 +259,28 @@ describe('the page’s template', () => {
     expect(html).toContain('class="soon-pill"');
     expect(html).not.toContain('data-join');
     expect(html).not.toMatch(/\{\{|<!--fitee:/);
+  });
+
+  it('names every full-analysis lift in its text, from the library, as the hero’s chips name them', () => {
+    const list = fullList();
+    expect(list).toBe('Back squat, bench press, deadlift, overhead press, barbell row, Romanian deadlift, push-up and reverse lunge');
+    const full = EXERCISES.filter((e) => e.analysis === 'full');
+    expect(list.split(/, | and /)).toHaveLength(full.length);
+    for (const e of full) expect(list.toLowerCase()).toContain(LIFTS.find((l) => l.id === e.id)!.short.toLowerCase());
+    const html = renderPage(TEMPLATE, null, FACTS);
+    expect(html).toContain(`<dt><span class="big">${full.length}</span> lifts with full analysis</dt>`);
+    expect(html).toContain(`<dd>${list}. The checks follow`);
+    expect(html).toContain(`Full technique analysis on ${full.length} lifts:`);
+    expect((html.match(/class="chip"/g) ?? []).length).toBe(full.length);
+  });
+
+  it('puts the form gate where the coach has it: on adding weight to a full-analysis lift, not on every rep of one', () => {
+    const html = renderPage(TEMPLATE, null, FACTS);
+    // A plain push-up or reverse lunge progresses by reps (src/log/coach.ts, formGated): no check gates that.
+    expect(html).toContain('Once every set reaches the top of your rep range, it adds weight, or asks for more reps or a harder variation on a bodyweight move with none added. On a lift with full analysis, it adds weight only after your latest check on that lift was clean.');
+    expect(html).not.toMatch(/lifts with full analysis, it also waits/);
+    // Repeated faults: about 10% lighter on a loaded set, fewer reps on a plain one (suggest()'s technique branch).
+    expect(html).toContain('The same fault in two of your last three checks? A lighter load, or fewer reps on a bodyweight move with none added, plus an exercise that helps.');
   });
 
   it('says the pose model’s size as the app does, from the files the build ships', () => {

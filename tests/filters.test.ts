@@ -40,7 +40,7 @@ describe('library filters', () => {
       expect(e.role).toBe('compound');
     }
     expect(ids({ fullOnly: true }).sort()).toEqual(
-      ['back-squat', 'barbell-row', 'bench-press', 'deadlift', 'overhead-press', 'romanian-deadlift'].sort(),
+      ['back-squat', 'barbell-row', 'bench-press', 'deadlift', 'overhead-press', 'push-up', 'reverse-lunge', 'romanian-deadlift'].sort(),
     );
   });
 

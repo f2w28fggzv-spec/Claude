@@ -4,7 +4,7 @@ import { jointsOf } from '../src/data/helpers';
 import { BASIC_CHECKS, FRONT_ONLY_CHECKS, JOINTS, LEVELS, MUSCLE_GROUPS } from '../src/data/types';
 import { availableExercises } from '../src/program/builder';
 
-const FULL_ANALYSIS = ['back-squat', 'bench-press', 'deadlift', 'overhead-press', 'barbell-row', 'romanian-deadlift'];
+const FULL_ANALYSIS = ['back-squat', 'bench-press', 'deadlift', 'overhead-press', 'barbell-row', 'romanian-deadlift', 'push-up', 'reverse-lunge'];
 
 describe('exercise library', () => {
   it('has unique ids', () => {
@@ -22,7 +22,7 @@ describe('exercise library', () => {
     }
   });
 
-  it('gives full analysis to exactly the six priority lifts', () => {
+  it('gives full analysis to exactly the priority lifts', () => {
     expect(EXERCISES.filter((e) => e.analysis === 'full').map((e) => e.id).sort()).toEqual([...FULL_ANALYSIS].sort());
   });
 

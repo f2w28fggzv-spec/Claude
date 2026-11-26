@@ -55,6 +55,16 @@ export function thresholdFields(check: Check): ThresholdField[] {
 /** The user's label says this check should fail on the rep. */
 export const expectedFail = (check: Check, faults: string[]) => faults.includes(check.fault);
 
+/**
+ * Another check with the same fault failed on the rep. Labels name faults, once
+ * per rep, and some faults have two checks (the push-up's body line at the
+ * bottom and at the top, a squat's knee and hip lockouts): when one of them
+ * caught the labelled fault, the other one passing isn't a miss (the fault can
+ * be at one end of the rep only), so it isn't scored.
+ */
+export const caughtByAnother = (check: Check, results: CheckResult[]) =>
+  results.some((c) => c.checkId !== check.id && c.status === 'fail' && c.fault === check.fault);
+
 export interface CheckScore {
   checkId: string;
   label: string;
@@ -109,8 +119,9 @@ export function scoreRecordings(
       const got = v.status === 'fail';
       if (got && want) s.truePos++;
       else if (got) s.falsePos++;
-      else if (want) s.falseNeg++;
-      else s.trueNeg++;
+      else if (want) {
+        if (!caughtByAnother(check, rep.checks)) s.falseNeg++;
+      } else s.trueNeg++;
     }
     const judged = s.truePos + s.falsePos + s.falseNeg + s.trueNeg;
     s.accuracy = judged ? (s.truePos + s.trueNeg) / judged : null;
@@ -156,12 +167,17 @@ export function suggestThreshold(
   return best && best.accuracy > base ? best : null;
 }
 
-/** Measured values per labelled rep for one check, for suggestions. */
+/**
+ * Measured values per labelled rep for one check, for suggestions. A rep whose
+ * labelled fault another check caught while this one passed is left out, as
+ * in the score (see caughtByAnother).
+ */
 export function samplesFor(check: Check, score: CalibrationScore): { value: number; expectFail: boolean }[] {
   return score.reps
     .filter((r) => r.faults)
     .map((r) => ({ r, v: r.checks.find((c) => c.checkId === check.id) }))
     .filter(({ v }) => v && v.status !== 'unknown' && v.value !== undefined)
+    .filter(({ r, v }) => !(expectedFail(check, r.faults!) && v!.status === 'pass' && caughtByAnother(check, r.checks)))
     .map(({ r, v }) => ({ value: v!.value!, expectFail: expectedFail(check, r.faults!) }));
 }
 

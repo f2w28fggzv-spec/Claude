@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCorrective, easyWeekActive, formState, insights, loadStep, nextDayIndex, repeatedFaults, startEasyWeek, suggest, techniqueTrend } from '../src/log/coach';
+import { addCorrective, easyWeekActive, formGated, formState, insights, loadStep, nextDayIndex, repeatedFaults, startEasyWeek, suggest, techniqueSection, techniqueTrend } from '../src/log/coach';
 import {
   e1rm,
   exerciseHistory,
@@ -136,6 +136,64 @@ describe('coach: next weights', () => {
     expect(faulty.note).toMatch(/depth/i);
     // 4 of 5 clean reps is clean enough (80%).
     expect(suggest(squat, hist(log), [check('back-squat', '2026-10-02', { shallowDepth: 1 })], 'kg', at).kind).toBe('increase');
+  });
+
+  it('gates full-analysis lifts only while they are lifted with weight (one rule for the coach and the progress page)', () => {
+    const bw = (added: number | undefined, ...reps: number[]): SetEntry[] => reps.map((r) => ({ bw: true, weight: added, reps: r, done: true }));
+    const last = (id: string, s: SetEntry[]) => hist([workout('2026-10-01', [{ id, sets: s }])], id).at(-1);
+    const gated = (id: string, s?: SetEntry[]) => formGated(getExercise(id)!, s && last(id, s));
+    // Barbell lifts: gated, and before the first session too (the coach starts them with weight).
+    expect(gated('back-squat', sets(100, 10, 10, 10))).toBe(true);
+    expect(gated('back-squat')).toBe(true);
+    expect(gated('back-squat', sets(0, 10, 10, 10))).toBe(false); // logged with no weight: progresses by reps
+    // Bodyweight full-analysis lifts: only with added weight (they start at body weight).
+    for (const id of ['push-up', 'reverse-lunge']) {
+      expect(getExercise(id)!.analysis).toBe('full');
+      expect(gated(id)).toBe(false);
+      expect(gated(id, bw(undefined, 20, 20, 20))).toBe(false);
+      expect(gated(id, bw(10, 20, 20, 20))).toBe(true);
+    }
+    // Basic analysis: never.
+    expect(gated('dumbbell-curl', sets(12, 12, 12, 12))).toBe(false);
+    expect(gated('pull-up', bw(10, 10, 10, 10))).toBe(false);
+
+    // suggest() holds the weight for a check exactly where the predicate says so.
+    const at = new Date('2026-10-03T12:00:00');
+    const cases: [string, SetEntry[]][] = [
+      ['back-squat', sets(100, 10, 10, 10)],
+      ['bench-press', sets(60, 10, 10, 10)],
+      ['push-up', bw(undefined, 20, 20, 20)],
+      ['push-up', bw(10, 20, 20, 20)],
+      ['reverse-lunge', bw(undefined, 20, 20, 20)],
+      ['reverse-lunge', bw(10, 20, 20, 20)],
+      ['dumbbell-curl', sets(12, 12, 12, 12)],
+      ['pull-up', bw(10, 10, 10, 10)],
+    ];
+    for (const [id, s] of cases) {
+      const reps = Math.max(...s.map((x) => x.reps ?? 0));
+      const out = suggest(item(id, [reps - 4, reps]), hist([workout('2026-10-01', [{ id, sets: s }])], id), [], 'kg', at);
+      expect(out.form !== undefined, `${id} ${JSON.stringify(s[0])}`).toBe(gated(id, s));
+      if (gated(id, s)) expect(out).toMatchObject({ kind: 'check', form: 'unchecked' });
+    }
+  });
+
+  it('shows the progress page’s form gate by the same rule, and says when there’s no check yet (techniqueSection)', () => {
+    const bw = (added: number | undefined, ...reps: number[]): SetEntry[] => reps.map((r) => ({ bw: true, weight: added, reps: r, done: true }));
+    const at = new Date('2026-10-03T12:00:00');
+    const section = (id: string, s?: SetEntry[], tech: TechniqueSummary[] = []) =>
+      techniqueSection(getExercise(id)!, s ? hist([workout('2026-10-01', [{ id, sets: s }])], id) : [], tech, at);
+    for (const id of ['push-up', 'reverse-lunge']) {
+      // A plain push-up or lunge: no gate to show, so a line says there's no check yet.
+      expect(section(id)).toEqual({ show: true, gate: undefined, noChecks: true });
+      expect(section(id, bw(undefined, 20, 20, 20))).toEqual({ show: true, gate: undefined, noChecks: true });
+      // With added weight the coach gates it, and the section shows the gate instead.
+      expect(section(id, bw(10, 20, 20, 20))).toMatchObject({ show: true, gate: { state: 'unchecked' }, noChecks: true });
+    }
+    expect(section('back-squat')).toMatchObject({ show: true, gate: { state: 'unchecked' } });
+    expect(section('back-squat', sets(100, 10, 10, 10), [check('back-squat', '2026-10-02', {})])).toMatchObject({ show: true, gate: { state: 'clean' }, noChecks: false });
+    // Basic analysis: shown once it has checks, never gated.
+    expect(section('dumbbell-curl', sets(12, 12, 12, 12)).show).toBe(false);
+    expect(section('dumbbell-curl', sets(12, 12, 12, 12), [check('dumbbell-curl', '2026-10-02', {})])).toEqual({ show: true, gate: undefined, noChecks: false });
   });
 
   it('reads the form gate from the latest recent check', () => {

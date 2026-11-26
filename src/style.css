@@ -5,6 +5,9 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); -webkit-text-size-adjust: 100%; }
 body { -webkit-tap-highlight-color: transparent; font-optical-sizing: auto; }
+/* Every field's example text at 4.5:1 or more on the fills fields use (the browsers' own placeholder greys are
+   lighter, and Firefox fades them further). */
+::placeholder { color: var(--placeholder); opacity: 1; }
 main {
   max-width: 640px;
   margin: 0 auto;
@@ -573,6 +576,9 @@ small.down { color: var(--warn-text); }
   transition: border-color 200ms, background-color 200ms;
 }
 .set-row input::placeholder { color: var(--placeholder); font-weight: 500; }
+/* A ticked set's empty box shows what was logged ("BW": body weight only, "–": nothing; never the plan, see
+   WorkoutEditor.tsx), so there it reads as the value. */
+.set-row.done input::placeholder { color: var(--text); }
 .set-row input:focus { outline: none; border-color: var(--accent); background: var(--card); }
 .set-row.done input { background: var(--accent-soft); border-color: transparent; }
 .set-row.done .set-n { background: var(--accent-strong); color: var(--accent-on); }

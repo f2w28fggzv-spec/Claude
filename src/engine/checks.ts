@@ -8,6 +8,7 @@ import type {
   RepPosition,
   RepTracking,
 } from '../data/types';
+import { TEMPO_UNTIMED } from '../data/describe';
 import { angleDeg, fromVerticalDeg } from './geometry';
 import { JUDGE_VISIBILITY, point, sidedPoint, type Reader } from './landmarks';
 import { adjustmentDeg } from './personalize';
@@ -22,6 +23,8 @@ export interface CheckContext {
   torsoPx: number;
   /** Smoothed tracked-joint y per frame (reps only). */
   tracked: number[];
+  /** Smoothed tracked-joint x per frame (reps only). */
+  trackedX: number[];
   proportions?: BodyProportions;
   /** False when the camera wasn't at the configured angle for this rep. */
   viewOk: boolean;
@@ -76,10 +79,39 @@ function positionFrame(rep: RepSegment, at: RepPosition) {
   return at === 'top' ? rep.topFrame : rep.bottomFrame;
 }
 
-/** Frame indices around `center`, kept inside the rep. */
-function around(rep: RepSegment, center: number, k = WINDOW): number[] {
+/**
+ * How far the tracked joint may move from where it was at the top, in torso
+ * lengths (smoothed as the tracked signal is), for a frame after a rep's end
+ * to count toward that rep's top (see around()).
+ */
+const STILL_AT_TOP = 0.07;
+
+/**
+ * Frame indices within `k` of the rep position `at`, kept inside the rep,
+ * except at the top of a lift whose first move is down: there the top is the
+ * rep's last frame (standing tall after a squat), so the window runs on past
+ * it into the frames after the rep and sees both sides of the turning point,
+ * as it does at every other position. Only while the tracked joint stays
+ * where it was at the top, though: in the start position (or the next rep
+ * just beginning), not what comes after a set (racking the bar, turning to
+ * walk away), where a joint that straightens would pass for the last rep's
+ * lockout. Up-first lifts judge their start at the rep's first frame and stay
+ * inside the rep.
+ */
+function around(ctx: CheckContext, rep: RepSegment, at: RepPosition, k = WINDOW): number[] {
+  const center = positionFrame(rep, at);
   const out: number[] = [];
   for (let i = Math.max(rep.startFrame, center - k); i <= Math.min(rep.endFrame, center + k); i++) out.push(i);
+  const tracking = ctx.exercise.tracking;
+  if (at !== 'top' || tracking.kind !== 'reps' || tracking.firstMove !== 'down') return out;
+  const x0 = ctx.trackedX[center];
+  const y0 = ctx.tracked[center];
+  const reach = STILL_AT_TOP * ctx.torsoPx;
+  for (let i = rep.endFrame + 1; i <= center + k && i < ctx.seq.frames.length; i++) {
+    // Stops at the first frame that has moved away, or where the joint isn't tracked.
+    if (!(Math.hypot(ctx.trackedX[i] - x0, ctx.tracked[i] - y0) <= reach)) break;
+    out.push(i);
+  }
   return out;
 }
 
@@ -137,7 +169,7 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
   switch (check.type) {
     case 'jointAngle': {
       const target = rangeText(check.min, check.max);
-      const values = around(rep, positionFrame(rep, check.at)).map((i) => angleIn(ctx, i, check.angle));
+      const values = around(ctx, rep, check.at).map((i) => angleIn(ctx, i, check.angle));
       const v = median(values);
       if (values.filter(Number.isFinite).length < 2 || !Number.isFinite(v)) return unknown(check, target, NOT_VISIBLE);
       return verdict(check, inRange(v, check.min, check.max), v, `${round(v)}°`, target);
@@ -160,10 +192,10 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
           ? `${below ? 'at or below' : 'at or above'} ${check.reference}`
           : check.margin > 0
             ? `at least ${pct(check.margin)} of torso ${word} ${check.reference}`
-            : `no more than ${pct(-check.margin)} of torso short of ${check.reference}`;
+            : `at most ${pct(-check.margin)} of torso ${below ? 'above' : 'below'} ${check.reference}`;
       // How far `point` is past `reference` in the required direction, as a
       // fraction of torso length; the best frame near the position counts.
-      const values = around(rep, positionFrame(rep, check.at)).map((i) => {
+      const values = around(ctx, rep, check.at).map((i) => {
         const f = ctx.seq.frames[i];
         const p = point(f, check.point, ctx.reader);
         const r = point(f, check.reference, ctx.reader);
@@ -193,7 +225,7 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
         }
       }
       const target = `${rangeText(minDeg, maxDeg)} from vertical`;
-      const values = around(rep, positionFrame(rep, check.at)).map((i) => {
+      const values = around(ctx, rep, check.at).map((i) => {
         const f = ctx.seq.frames[i];
         const sh = point(f, 'shoulder', ctx.reader);
         const hip = point(f, 'hip', ctx.reader);
@@ -221,7 +253,7 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
     case 'symmetry': {
       const target = `within ${check.maxDiffDeg}°`;
       if (view !== 'front') return unknown(check, target, 'Left/right balance needs a front-on camera.');
-      const diffs = around(rep, positionFrame(rep, check.at)).map((i) =>
+      const diffs = around(ctx, rep, check.at).map((i) =>
         Math.abs(sidedAngle(ctx, i, check.angle, 'left') - sidedAngle(ctx, i, check.angle, 'right')),
       );
       const ok = diffs.filter(Number.isFinite);
@@ -231,7 +263,8 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
     }
 
     case 'tempo': {
-      const target = rangeText(check.minSec, check.maxSec, ' s');
+      // phaseSeconds leaves out the slow ends, so the reading is shorter than the whole lowering: say so.
+      const target = `${rangeText(check.minSec, check.maxSec, ' s')}, ${TEMPO_UNTIMED}`;
       const tracking = ctx.exercise.tracking as Extract<RepTracking, { kind: 'reps' }>;
       const first = phaseSeconds(ctx, rep.startFrame, rep.turnFrame);
       const second = phaseSeconds(ctx, rep.turnFrame, rep.endFrame);
@@ -242,11 +275,12 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
 
     case 'lockout': {
       const target = `at least ${check.minDeg}°`;
-      // Lockout may peak a moment before or after the turning point.
+      // Lockout may peak a moment before or after the turning point: the
+      // largest angle within 0.3 s of it counts (on a down-first lift, up to
+      // 0.3 s past the rep's end while the tracked joint stays at the top;
+      // see around()).
       const fps = framesPerSecond(ctx);
-      const values = around(rep, positionFrame(rep, check.at), Math.max(WINDOW, Math.round(fps * 0.3))).map((i) =>
-        angleIn(ctx, i, check.angle),
-      );
+      const values = around(ctx, rep, check.at, Math.max(WINDOW, Math.round(fps * 0.3))).map((i) => angleIn(ctx, i, check.angle));
       const ok = values.filter(Number.isFinite);
       if (ok.length < 2) return unknown(check, target, NOT_VISIBLE);
       const v = Math.max(...ok);

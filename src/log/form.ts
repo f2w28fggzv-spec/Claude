@@ -23,3 +23,17 @@ export function formText(cleanReps: number, reps: number): string {
   const r = formRating(cleanReps, reps);
   return r ? `${cleanReps}/${reps} clean rep${reps === 1 ? '' : 's'} · ${r.label}` : 'No reps counted';
 }
+
+/**
+ * How many reps of an analysed set had each fault (one list of check results
+ * per rep; a hold is one list). A rep counts once per fault even when two of
+ * its checks report the same one: the push-up's body line at the bottom and
+ * at the top, a squat's knee and hip lockouts.
+ */
+export function faultReps(reps: { status: string; fault?: string }[][]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const checks of reps) {
+    for (const f of new Set(checks.filter((c) => c.status === 'fail' && c.fault).map((c) => c.fault!))) out[f] = (out[f] ?? 0) + 1;
+  }
+  return out;
+}

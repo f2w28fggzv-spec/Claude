@@ -261,6 +261,11 @@ h1 {
   .stage:not(.is-live) .stage-body { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'figure' 'legend'; row-gap: 14px; }
   .stage:not(.is-live) .stage-figure { height: 300px; }
 }
+/* A lift drawn much wider than tall (the push-up, on the floor): on a phone its start and turnaround stack, each
+   the stage's width, which draws it larger than side by side at half of it (src/landing/hero.ts sets .is-wide). */
+@media (max-width: 559.98px) {
+  .stage.is-still .stage-figure.is-wide { grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+}
 
 /* ── The idea ─────────────────────────────────────────── */
 .idea { padding: 24px 0 40px; }
@@ -507,9 +512,8 @@ h2 { margin: 0 0 28px; max-width: 19em; font-size: clamp(1.95rem, 1.2rem + 2.7vw
 .list .wrap { --panel-bg: var(--panel); --panel-ink: var(--panel-text); --panel-ink-muted: var(--panel-muted); }
 .panel {
   /* fitee:molten-tokens */
-  /* Text as on the app's own panel: warm on Paper, Chrome on Molten. The field's example address at 4.9:1 on
-     its Molten field (the Molten placeholder is 3.5:1 there). */
-  --text: var(--panel-ink); --muted: var(--panel-ink-muted); --placeholder: #868a92;
+  /* Text as on the app's own panel: warm on Paper, Chrome on Molten. */
+  --text: var(--panel-ink); --muted: var(--panel-ink-muted);
   position: relative; overflow: hidden; padding: 30px 22px 34px; border-radius: 32px; color: var(--text);
   /* The panel, then the app's flame glow over it (Molten flame at 42%, from the token). Two declarations, so a
      browser without color-mix() loses only the glow, never the panel. */

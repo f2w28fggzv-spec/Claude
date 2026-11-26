@@ -167,20 +167,22 @@ export function ExerciseCards({ w, update, history, unit, technique = [], editin
                 <span />
               </div>
               {e.sets.map((s, si) => (
+                // An empty box shows the plan as a hint until the set is ticked; on a ticked set it shows
+                // what is logged ("BW": body weight only, "–": nothing), in the text colour (style.css).
                 <div class={`set-row ${s.done ? 'done' : ''}`} role="row">
                   <span class="set-n">{si + 1}</span>
                   {!hold && (
                     <NumInput
                       decimal
                       label={bw ? `Set ${si + 1} added weight in ${unit} (empty for body weight only)` : `Set ${si + 1} weight in ${unit}`}
-                      placeholder={s.planned?.weight !== undefined ? String(Number(toUnit(s.planned.weight, unit).toFixed(1))) : bw ? 'BW' : '–'}
+                      placeholder={!s.done && s.planned?.weight !== undefined ? String(Number(toUnit(s.planned.weight, unit).toFixed(1))) : bw ? 'BW' : '–'}
                       value={s.weight !== undefined ? toUnit(s.weight, unit) : undefined}
                       onValue={(v) => typed(ei, si, { weight: v === undefined ? undefined : fromUnit(v, unit) })}
                     />
                   )}
                   <NumInput
                     label={`Set ${si + 1} ${hold ? 'seconds' : 'reps'}`}
-                    placeholder={String((hold ? s.planned?.seconds : s.planned?.reps) ?? '–')}
+                    placeholder={String((s.done ? undefined : hold ? s.planned?.seconds : s.planned?.reps) ?? '–')}
                     value={hold ? s.seconds : s.reps}
                     onValue={(v) => typed(ei, si, hold ? { seconds: v } : { reps: v })}
                   />
