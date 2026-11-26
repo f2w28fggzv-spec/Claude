@@ -25,6 +25,13 @@ import type { HeroData, HeroLift } from './types';
 const REPS_PER_LIFT = 2;
 /** The shortest time between two painted frames: about 30 a second on phones and small processors, else every frame. */
 const MIN_FRAME_MS = lowPower() ? 1000 / 30 - 2 : 0;
+/**
+ * How much wider than tall a lift's drawing is before its reduced-motion stills stack on a phone. Stacked, each
+ * still has the stage's width but under half its height, less its caption: that draws the figure larger than side
+ * by side (half the width) once it is about 1.4 (at 320 px) to 1.7 (at 559 px) times as wide as tall. The push-up
+ * is 1.9; the bench press, 1.0, stays side by side.
+ */
+const WIDE = 1.75;
 const AT_START: Moment = { phase: 'start', s: 0, u: 0, action: 'holding' };
 const AT_FAR: Moment = { phase: 'far', s: 1, u: 0, action: 'holding' };
 
@@ -98,8 +105,8 @@ export function startHero(stage: HTMLElement, data: HeroData): void {
   const pictures = () => [...figure.querySelectorAll<SVGSVGElement>('svg')];
   const layout = () => {
     const box = viewBoxOf(lift().box);
-    // A lift drawn wider than tall (the push-up, on the floor): on a phone its stills stack (landing.css).
-    figure.classList.toggle('is-wide', lift().box.w > lift().box.h);
+    // A lift drawn much wider than tall (the push-up, on the floor): on a phone its stills stack (landing.css).
+    figure.classList.toggle('is-wide', lift().box.w >= WIDE * lift().box.h);
     if (!still) {
       // The page's own frame, or (back from the stills) a new one.
       const svg = figure.querySelector<SVGSVGElement>(':scope > svg');

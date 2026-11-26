@@ -33,8 +33,14 @@ const range = (min?: number, max?: number, unit = '°') =>
 /** Plain-language target for a check, for the "How we judge it" list. */
 export function describeTarget(c: Check): string {
   switch (c.type) {
-    case 'jointAngle':
-      return `${c.angle.vertex[0].toUpperCase()}${c.angle.vertex.slice(1)} angle ${range(c.min, c.max)} at the ${c.at}`;
+    case 'jointAngle': {
+      // The shoulder–hip–ankle angle reads the body's line (180° = straight), not how far the hip bends.
+      const { a, vertex, c: end } = c.angle;
+      if (a === 'shoulder' && vertex === 'hip' && end === 'ankle' && c.min !== undefined && c.max === undefined) {
+        return `Shoulder, hip and ankle in a straight line (within ${180 - c.min}°) at the ${c.at}`;
+      }
+      return `${vertex[0].toUpperCase()}${vertex.slice(1)} angle ${range(c.min, c.max)} at the ${c.at}`;
+    }
     case 'rangeOfMotion':
       return `At least ${c.minDeg}° of ${c.angle.vertex} movement per rep`;
     case 'relativeHeight': {

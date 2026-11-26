@@ -81,3 +81,13 @@ describe('tempo targets', () => {
     }
   });
 });
+
+describe('body-line targets', () => {
+  it('say what the shoulder–hip–ankle angle measures, not a hip bend', () => {
+    const lines = getExercise('push-up')!.checks.filter((c) => c.type === 'jointAngle' && c.angle.c === 'ankle');
+    expect(lines.map(describeTarget)).toEqual(['Shoulder, hip and ankle in a straight line (within 15°) at the bottom', 'Shoulder, hip and ankle in a straight line (within 15°) at the top']);
+    // Other joint angles keep their name.
+    const knees = getExercise('romanian-deadlift')!.checks.find((c) => c.type === 'jointAngle' && c.angle.vertex === 'knee')!;
+    expect(describeTarget(knees)).toBe('Knee angle at least 140° at the bottom');
+  });
+});

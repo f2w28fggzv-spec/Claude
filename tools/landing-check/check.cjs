@@ -49,8 +49,8 @@
 //      phone's edge only (720 to 1440 px); pictures fetched no larger than
 //      the screen needs; the rep list readable on a phone; reduced motion
 //      (and switched on and off while the page is open, the pause button
-//      there whenever anything moves; on a phone a lift drawn wider than tall,
-//      the push-up, with its stills one above the other; from 560 px the
+//      there whenever anything moves; on a phone each lift's stills as large
+//      as the stage allows, the push-up's one above the other; from 560 px the
 //      stills across the stage, with no layout shift as the script takes
 //      over); no JavaScript
 //      (the controls leave no gaps);
@@ -881,28 +881,39 @@ async function main() {
       const pause = await page.evaluate(() => getComputedStyle(document.querySelector('.demo-pause')).display);
       check('reduced motion: the start and the turnaround side by side, nothing plays', a.still && a.svgs === 2 && a.markup === b.markup && pause === 'none');
       await page.locator('.stage').screenshot({ path: path.join(SHOTS, 'hero-reduced-motion.png') });
-      // A lift drawn wider than tall (the push-up, on the floor): its stills one above the other, each the stage's width,
-      // rather than side by side at half of it; the stage keeps its height.
-      const wide = await page.evaluate(() => JSON.parse(document.getElementById('hero-data').textContent).lifts.filter((l) => l.box.w > l.box.h).map((l) => l.id));
-      const stacked = [];
-      for (const id of wide) {
+      // Each lift's stills drawn as large as the stage allows: one drawn much wider than tall (the push-up, on the floor)
+      // one above the other at the stage's width, the rest side by side; whichever, the stage keeps its height. Measured
+      // both ways (the page's arrangement, then the other) on the drawing's own box.
+      const ids = await page.evaluate(() => [...document.querySelectorAll('.chip')].map((c) => c.dataset.lift));
+      const arranged = [];
+      for (const id of ids) {
         await page.click(`.chip[data-lift="${id}"]`);
-        await sleep(400);
-        const st = await page.evaluate(() => {
-          const f = document.querySelector('.stage-figure').getBoundingClientRect();
-          const r = [...document.querySelectorAll('.still')].map((e) => e.getBoundingClientRect());
-          return { ok: r.length === 2 && r.every((x) => x.width >= f.width - 1) && r[1].top >= r[0].bottom, height: document.querySelector('.stage').getBoundingClientRect().height };
-        });
-        stacked.push({ id, ...st });
-        await page.locator('.stage').screenshot({ path: path.join(SHOTS, `hero-reduced-motion-${id}.png`) });
+        await sleep(350);
+        arranged.push(
+          await page.evaluate(() => {
+            const fig = document.querySelector('.stage-figure');
+            const lift = JSON.parse(document.getElementById('hero-data').textContent).lifts.find((l) => l.id === document.querySelector('.stage').dataset.showing);
+            const scale = () => {
+              const r = document.querySelector('.still svg').getBoundingClientRect();
+              return Math.min(r.width / lift.box.w, r.height / lift.box.h);
+            };
+            const stills = [...document.querySelectorAll('.still')].map((e) => e.getBoundingClientRect());
+            const stacked = stills.length === 2 && stills[1].top >= stills[0].bottom && stills.every((r) => r.width >= fig.getBoundingClientRect().width - 1);
+            const mine = scale();
+            fig.classList.toggle('is-wide');
+            const other = scale();
+            fig.classList.toggle('is-wide');
+            return { id: lift.id, stacked, mine, other, height: document.querySelector('.stage').getBoundingClientRect().height };
+          }),
+        );
+        if (arranged[arranged.length - 1].stacked) await page.locator('.stage').screenshot({ path: path.join(SHOTS, `hero-reduced-motion-${id}.png`) });
       }
       await page.click('.chip[data-lift="back-squat"]');
       await sleep(400);
-      const h0 = (await heroState(page)).height;
       check(
-        'reduced motion, 390 px: a lift drawn wider than tall has its start and turnaround one above the other, each the stage’s width, at the same stage height',
-        wide.length >= 1 && stacked.every((x) => x.ok && Math.abs(x.height - h0) < 0.5),
-        stacked.map((x) => `${x.id} ${x.ok ? 'stacked' : 'NOT stacked'}, ${x.height.toFixed(1)} px`).join('; ') + ` (others ${h0.toFixed(1)} px)`,
+        'reduced motion, 390 px: each lift’s stills drawn as large as the stage allows (the push-up’s one above the other, the rest side by side), at one stage height',
+        arranged.some((x) => x.id === 'push-up' && x.stacked) && arranged.every((x) => x.mine >= x.other - 0.5) && new Set(arranged.map((x) => x.height.toFixed(1))).size === 1,
+        arranged.map((x) => `${x.id} ${x.stacked ? 'stacked' : 'side by side'} ${Math.round(x.mine)} (other way ${Math.round(x.other)})`).join('; ') + `; stage ${arranged[0]?.height.toFixed(1)} px`,
       );
       // Switched off and on again while the page is open: the demo plays (with its pause button), then stops again.
       const motion = async () => {
