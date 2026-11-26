@@ -123,7 +123,7 @@ export function analyze(exercise: Exercise, seq: PoseSequence, opts: AnalyzeOpti
   }
   if (seen < seq.frames.length * 0.7) warnings.push('You were out of view for part of the recording.');
 
-  const ctx = (tracked: number[], frames: number[]): CheckContext => {
+  const ctx = (tracked: number[], frames: number[], trackedX: number[] = []): CheckContext => {
     const ratios = frames.map((i) => bodyWidthRatio(seq, i, torsoPx));
     return {
       exercise: { ...exercise, checks },
@@ -131,6 +131,7 @@ export function analyze(exercise: Exercise, seq: PoseSequence, opts: AnalyzeOpti
       reader,
       torsoPx,
       tracked,
+      trackedX,
       proportions: opts.proportions,
       viewOk: viewMatches(view, median(ratios)),
     };
@@ -163,6 +164,7 @@ export function analyze(exercise: Exercise, seq: PoseSequence, opts: AnalyzeOpti
   }
 
   const tracked = trackedSignal(seq, exercise.tracking, reader);
+  const trackedX = trackedSignal(seq, exercise.tracking, reader, 'x');
   const segments = segmentReps(seq, exercise.tracking, reader, torsoPx);
   if (segments.length === 0) {
     warnings.push(
@@ -172,7 +174,7 @@ export function analyze(exercise: Exercise, seq: PoseSequence, opts: AnalyzeOpti
   const reps = segments.map((rep: RepSegment, index) => {
     const frames: number[] = [];
     for (let i = rep.startFrame; i <= rep.endFrame; i++) frames.push(i);
-    const c = ctx(tracked, frames);
+    const c = ctx(tracked, frames, trackedX);
     if (view === 'front' && exercise.unilateral && exercise.tracking.kind === 'reps') {
       c.workingSide = workingSide(seq, exercise.tracking.joint, frames, reader);
     }

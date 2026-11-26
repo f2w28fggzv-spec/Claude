@@ -6,13 +6,14 @@ import { describe, expect, it } from 'vitest';
 import { getExercise } from '../src/data/exercises';
 import { MUSCLE_GROUPS, type Exercise } from '../src/data/types';
 import type { Levels } from '../src/demo/engagement';
-import { solve, type Figure, type Side } from '../src/demo/figure';
+import { L, along, legTo, solve, sub, type Figure, type Side, type Vec } from '../src/demo/figure';
 import * as D from '../src/demo/patterns';
 import { demoBounds, figureAt, frameMarkup } from '../src/demo/render';
 import type { Demo } from '../src/demo/types';
 import { analyze } from '../src/engine/analyze';
-import type { AnalysisResult, CheckResult } from '../src/engine/types';
-import { demoSequence, type DemoMoment, type DemoSequenceOptions } from './fixtures/demoSeq';
+import { angleDeg } from '../src/engine/geometry';
+import type { AnalysisResult, CheckResult, PoseSequence } from '../src/engine/types';
+import { demoSequence, hipsOffLine, type DemoMoment, type DemoSequenceOptions } from './fixtures/demoSeq';
 
 const ex = (id: string) => getExercise(id)!;
 const REST = Object.fromEntries(MUSCLE_GROUPS.map((g) => [g, 0])) as Levels;
@@ -64,22 +65,6 @@ describe.each(['push-up', 'reverse-lunge'])('%s: full analysis', (id) => {
 });
 
 // ── Push-up ──────────────────────────────────────────────────────────────
-
-/**
- * Moves the hip (and the knee with it, in proportion) off the shoulder–ankle line by `d` body
- * heights: positive toward the floor (hips sagging), negative away from it (hips piking).
- */
-function hipsOffLine(f: Figure, d: number): Figure {
-  const move = (sd: Side): Side => {
-    const line = { x: sd.shoulder.x - sd.ankle.x, y: sd.shoulder.y - sd.ankle.y };
-    const len = Math.hypot(line.x, line.y);
-    let n = { x: -line.y / len, y: line.x / len };
-    if (n.y < 0) n = { x: -n.x, y: -n.y }; // down on screen, toward the floor
-    const k = Math.hypot(sd.knee.x - sd.ankle.x, sd.knee.y - sd.ankle.y) / Math.hypot(sd.hip.x - sd.ankle.x, sd.hip.y - sd.ankle.y);
-    return { ...sd, hip: { x: sd.hip.x + n.x * d, y: sd.hip.y + n.y * d }, knee: { x: sd.knee.x + n.x * d * k, y: sd.knee.y + n.y * d * k } };
-  };
-  return { ...f, a: move(f.a), b: move(f.b) };
-}
 
 describe('push-up: faulty variants fail only their own check', () => {
   const e = ex('push-up');
@@ -162,5 +147,60 @@ describe('reverse lunge: the leading leg', () => {
   it('still catches each fault with the other leg leading', () => {
     expectOnly(e, analyze(e, demoSequence({ ...e, demo: remap(e.demo, (s) => 0.7 * s) }, { edit: alternating })), ['depth']);
     expectOnly(e, analyze(e, demoSequence({ ...e, demo: remap(e.demo, (s) => 0.45 + 0.55 * s) }, { edit: alternating })), ['lockout-knee']);
+  });
+});
+
+/**
+ * The way back with the stepping foot landing late: the front leg straightens first, so the hips reach
+ * standing height `late` of the way-back time before the back foot, swung in off the floor with its knee
+ * bent, lands beside the front one (the demo lands it as the hips arrive). Leg b steps.
+ */
+function lateLanding(d: Demo, late: number) {
+  const stand = solve('side', d.pose(0));
+  const lifted = { x: stand.b.ankle.x - 0.12, y: stand.b.ankle.y - 0.06 };
+  return (f: Figure, at: DemoMoment): Figure => {
+    if (!at.back) return f;
+    const sh = Math.max(0, (at.s - late) / (1 - late));
+    const hips = solve('side', d.pose(sh));
+    let ankle: Vec;
+    let foot: Side;
+    if (at.s <= late) {
+      const u = at.s / late; // 1 → 0: the foot comes in and down
+      ankle = { x: stand.b.ankle.x + (lifted.x - stand.b.ankle.x) * u, y: stand.b.ankle.y + (lifted.y - stand.b.ankle.y) * Math.sin((Math.PI / 2) * u) };
+      foot = stand.b;
+    } else {
+      const w = sh < 0.4 ? 1 - sh / 0.4 : 0; // from the demo's own path into the lifted swing
+      const o = hips.b.ankle;
+      ankle = { x: o.x + (lifted.x - o.x) * w, y: o.y + (lifted.y - o.y) * w };
+      foot = hips.b;
+    }
+    const hip = hips.b.hip;
+    const v = sub(ankle, hip);
+    const leg = legTo(hip, ankle, { x: v.y, y: -v.x });
+    const knee = along(hip, leg.thigh, L.thigh);
+    const end = along(knee, leg.shin, L.shin);
+    const mv = (p: Vec): Vec => ({ x: p.x - foot.ankle.x + end.x, y: p.y - foot.ankle.y + end.y });
+    return { ...hips, b: { ...hips.b, knee, ankle: end, heel: mv(foot.heel), ball: mv(foot.ball), toe: mv(foot.toe) } };
+  };
+}
+
+/** The near knee's angle (the leg the camera sees) in one frame. */
+function nearKnee(seq: PoseSequence, i: number) {
+  const [w, h] = [seq.width, seq.height];
+  const p = (k: number) => ({ x: seq.frames[i].lm![k][0] * w, y: seq.frames[i].lm![k][1] * h });
+  return angleDeg(p(24), p(26), p(28));
+}
+
+describe('reverse lunge: standing up', () => {
+  const e = ex('reverse-lunge');
+
+  it('counts a lockout reached as the stepping foot lands just after the hips top out', () => {
+    // The near leg steps back (legs swapped through the set), so its knee is still bent when the hips
+    // reach the top and straightens about 0.24 s later, as the foot lands.
+    const late = lateLanding(e.demo, 0.2);
+    const seq = demoSequence(e, { edit: (f, at) => (at.rep < 3 ? swapLegs(late(f, at)) : f) });
+    const r = analyze(e, seq);
+    expectOnly(e, r, []);
+    for (const rep of r.reps) expect(nearKnee(seq, rep.endFrame)).toBeLessThan(160);
   });
 });

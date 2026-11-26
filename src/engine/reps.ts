@@ -32,14 +32,14 @@ export interface RepSegment {
 export const minAmplitudePx = (tracking: Reps, torsoPx: number) =>
   (tracking.minAmplitude ?? DEFAULT_MIN_AMPLITUDE) * torsoPx;
 
-/** Smoothed screen-y of the tracked joint; NaN where it isn't visible. */
-export function trackedSignal(seq: PoseSequence, tracking: Reps, reader: Reader): number[] {
+/** Smoothed screen-y (or, with axis 'x', screen-x) of the tracked joint; NaN where it isn't visible. */
+export function trackedSignal(seq: PoseSequence, tracking: Reps, reader: Reader, axis: 'x' | 'y' = 'y'): number[] {
   const times = seq.frames.map((f) => f.t);
-  const y = seq.frames.map((f) => {
+  const v = seq.frames.map((f) => {
     const p = point(f, tracking.joint, reader);
-    return p && p.v >= MIN_VISIBILITY ? p.y : NaN;
+    return p && p.v >= MIN_VISIBILITY ? p[axis] : NaN;
   });
-  return smooth(fillGaps(y, times, MAX_GAP_MS), times, SMOOTH_MS);
+  return smooth(fillGaps(v, times, MAX_GAP_MS), times, SMOOTH_MS);
 }
 
 /** Builds reps (home → far → home) from alternating turning points. */

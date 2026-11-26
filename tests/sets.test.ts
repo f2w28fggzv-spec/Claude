@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { PoseSequence } from '../src/engine/types';
-import { formRating, formText } from '../src/log/form';
+import { getExercise } from '../src/data/exercises';
+import { analyze } from '../src/engine/analyze';
+import { faultReps, formRating, formText } from '../src/log/form';
 import { compactSequence, MAX_REPLAYS, pruneIds, type SavedSetMeta } from '../src/sets/sets';
 import { nearestFrame } from '../src/screens/SetPlayer';
+import { demoSequence, hipsOffLine } from './fixtures/demoSeq';
 
 const meta = (i: number, video = false): SavedSetMeta => ({
   id: `s${i}`,
@@ -42,6 +45,15 @@ describe('saved sets', () => {
     expect(formRating(1, 5)).toMatchObject({ label: 'Needs work', tone: 'bad' });
     expect(formRating(0, 0)).toBeNull();
     expect(formText(4, 5)).toBe('4/5 clean reps · Good');
+  });
+
+  it('counts each fault once per rep, even when two of its checks report it', () => {
+    // A push-up sagging through the whole set fails both body-line checks on every rep.
+    const pushUp = getExercise('push-up')!;
+    const r = analyze(pushUp, demoSequence(pushUp, { edit: (f) => hipsOffLine(f, 0.06) }));
+    expect(r.reps.map((rep) => rep.checks.filter((c) => c.fault === 'bodyLine').map((c) => c.status))).toEqual(Array(3).fill(['fail', 'fail']));
+    expect(faultReps(r.reps.map((rep) => rep.checks))).toEqual({ bodyLine: 3 });
+    expect(faultReps([[{ status: 'fail', fault: 'a' }, { status: 'pass' }], [{ status: 'unknown', fault: 'a' }], [{ status: 'fail', fault: 'b' }, { status: 'fail', fault: 'a' }]])).toEqual({ a: 2, b: 1 });
   });
 
   it('finds the frame nearest to a time for replays', () => {

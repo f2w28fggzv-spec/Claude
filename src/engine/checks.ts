@@ -22,6 +22,8 @@ export interface CheckContext {
   torsoPx: number;
   /** Smoothed tracked-joint y per frame (reps only). */
   tracked: number[];
+  /** Smoothed tracked-joint x per frame (reps only). */
+  trackedX: number[];
   proportions?: BodyProportions;
   /** False when the camera wasn't at the configured angle for this rep. */
   viewOk: boolean;
@@ -77,20 +79,38 @@ function positionFrame(rep: RepSegment, at: RepPosition) {
 }
 
 /**
+ * How far the tracked joint may move from where it was at the top, in torso
+ * lengths (smoothed as the tracked signal is), for a frame after a rep's end
+ * to count toward that rep's top (see around()).
+ */
+const STILL_AT_TOP = 0.07;
+
+/**
  * Frame indices within `k` of the rep position `at`, kept inside the rep,
  * except at the top of a lift whose first move is down: there the top is the
  * rep's last frame (standing tall after a squat), so the window runs on past
- * it into the frames after the rep (within the recording) and sees both sides
- * of the turning point, as it does at every other position. Up-first lifts
- * judge their start at the rep's first frame and stay inside the rep.
+ * it into the frames after the rep and sees both sides of the turning point,
+ * as it does at every other position. Only while the tracked joint stays
+ * where it was at the top, though: in the start position (or the next rep
+ * just beginning), not what comes after a set (racking the bar, turning to
+ * walk away), where a joint that straightens would pass for the last rep's
+ * lockout. Up-first lifts judge their start at the rep's first frame and stay
+ * inside the rep.
  */
 function around(ctx: CheckContext, rep: RepSegment, at: RepPosition, k = WINDOW): number[] {
   const center = positionFrame(rep, at);
-  const tracking = ctx.exercise.tracking;
-  const pastEnd = at === 'top' && tracking.kind === 'reps' && tracking.firstMove === 'down';
-  const last = pastEnd ? ctx.seq.frames.length - 1 : rep.endFrame;
   const out: number[] = [];
-  for (let i = Math.max(rep.startFrame, center - k); i <= Math.min(last, center + k); i++) out.push(i);
+  for (let i = Math.max(rep.startFrame, center - k); i <= Math.min(rep.endFrame, center + k); i++) out.push(i);
+  const tracking = ctx.exercise.tracking;
+  if (at !== 'top' || tracking.kind !== 'reps' || tracking.firstMove !== 'down') return out;
+  const x0 = ctx.trackedX[center];
+  const y0 = ctx.tracked[center];
+  const reach = STILL_AT_TOP * ctx.torsoPx;
+  for (let i = rep.endFrame + 1; i <= center + k && i < ctx.seq.frames.length; i++) {
+    // Stops at the first frame that has moved away, or where the joint isn't tracked.
+    if (!(Math.hypot(ctx.trackedX[i] - x0, ctx.tracked[i] - y0) <= reach)) break;
+    out.push(i);
+  }
   return out;
 }
 
@@ -255,7 +275,8 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
       const target = `at least ${check.minDeg}°`;
       // Lockout may peak a moment before or after the turning point: the
       // largest angle within 0.3 s of it counts (on a down-first lift, up to
-      // 0.3 s past the rep's end; see around()).
+      // 0.3 s past the rep's end while the tracked joint stays at the top;
+      // see around()).
       const fps = framesPerSecond(ctx);
       const values = around(ctx, rep, check.at, Math.max(WINDOW, Math.round(fps * 0.3))).map((i) => angleIn(ctx, i, check.angle));
       const ok = values.filter(Number.isFinite);

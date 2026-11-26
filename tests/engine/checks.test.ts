@@ -146,7 +146,73 @@ function legSeq(firstMove: 'down' | 'up', knee: (rested: number | null) => numbe
   return { version: 1, width: 720, height: 1280, source: 'synthetic', frames };
 }
 
+/**
+ * A bench press seen side-on, 30 fps: three reps, the wrist (tracked) lowered from straight arms over the
+ * shoulder to the chest in 1.5 s and pressed back in 1.0 s, the last press stopping with the elbows at
+ * `lastTop` degrees. Then, if `rack`, the bar is racked as many lifters do: the arms swing 25° back toward
+ * the head over 0.7 s while the elbows straighten to 176°, and stay at the hooks.
+ */
+function benchSeq(lastTop: number, rack: boolean): PoseSequence {
+  const fps = 30;
+  const [U, F] = [150, 150];
+  const S = { x: 700, y: 470 };
+  const reach = (deg: number) => Math.sqrt(U * U + F * F - 2 * U * F * Math.cos((deg * Math.PI) / 180));
+  const polar = (r: number, sweep: number) => ({ x: S.x + r * Math.sin((sweep * Math.PI) / 180), y: S.y - r * Math.cos((sweep * Math.PI) / 180) });
+  const ease = (u: number) => (1 - Math.cos(Math.PI * Math.min(1, Math.max(0, u)))) / 2;
+  const mix = (a: { x: number; y: number }, b: { x: number; y: number }, s: number) => ({ x: a.x + (b.x - a.x) * s, y: a.y + (b.y - a.y) * s });
+  const lock = polar(reach(176), 0);
+  const chest = { x: S.x - 50, y: S.y - 70 };
+  const soft = polar(reach(lastTop), 0);
+  const wrists: { x: number; y: number }[] = [];
+  const hold = (sec: number, w: { x: number; y: number }) => { for (let i = 0; i < sec * fps; i++) wrists.push(w); };
+  const move = (sec: number, at: (u: number) => { x: number; y: number }) => { for (let i = 0; i < sec * fps; i++) wrists.push(at(i / (sec * fps))); };
+  hold(1, lock);
+  for (let r = 0; r < 3; r++) {
+    const top = r === 2 ? soft : lock;
+    move(1.5, (u) => mix(lock, chest, ease(u)));
+    hold(0.15, chest);
+    move(1.0, (u) => mix(chest, top, ease(u)));
+    if (r < 2) hold(0.6, lock);
+  }
+  if (rack) move(0.7, (u) => polar(reach(lastTop + (176 - lastTop) * ease(u)), 25 * ease(u)));
+  hold(3, rack ? polar(reach(176), 25) : soft);
+  const frames = wrists.map((w, k) => {
+    // The elbow from the two arm segments, bent toward the feet.
+    const d = Math.hypot(w.x - S.x, w.y - S.y);
+    const along = (U * U - F * F + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, U * U - along * along));
+    const [ux, uy] = [(w.x - S.x) / d, (w.y - S.y) / d];
+    const elbow = { x: S.x + ux * along + uy * h, y: S.y + uy * along - ux * h };
+    const pt: Record<string, { x: number; y: number }> = {
+      shoulder: S, elbow, wrist: w, hip: { x: 400, y: 472 }, knee: { x: 200, y: 440 }, ankle: { x: 180, y: 650 }, heel: { x: 165, y: 655 }, toe: { x: 225, y: 660 },
+    };
+    const lm: RawLandmark[] = Array.from({ length: 33 }, () => [0, 0, 0, 0]);
+    const at = (p: { x: number; y: number }, v: number, dx = 0): RawLandmark => [(p.x + dx) / 1280, p.y / 720, 0, v];
+    const index: Record<string, [number, number]> = { shoulder: [12, 11], elbow: [14, 13], wrist: [16, 15], hip: [24, 23], knee: [26, 25], ankle: [28, 27], heel: [30, 29], toe: [32, 31] };
+    for (const [j, [near, farSide]] of Object.entries(index)) {
+      lm[near] = at(pt[j], 0.98);
+      lm[farSide] = at(pt[j], 0.8, 3);
+    }
+    lm[0] = at({ x: 815, y: 430 }, 0.98);
+    lm[8] = at({ x: 790, y: 455 }, 0.95);
+    lm[7] = at({ x: 787, y: 455 }, 0.7);
+    return { t: Math.round((k * 1000) / fps), lm };
+  });
+  return { version: 1, width: 1280, height: 720, source: 'synthetic', frames };
+}
+
 describe('lockout', () => {
+  describe('after the last rep of a lift that moves down first', () => {
+    const e = withChecks('bench-press', [C.lockout('elbow', 165)]);
+    it('doesn’t take racking the bar for the last rep’s lockout', () => {
+      // The elbows straighten as the bar goes back to the hooks; the press itself stopped at 150°.
+      expect(statuses(analyze(e, benchSeq(150, true)), 'lockout-elbow')).toEqual(['pass', 'pass', 'fail']);
+      // The same set without the rack, and with the last press locked out before racking.
+      expect(statuses(analyze(e, benchSeq(150, false)), 'lockout-elbow')).toEqual(['pass', 'pass', 'fail']);
+      expect(statuses(analyze(e, benchSeq(176, true)), 'lockout-elbow')).toEqual(['pass', 'pass', 'pass']);
+    });
+  });
+
   describe('at the top of a lift that moves down first (the top is the rep’s last frame)', () => {
     const e = withChecks('back-squat', [C.lockout('knee', 165)]);
     // Knee bent through the rep and until `late` seconds after the hips are back at the top, as when
@@ -156,6 +222,11 @@ describe('lockout', () => {
       expect(statuses(analyze(e, lateLockout(0.15)), 'lockout-knee')).toEqual(['pass', 'pass', 'pass']);
     });
     it('but no further than 0.3 s from the top', () => {
+      // The top is where the smoothed hip settles, two frames (0.07 s) into the rest, so the window
+      // reaches about 0.37 s into it: 0.25 s counts and 0.4 s doesn't (a 0.15 s or 0.45 s window would
+      // get one of them wrong).
+      expect(statuses(analyze(e, lateLockout(0.25)), 'lockout-knee')).toEqual(['pass', 'pass', 'pass']);
+      expect(statuses(analyze(e, lateLockout(0.4)), 'lockout-knee')).toEqual(['fail', 'fail', 'fail']);
       expect(statuses(analyze(e, lateLockout(0.6)), 'lockout-knee')).toEqual(['fail', 'fail', 'fail']);
     });
   });

@@ -9,6 +9,7 @@ import type { AnalysisResult, CheckResult, PoseSequence } from '../engine/types'
 import { drawSkeleton } from '../draw';
 import { nearestShot } from '../analysis/snapshots';
 import { loadOverrides, loadProportions, saveOverride } from '../storage';
+import { faultReps } from '../log/form';
 import { saveTechnique } from '../log/store';
 import { newSetId, saveSet, saveSetVideo } from '../sets/sets';
 import { showToast } from '../ui/toast';
@@ -48,10 +49,8 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
     if (result.reps.length === 0 && !result.hold) return;
     const id = newSetId();
     const at = new Date().toISOString();
-    const faults: Record<string, number> = {};
-    for (const list of result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks)) {
-      for (const c of list) if (c.status === 'fail' && c.fault) faults[c.fault] = (faults[c.fault] ?? 0) + 1;
-    }
+    // Reps with each fault (a rep failing two checks with the same fault counts once).
+    const faults = faultReps(result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks));
     const cleanReps = result.hold
       ? Number(result.hold.checks.every((c) => c.status !== 'fail'))
       : result.reps.filter((r) => r.checks.every((c) => c.status !== 'fail')).length;
@@ -89,9 +88,7 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
     }
   };
 
-  const faultsSeen = new Map<string, number>();
-  const checks = result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks);
-  for (const list of checks) for (const c of list) if (c.status === 'fail' && c.fault) faultsSeen.set(c.fault, (faultsSeen.get(c.fault) ?? 0) + 1);
+  const faultsSeen = Object.entries(faultReps(result.hold ? [result.hold.checks] : result.reps.map((r) => r.checks)));
 
   const depthChecks = exercise.checks.filter((c): c is RelativeHeightCheck => c.type === 'relativeHeight');
   const far = exercise.tracking.kind === 'reps' && exercise.tracking.firstMove === 'down' ? 'Bottom' : 'Top';
@@ -104,11 +101,11 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
         <p class="note">{w}</p>
       ))}
 
-      {faultsSeen.size > 0 && (
+      {faultsSeen.length > 0 && (
         <section class="card">
           <h2>What to work on</h2>
           <ul class="tips">
-            {[...faultsSeen].map(([id, n]) => {
+            {faultsSeen.map(([id, n]) => {
               const f = exercise.faults.find((x) => x.id === id);
               if (!f) return null;
               const corrective = getExercise(f.corrective);

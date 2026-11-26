@@ -131,7 +131,8 @@ export function SetPlayer({
 
   const idx = nearestFrame(frames, time * 1000);
   const rep = result.reps.find((r) => idx >= r.startFrame && idx <= r.endFrame);
-  const faults = rep ? rep.checks.filter((c) => c.status === 'fail') : [];
+  // One chip per fault: two checks can report the same one (the push-up's body line at the bottom and the top).
+  const faults = rep ? [...new Set(rep.checks.filter((c) => c.status === 'fail').map((c) => c.fault))] : [];
   const faultLabel = (id?: string) => exercise?.faults.find((f) => f.id === id)?.label ?? 'Fault';
 
   return (
@@ -145,7 +146,7 @@ export function SetPlayer({
           <>
             <strong>Rep {rep.index + 1}</strong>
             {faults.length ? (
-              faults.map((c) => <span class="fault-chip">{faultLabel(c.fault)}</span>)
+              faults.map((f) => <span class="fault-chip">{faultLabel(f)}</span>)
             ) : (
               <span class="ok-chip">
                 <Icon name="check" size={12} /> No faults

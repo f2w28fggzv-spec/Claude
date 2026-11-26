@@ -576,7 +576,8 @@ small.down { color: var(--warn-text); }
   transition: border-color 200ms, background-color 200ms;
 }
 .set-row input::placeholder { color: var(--placeholder); font-weight: 500; }
-/* A ticked set's empty box shows what was logged ("BW": body weight only), so there it reads as the value. */
+/* A ticked set's empty box shows what was logged ("BW": body weight only, "–": nothing; never the plan, see
+   WorkoutEditor.tsx), so there it reads as the value. */
 .set-row.done input::placeholder { color: var(--text); }
 .set-row input:focus { outline: none; border-color: var(--accent); background: var(--card); }
 .set-row.done input { background: var(--accent-soft); border-color: transparent; }

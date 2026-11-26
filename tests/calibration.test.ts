@@ -14,6 +14,7 @@ import {
 } from '../src/calibration/calibrate';
 import { EXERCISES, getExercise } from '../src/data/exercises';
 import { analyze } from '../src/engine/analyze';
+import { demoSequence, hipsOffLine } from './fixtures/demoSeq';
 import { fixture } from './fixtures/load';
 
 const squat = getExercise('back-squat')!;
@@ -54,6 +55,40 @@ describe('calibration scoring', () => {
     const lenient = { 'back-squat': { depth: { margin: -0.4 } } };
     const d = scoreRecordings(squat, [correct], lenient).perCheck.find((p) => p.checkId === 'depth')!;
     expect(d.falseNeg).toBe(2); // shallow reps now pass, so the faults are missed
+  });
+});
+
+describe('a fault two checks share (the push-up’s body line at the bottom and at the top)', () => {
+  const pushUp = getExercise('push-up')!;
+  const top = pushUp.checks.find((c) => c.id === 'angle-body-top')!;
+  const recording = (id: string, sag: (s: number) => number, fault: string[]): CalibrationRecording => ({
+    id,
+    exerciseId: 'push-up',
+    createdAt: '2026-11-02T10:00:00.000Z',
+    source: 'camera',
+    seq: demoSequence(pushUp, { edit: (f, at) => hipsOffLine(f, sag(at.s)) }),
+    labels: { 0: fault, 1: fault, 2: fault },
+  });
+  // Hips sagging a lot at the bottom and a little at the top (about 175°, inside the limit), labelled; the demo, labelled clean.
+  const sagging = recording('sag', (s) => 0.015 + 0.045 * s, ['bodyLine']);
+  const clean = recording('clean', () => 0, []);
+  const score = (recs: CalibrationRecording[], id: string) => scoreRecordings(pushUp, recs, {}).perCheck.find((p) => p.checkId === id)!;
+
+  it('doesn’t count a miss for the check that passed when the other one caught the labelled fault', () => {
+    expect(score([sagging, clean], 'angle-body-bottom')).toMatchObject({ truePos: 3, falseNeg: 0, trueNeg: 3, accuracy: 1 });
+    expect(score([sagging, clean], 'angle-body-top')).toMatchObject({ truePos: 0, falseNeg: 0, trueNeg: 3, accuracy: 1 });
+  });
+
+  it('so it suggests no stricter limit for that check', () => {
+    const s = scoreRecordings(pushUp, [sagging, clean], {});
+    expect(samplesFor(top, s)).toHaveLength(3);
+    expect(suggestThreshold(thresholdFields(top)[0], 165, samplesFor(top, s))).toBeNull();
+  });
+
+  it('still counts a miss for both when neither caught it', () => {
+    const missed = recording('missed', () => 0, ['bodyLine']);
+    expect(score([missed], 'angle-body-bottom')).toMatchObject({ falseNeg: 3, accuracy: 0 });
+    expect(score([missed], 'angle-body-top')).toMatchObject({ falseNeg: 3, accuracy: 0 });
   });
 });
 

@@ -84,3 +84,20 @@ export function demoSequence(e: Exercise, o: DemoSequenceOptions = {}): PoseSequ
   });
   return { version: 1, width, height, source: 'synthetic', frames };
 }
+
+/**
+ * Moves the hip (and the knee with it, in proportion) off the shoulder–ankle line by `d` body
+ * heights: positive toward the floor (hips sagging), negative away from it (hips piking). For a
+ * push-up's body-line faults, through `edit`.
+ */
+export function hipsOffLine(f: Figure, d: number): Figure {
+  const move = (sd: Side): Side => {
+    const line = { x: sd.shoulder.x - sd.ankle.x, y: sd.shoulder.y - sd.ankle.y };
+    const len = Math.hypot(line.x, line.y);
+    let n = { x: -line.y / len, y: line.x / len };
+    if (n.y < 0) n = { x: -n.x, y: -n.y }; // down on screen, toward the floor
+    const k = Math.hypot(sd.knee.x - sd.ankle.x, sd.knee.y - sd.ankle.y) / Math.hypot(sd.hip.x - sd.ankle.x, sd.hip.y - sd.ankle.y);
+    return { ...sd, hip: { x: sd.hip.x + n.x * d, y: sd.hip.y + n.y * d }, knee: { x: sd.knee.x + n.x * d * k, y: sd.knee.y + n.y * d * k } };
+  };
+  return { ...f, a: move(f.a), b: move(f.b) };
+}
