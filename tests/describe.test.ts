@@ -79,6 +79,9 @@ describe('tempo targets', () => {
       // MIN_ECCENTRIC_SEC 0.65 measured ≈ ACSM's 1 s lower bound for a smooth lowering (src/data/sources.ts).
       expect(describeTarget(tempo)).toBe('Lowering takes at least 0.65 s, not counting its slow start and finish (about 1 s in all)');
     }
+    const tempo = getExercise('back-squat')!.checks.find((c) => c.type === 'tempo')!;
+    expect(describeTarget({ ...tempo, minSec: 0.65, maxSec: 1.95 })).toBe('Lowering takes 0.65–1.95 s, not counting its slow start and finish (about 1–3 s in all)');
+    expect(describeTarget({ ...tempo, minSec: undefined, maxSec: 1.3 })).toBe('Lowering takes at most 1.3 s, not counting its slow start and finish (at most about 2 s in all)');
   });
 });
 

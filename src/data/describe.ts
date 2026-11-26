@@ -26,7 +26,6 @@ export const secondaryText = (e: Exercise) => e.secondary.map((g) => MUSCLE_LABE
 export const equipmentText = (e: Exercise) => e.equipment.map((q) => EQUIPMENT_LABELS[q]).join(' + ');
 
 const pct = (v: number) => `${Math.round(Math.abs(v) * 100)}%`;
-const secs = (v: number) => `${Math.round(v * 10) / 10} s`;
 const range = (min?: number, max?: number, unit = '°') =>
   min !== undefined && max !== undefined ? `${min}–${max}${unit}` : max !== undefined ? `at most ${max}${unit}` : `at least ${min}${unit}`;
 
@@ -58,9 +57,11 @@ export function describeTarget(c: Check): string {
     case 'symmetry':
       return `Left and right within ${c.maxDiffDeg}°`;
     case 'tempo': {
-      // The engine doesn't time a movement's slow start and finish (TEMPO_MEASURED_SHARE): say what a minimum asks in all.
-      const inAll = c.minSec !== undefined ? `, not counting its slow start and finish (about ${secs(c.minSec / TEMPO_MEASURED_SHARE)} in all)` : '';
-      return `${c.phase === 'eccentric' ? 'Lowering' : 'Lifting'} takes ${range(c.minSec, c.maxSec, ' s')}${inAll}`;
+      // The engine doesn't time a movement's slow start and finish (TEMPO_MEASURED_SHARE): say what the limits ask in all.
+      const all = (v: number) => Math.round((v / TEMPO_MEASURED_SHARE) * 10) / 10;
+      const { minSec: lo, maxSec: hi } = c;
+      const inAll = lo !== undefined && hi !== undefined ? `about ${all(lo)}–${all(hi)} s` : lo !== undefined ? `about ${all(lo)} s` : `at most about ${all(hi!)} s`;
+      return `${c.phase === 'eccentric' ? 'Lowering' : 'Lifting'} takes ${range(lo, hi, ' s')}, not counting its slow start and finish (${inAll} in all)`;
     }
     case 'lockout':
       return `Straightens to at least ${c.minDeg}° at the ${c.at}`;
