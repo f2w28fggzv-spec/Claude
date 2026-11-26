@@ -229,9 +229,10 @@ const DRAFT_EXERCISES: Exercise[] = [
       // phone shifts it; see the placement). −1.2 allows 0.15–0.2 torso lengths for 2D landmark error and
       // leg proportions (numeric limit derived, not published): on the demo's path a rep stopping with the
       // back knee's centre about 13 cm up passes (1.11) and one stopping about 19 cm up fails (1.21).
-      // Wade et al. 2023 found camera-side joint centres off by 0.05 (hip) and 0.12 (toe) torso lengths on
-      // average (OpenPose, walking): in random directions that flags about 2–5% of correct reps, and about
-      // half if both errors push the same way, so the margin is a starting value to calibrate.
+      // Wade et al. 2023 found camera-side joint centres off by 0.05 (hip) and 0.12 (Wade's MTP row: toe
+      // keypoints measured against the MTP joint, used here for the toe) torso lengths on average
+      // (OpenPose, walking): in random directions that flags about 2–5% of correct reps, and about half
+      // if both errors push the same way, so the margin is a starting value to calibrate.
       cite(
         C.height('depth', 'Depth: hips down to about knee height', 'hip', 'toe', 'atOrBelow', 'bottom', -1.2, 'partialRange'),
         `${SRC.nsca}; ${SRC.farrokhi2008} (numeric limit derived, not published, with segment lengths from ${SRC.winter2009}); tolerance from ${SRC.wade2023}`,
@@ -251,9 +252,14 @@ const DRAFT_EXERCISES: Exercise[] = [
       // foot often lands just after the hips reach the top; the largest angle within 0.3 s either side of
       // the top counts (src/engine/checks.ts). 165° allows for 2D landmark error.
       cite(C.lockout('knee', LOCKOUT_DEG), `${SRC.nsca}; tolerance from ${SRC.wade2023}`),
-      // NSCA: "Allow the lead hip and knee to slowly flex"; ACSM moderate tempo 1–2 s. Timed on the hip,
-      // so it includes the step back and needs neither leg.
-      cite(C.eccentric(MIN_ECCENTRIC_SEC), `${SRC.nsca}; ${SRC.acsm2009}`),
+      // NSCA: "Allow the lead hip and knee to slowly flex". The Army's bodyweight rear lunge lowers slowly
+      // too: ATP 7-22.02 runs it "at a slow cadence" (para 3-4, p. 3-2), 50 counts a minute (para 1-17,
+      // p. 1-7), so the step back and down takes 1.2 s; FM 7-22 (2012), which it superseded, says it "is
+      // always performed at a slow cadence. On counts 1 and 3, move into position in a slow, controlled
+      // manner" (p. 8-5). (The Army's push-up drill runs at a moderate cadence, so the push-up has no
+      // tempo check.) ACSM moderate tempo 1–2 s. Timed on the hip, so it includes the step back and needs
+      // neither leg.
+      cite(C.eccentric(MIN_ECCENTRIC_SEC), `${SRC.nsca}; ${SRC.atp72202}; ${SRC.acsm2009}`),
     ],
     faults: [
       F.partialRange('split-squat', 'Lower until your back knee nearly touches the floor.'),
@@ -833,8 +839,9 @@ const DRAFT_EXERCISES: Exercise[] = [
     checks: [
       // FM 7-22 (Appendix A, the Army push-up test) and FM 21-20: lower "until your upper arms are at
       // least parallel to the ground". The landmarks are joint centres: the upper arm is parallel when
-      // the shoulder's centre is level with the elbow's (a height difference, unlike an elbow angle seen
-      // from the side, doesn't change with how far the elbows flare toward the camera). Where that
+      // the shoulder's centre is level with the elbow's (a height difference changes far less than an
+      // elbow angle seen from the side with how far the elbows flare toward the camera: with the phone on
+      // the floor, about 0.02 torso lengths for a 15 cm flare and 0.03 for 20 cm, toward passing). Where that
       // happens depends on where the hands are: with the hands under the shoulders the upper arm only
       // reaches parallel as the chest nears the floor, so a rep to full depth can read just past level,
       // within the camera's error (about 0.02–0.07 torso lengths in a 3D arm model; the demo reads 0.08).
@@ -866,8 +873,14 @@ const DRAFT_EXERCISES: Exercise[] = [
         C.angle('body', 'top', { min: LOCKOUT_DEG }, 'bodyLine', 'Body straight at the top'),
         `${SRC.fm722}; ${SRC.fm2120}; ${SRC.atp72201} (numeric limit derived, not published); tolerance from ${SRC.wade2023}`,
       ),
-      // No tempo check: ACSM 2009's "1–2 s ECC" goes with heavy loads; for sets of 15–25 reps or more it
-      // recommends moderate to fast velocities, and the builder gives push-ups up to 20 or 25 reps a set.
+      // No tempo check. The Army's own push-up drill lowers in one count at a moderate cadence, 80 counts
+      // a minute, so in 0.75 s (FM 7-22, 2012: "Cadence: MODERATE", count 1 "Bend the elbows, lowering
+      // the body until the upper arms are parallel with the ground", p. 8-14; MODERATE "80 counts per
+      // minute", para 7-25, p. 7-11; the same in ATP 7-22.02, which superseded those chapters in 2020:
+      // para 3-13, pp. 3-8 to 3-9, and para 1-17, p. 1-7): a minimum of roughly 1 s in all would fault
+      // the push-up's own standard. And ACSM 2009's "1–2 s ECC" goes with heavy loads; for sets of 15–25
+      // reps or more it recommends moderate to fast velocities, and the builder gives push-ups up to 20
+      // or 25 reps a set. (The reverse lunge keeps its check: its standards lower slowly.)
     ],
     faults: [
       F.partialRange('incline-push-up', 'Lower until your upper arms are level with the floor or lower.'),

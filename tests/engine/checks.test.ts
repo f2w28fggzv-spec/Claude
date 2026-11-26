@@ -3,7 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import { getExercise, EXERCISES } from '../../src/data/exercises';
 import { ANGLES, C } from '../../src/data/helpers';
+import { MIN_ECCENTRIC_SEC, TEMPO_MEASURED_SHARE } from '../../src/data/sources';
 import type { Check, Exercise } from '../../src/data/types';
+import { L } from '../../src/demo/figure';
 import { analyze, withOverrides } from '../../src/engine/analyze';
 import type { AnalysisResult, CheckStatus, PoseSequence, RawLandmark } from '../../src/engine/types';
 import { fixture } from '../fixtures/load';
@@ -291,6 +293,38 @@ describe('tempo', () => {
   it('is still judged when the camera angle is wrong', () => {
     const r = run('back-squat', 'squat-front');
     expect(statuses(r, 'tempo-eccentric').every((s) => s !== 'unknown')).toBe(true);
+  });
+  it('times about two thirds of a smooth lowering (TEMPO_MEASURED_SHARE, MIN_ECCENTRIC_SEC in src/data/sources.ts)', () => {
+    // The standing squat figure moved down 0.8 torso lengths and back up as one piece, so the tracked hip
+    // follows the profile itself, lowered in T s and timed at 15–60 fps. (A lift's own path counts too:
+    // see MIN_ECCENTRIC_SEC.)
+    const squat = ex('back-squat');
+    const stand = squat.demo.pose(0);
+    const unease = (s: number) => Math.acos(Math.min(1, Math.max(-1, 1 - 2 * s))) / Math.PI; // the demo timeline's cosine ease, undone
+    const minJerk = (u: number) => 10 * u ** 3 - 15 * u ** 4 + 6 * u ** 5;
+    const cosine = (u: number) => (1 - Math.cos(Math.PI * u)) / 2;
+    const judged = withChecks('back-squat', [C.eccentric(MIN_ECCENTRIC_SEC)]);
+    const readings = (T: number, profile: (u: number) => number) => {
+      // Paced without a tempo check, which would stretch the demo's lowering to suit itself (src/demo/timeline.ts).
+      const moved: Exercise = {
+        ...squat,
+        checks: [],
+        demo: { ...squat.demo, back: undefined, timing: { ...squat.demo.timing, out: T }, pose: (s) => ({ ...stand, at: { ...stand.at, y: stand.at.y + 0.8 * L.torso * profile(unease(s)) } }) },
+      };
+      return [15, 20, 24, 25, 30, 60].flatMap((fps) => analyze(judged, demoSequence(moved, { fps })).reps.map((r) => r.checks[0]));
+    };
+    const smooth = readings(1.0, minJerk);
+    expect(smooth).toHaveLength(18);
+    const v = smooth.map((c) => c.value!);
+    // A minimum-jerk 1.0 s lowering reads 0.64–0.73 s: the share brackets TEMPO_MEASURED_SHARE, and it passes at about the limit.
+    expect(Math.min(...v)).toBeGreaterThanOrEqual(0.62);
+    expect(Math.max(...v)).toBeLessThanOrEqual(0.75);
+    expect(Math.min(...v)).toBeLessThanOrEqual(TEMPO_MEASURED_SHARE);
+    expect(smooth.filter((c) => c.status === 'pass').length).toBeGreaterThanOrEqual(15);
+    // Cosine-eased, 0.73–0.80 s: every rep passes.
+    for (const c of readings(1.0, cosine)) expect([c.status, c.value! >= 0.72 && c.value! <= 0.81]).toEqual(['pass', true]);
+    // A minimum-jerk 0.8 s lowering reads 0.52–0.60 s and fails at every frame rate.
+    for (const c of readings(0.8, minJerk)) expect([c.status, c.value! < MIN_ECCENTRIC_SEC]).toEqual(['fail', true]);
   });
 });
 

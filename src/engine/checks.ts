@@ -8,6 +8,7 @@ import type {
   RepPosition,
   RepTracking,
 } from '../data/types';
+import { TEMPO_UNTIMED } from '../data/describe';
 import { angleDeg, fromVerticalDeg } from './geometry';
 import { JUDGE_VISIBILITY, point, sidedPoint, type Reader } from './landmarks';
 import { adjustmentDeg } from './personalize';
@@ -262,7 +263,8 @@ export function evaluateRepCheck(check: Check, rep: RepSegment, ctx: CheckContex
     }
 
     case 'tempo': {
-      const target = rangeText(check.minSec, check.maxSec, ' s');
+      // phaseSeconds leaves out the slow ends, so the reading is shorter than the whole lowering: say so.
+      const target = `${rangeText(check.minSec, check.maxSec, ' s')}, ${TEMPO_UNTIMED}`;
       const tracking = ctx.exercise.tracking as Extract<RepTracking, { kind: 'reps' }>;
       const first = phaseSeconds(ctx, rep.startFrame, rep.turnFrame);
       const second = phaseSeconds(ctx, rep.turnFrame, rep.endFrame);

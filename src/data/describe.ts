@@ -25,6 +25,12 @@ export const musclesText = (e: Exercise) => e.primary.map((g) => MUSCLE_LABELS[g
 export const secondaryText = (e: Exercise) => e.secondary.map((g) => MUSCLE_LABELS[g]).join(', ');
 export const equipmentText = (e: Exercise) => e.equipment.map((q) => EQUIPMENT_LABELS[q]).join(' + ');
 
+/**
+ * What a tempo reading leaves out (TEMPO_MEASURED_SHARE), in the words both the
+ * "How we judge it" list and each rep's result use (src/engine/checks.ts).
+ */
+export const TEMPO_UNTIMED = 'not counting the slow start and finish';
+
 const pct = (v: number) => `${Math.round(Math.abs(v) * 100)}%`;
 const range = (min?: number, max?: number, unit = '°') =>
   min !== undefined && max !== undefined ? `${min}–${max}${unit}` : max !== undefined ? `at most ${max}${unit}` : `at least ${min}${unit}`;
@@ -57,11 +63,12 @@ export function describeTarget(c: Check): string {
     case 'symmetry':
       return `Left and right within ${c.maxDiffDeg}°`;
     case 'tempo': {
-      // The engine doesn't time a movement's slow start and finish (TEMPO_MEASURED_SHARE): say what the limits ask in all.
+      // The engine doesn't time a movement's slow start and finish (TEMPO_MEASURED_SHARE): say roughly what the
+      // limits ask in all (how much depends on how the lift moves its tracked joint; see MIN_ECCENTRIC_SEC).
       const all = (v: number) => Math.round((v / TEMPO_MEASURED_SHARE) * 10) / 10;
       const { minSec: lo, maxSec: hi } = c;
-      const inAll = lo !== undefined && hi !== undefined ? `about ${all(lo)}–${all(hi)} s` : lo !== undefined ? `about ${all(lo)} s` : `at most about ${all(hi!)} s`;
-      return `${c.phase === 'eccentric' ? 'Lowering' : 'Lifting'} takes ${range(lo, hi, ' s')}, not counting its slow start and finish (${inAll} in all)`;
+      const inAll = lo !== undefined && hi !== undefined ? `roughly ${all(lo)}–${all(hi)} s` : lo !== undefined ? `roughly ${all(lo)} s` : `at most roughly ${all(hi!)} s`;
+      return `${c.phase === 'eccentric' ? 'Lowering' : 'Lifting'} takes ${range(lo, hi, ' s')}, ${TEMPO_UNTIMED} (${inAll} in all)`;
     }
     case 'lockout':
       return `Straightens to at least ${c.minDeg}° at the ${c.at}`;

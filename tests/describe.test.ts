@@ -73,15 +73,25 @@ describe('relative-height targets', () => {
 });
 
 describe('tempo targets', () => {
-  it('say what a minimum asks in all, since the engine doesn’t time a movement’s slow start and finish', () => {
+  it('say roughly what a minimum asks in all, since the engine doesn’t time a movement’s slow start and finish', () => {
     for (const id of ['back-squat', 'bench-press', 'reverse-lunge']) {
       const tempo = getExercise(id)!.checks.find((c) => c.type === 'tempo')!;
-      // MIN_ECCENTRIC_SEC 0.65 measured ≈ ACSM's 1 s lower bound for a smooth lowering (src/data/sources.ts).
-      expect(describeTarget(tempo)).toBe('Lowering takes at least 0.65 s, not counting its slow start and finish (about 1 s in all)');
+      // MIN_ECCENTRIC_SEC 0.65 measured ≈ ACSM's 1 s lower bound, roughly: how much of a real lowering it asks
+      // depends on how the lift moves its tracked joint (src/data/sources.ts).
+      expect(describeTarget(tempo)).toBe('Lowering takes at least 0.65 s, not counting the slow start and finish (roughly 1 s in all)');
     }
     const tempo = getExercise('back-squat')!.checks.find((c) => c.type === 'tempo')!;
-    expect(describeTarget({ ...tempo, minSec: 0.65, maxSec: 1.95 })).toBe('Lowering takes 0.65–1.95 s, not counting its slow start and finish (about 1–3 s in all)');
-    expect(describeTarget({ ...tempo, minSec: undefined, maxSec: 1.3 })).toBe('Lowering takes at most 1.3 s, not counting its slow start and finish (at most about 2 s in all)');
+    expect(describeTarget({ ...tempo, minSec: 0.65, maxSec: 1.95 })).toBe('Lowering takes 0.65–1.95 s, not counting the slow start and finish (roughly 1–3 s in all)');
+    expect(describeTarget({ ...tempo, minSec: undefined, maxSec: 1.3 })).toBe('Lowering takes at most 1.3 s, not counting the slow start and finish (at most roughly 2 s in all)');
+  });
+
+  it('and each rep’s result says it too, so its reading isn’t taken for the whole lowering', () => {
+    const e = getExercise('reverse-lunge')!;
+    const tempo = analyze(e, demoSequence(e)).reps[0].checks.find((c) => c.checkId === 'tempo-eccentric')!;
+    expect(tempo.target).toBe('at least 0.65 s, not counting the slow start and finish');
+    // The demo lowers in 2.0 s (src/demo/timeline.ts); the reading leaves out its slow ends.
+    expect(tempo.value).toBeGreaterThan(1);
+    expect(tempo.value).toBeLessThan(1.6);
   });
 });
 
