@@ -143,7 +143,9 @@ function simctl() {
     process.on('SIGTERM', () => process.exit(0));
     const file = path.join(dir, `console-${launch}.txt`);
     const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\n$/, '').split('\n') : [];
-    let buffer = '';
+    // Like the real simctl, which prints "<bundle id>: <pid>" for every launch (with app.fitee as the bundle ID
+    // that reads "app.fitee: 26190", which the first macOS run's Release check took for the app's own output).
+    let buffer = `${bundle}: ${process.pid}\r\n`;
     const flush = () => {
       if (buffer) fs.writeSync(1, buffer);
       buffer = '';

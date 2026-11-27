@@ -697,6 +697,14 @@ describe.concurrent('the Release launch', SLOW, () => {
     const result = await judge(['2026-11-27 09:41:00.000 App[4211:90210] a system message']);
     expect(result.code, result.out).toBe(0);
   });
+  it("passes with simctl's own launch line, even when the bundle ID ends in fitee (the first macOS run)", async () => {
+    const result = await judge([
+      '2026-11-27 13:35:29.503 App[26190:109366] DiskCookieStorage changing policy from 2 to 0, cookie file: file:///Users/runner/Library/Cookies/app.fitee.binarycookies',
+      'app.fitee: 26190',
+      'com.example.fitee: 7',
+    ]);
+    expect(result.code, result.out).toBe(0);
+  });
   it('fails on a Capacitor or fitee line: a Release build never logs', async () => {
     expectError(await judge(['⚡️  WebView loaded']), 'logged 1 line', 'WebView loaded');
     expectError(await judge(['fitee:statusbar dark-text', 'fitee:ready {}']), 'logged 2 lines');

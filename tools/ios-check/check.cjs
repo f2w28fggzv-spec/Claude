@@ -424,9 +424,12 @@ async function launch(file, kind, infoFile, url) {
 
 // ---- release ----------------------------------------------------------------------------------------------------
 
-/** A Release build never logs (loggingBehavior 'debug' in capacitor.config.ts; the fitee: prints are Debug-only). */
+/** A Release build never logs (loggingBehavior 'debug' in capacitor.config.ts; the fitee: prints are Debug-only).
+ *  `simctl launch` itself prints "<bundle id>: <pid>" (with the placeholder bundle ID that's "app.fitee: 26190"),
+ *  so that line isn't the app's; fitee's own markers have no space after "fitee:". */
+const SIMCTL_PID_LINE = /^[A-Za-z0-9.-]+: \d+\s*$/;
 function release(file) {
-  const logged = readConsole(file).filter((line) => line.includes('⚡') || line.includes('fitee:'));
+  const logged = readConsole(file).filter((line) => !SIMCTL_PID_LINE.test(line) && (line.includes('⚡') || /fitee:\S/.test(line)));
   if (logged.length) {
     error(`Release launch: the Release build logged ${logged.length} line${logged.length === 1 ? '' : 's'}, and must log nothing (Debug builds only): ${logged.slice(0, 3).map((l) => quote(l, 120)).join(' ')}`);
   } else console.log('Release launch: kept running and logged nothing');
