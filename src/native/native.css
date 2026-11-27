@@ -20,13 +20,17 @@ html.native a {
   -webkit-touch-callout: none;
 }
 
-/* Licence texts in the Terms (src/native/screens/Legal.tsx). */
-.licences {
+/* Licence texts in the Terms (src/native/screens/Legal.tsx). Under .legal, to win over .legal ul's indent. */
+.legal .licences {
   padding-left: 0;
   list-style: none;
 }
 .licences details.more {
   margin: 4px 0;
+}
+/* Not .legal li's 0.88 opacity: on top of the summary's muted colour it falls under 4.5:1 on the light page. */
+.legal .licences li {
+  opacity: 1;
 }
 .licence {
   white-space: pre-wrap;

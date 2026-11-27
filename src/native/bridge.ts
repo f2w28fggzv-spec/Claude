@@ -30,7 +30,8 @@
 // itself: App (navigator.app.exitApp, a 'backbutton' listener) and WebView (Ionic.WebView.*) only when the page calls
 // them, and CapacitorHttp only when it's enabled (it's off: capacitor.config.ts). None of those, and nothing that can
 // make a request, set cookies or change the server path, is ever allowed. AppInfo.gate says the gate is in place;
-// the self-test's gate step proves it (GATE_PROBES).
+// the self-test's gate step proves it (GATE_PROBES). Outside the app (the Chromium check's stand-in bridge) there is
+// no webkit.messageHandlers.bridge to test, and the step reports itself skipped (SelfTestStep.skipped).
 //
 // FILES (Library/Application Support/fitee/, FiteeFiles.swift; names in src/native/setFiles.ts)
 //   data/  snapshot.json, snapshot.next.json, snapshot.prev.json: the copy of the log (src/native/snapshot.ts).
@@ -428,6 +429,12 @@ export interface ReadyMarker {
 export interface SelfTestStep {
   ok: boolean;
   error?: string;
+  /**
+   * Why the whole step didn't run here, with ok true: set only outside the app, where what it tests isn't there (the
+   * gate step without webkit.messageHandlers.bridge, in the Chromium check's stand-in bridge, tools/native-check/).
+   * Never in the app: CI fails a skipped step.
+   */
+  skipped?: string;
 }
 
 /** One video of the self-test's video step, saved with uploadVideo under the id "selftest<ms>a" (recorded) or "…b" (random). */
@@ -449,12 +456,17 @@ export interface SelfTestVideo extends SelfTestStep {
 
 /**
  * `fitee:selftest {json}`. Every step runs, each with its own timeout, so the marker always comes. It touches only its
- * own files and re-saves the unit as it is: it never deletes user data. CI: `ok` true; a warning if
- * video.recorded.played is 'skipped'.
+ * own files and re-saves the unit as it is: it never deletes user data. CI: `ok` true and `skipped` empty; a warning
+ * if video.recorded.played is 'skipped'.
  */
 export interface SelfTestMarker {
-  /** Every step's ok. */
+  /** Every step's ok (a skipped step's is true). */
   ok: boolean;
+  /**
+   * The steps that were skipped (SelfTestStep.skipped), in order: [] in the app, ["gate"] in the Chromium check.
+   * selftest.ts always sends it; optional so that a reader written before it (CI's test fixtures) still types.
+   */
+  skipped?: string[];
   /**
    * Two videos: `recorded`, a 160×120 canvas animated for 2 s, canvas.captureStream(30) → MediaRecorder (video/mp4
    * when supported) → Blob; `random`, 3 MiB + 5 random bytes as video/mp4. ok: both passed and folderExcluded.

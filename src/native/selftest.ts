@@ -172,7 +172,18 @@ async function videoStep(): Promise<SelfTestMarker['video']> {
 
 // ---- the bridge gate --------------------------------------------------------------------------------------------
 
+/**
+ * The channel the bridge gate guards (FiteeViewController.swift: webkit.messageHandlers.bridge, which native-bridge.js
+ * posts every call to). Only the app has it: the Chromium check's stand-in bridge (tools/native-check/) has none, and
+ * there the gate step is reported as skipped rather than failed.
+ */
+const hasNativeBridge = () =>
+  typeof (globalThis as { webkit?: { messageHandlers?: { bridge?: { postMessage?: unknown } } } }).webkit?.messageHandlers?.bridge?.postMessage === 'function';
+
 async function gateStep(info: AppInfo): Promise<SelfTestMarker['gate']> {
+  if (!hasNativeBridge()) {
+    return { ok: true, skipped: 'no webkit.messageHandlers.bridge here: only the app has the bridge gate', silent: [], answered: [], stateKept: false };
+  }
   const n = native();
   const send = capacitor()?.nativePromise;
   const target = { id: `selftest${Date.now()}g`, ext: 'mp4' as const };
@@ -253,8 +264,11 @@ export async function run(info: AppInfo): Promise<SelfTestMarker> {
   const video = await step('video', 90_000, { folderExcluded: false, recorded: { ok: false, played: false }, random: blank }, videoStep);
   const gate = await step('gate', 20_000, { silent: [], answered: [], stateKept: false }, () => gateStep(info));
   const pose = await step('pose', 95_000, { delegate: '', ms: 0 }, poseStep);
-  const steps = [video, snapshot, pose, csp, outside, keepAwake, gate];
-  const marker: SelfTestMarker = { ok: steps.every((s) => s.ok), video, snapshot, pose, csp, outside, keepAwake, gate };
+  const steps = { video, snapshot, pose, csp, outside, keepAwake, gate };
+  const skipped = Object.entries(steps)
+    .filter(([, s]) => s.skipped !== undefined)
+    .map(([name]) => name);
+  const marker: SelfTestMarker = { ok: Object.values(steps).every((s) => s.ok), skipped, ...steps };
   console.info(`${MARKERS.selftest} ${JSON.stringify(marker)}`);
   return marker;
 }
