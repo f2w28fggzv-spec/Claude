@@ -10,8 +10,9 @@
 //   check.cjs bundle <App.app> <label> <info.json>  Info.plist, the files in the bundle, the privacy manifests;
 //                                                   writes Info.plist as JSON to <info.json>
 //   check.cjs bundle-id <info.json>                 prints CFBundleIdentifier
-//   check.cjs launch <console> <light|dark|selftest> <info.json> [<probe url>]
-//                                                   a Debug launch's console (see launch() below)
+//   check.cjs launch <console> <light|dark|ipad|selftest> <info.json> [<probe url>]
+//                                                   a Debug launch's console (see launch() below); ipad is the
+//                                                   iPad's launch in the light appearance, judged as the light one
 //   check.cjs release <console>                     the Release build logged nothing
 //   check.cjs screen <png> <label> [--require]      how much of a screenshot isn't its background; --require fails a
 //                                                   blank one
@@ -213,7 +214,10 @@ function bundle(app, label, infoOut) {
 
 // ---- launch ---------------------------------------------------------------------------------------------------------
 
-const TITLES = { light: 'Light launch', dark: 'Dark launch', selftest: 'Self-test launch' };
+const TITLES = { light: 'Light launch', dark: 'Dark launch', ipad: 'iPad launch', selftest: 'Self-test launch' };
+
+/** The appearance each launch with a ready marker runs in (the iPad's: light). */
+const LOOK = { light: 'light', dark: 'dark', ipad: 'light' };
 
 /** Capacitor's console line for a console.* call in the page: "⚡️  [level] - message" (Plugins/Console.swift). */
 const CONSOLE_CALL = /\[(debug|error|info|log|trace|warn)\] - /;
@@ -340,10 +344,10 @@ function readyChecks(lines, c, kind, title, info) {
     }
   }
   const bars = lines.map((line) => after(line, c.MARKERS.statusbar)).filter((v) => v !== undefined);
-  const want = STATUS_BAR[kind];
+  const want = STATUS_BAR[LOOK[kind]];
   if (bars.length === 0) error(`${title}: no ${c.MARKERS.statusbar} line: the page never set the status bar style (src/native/statusBar.ts)`);
   else if (bars[bars.length - 1] !== want) {
-    error(`${title}: the status bar ends with ${show(bars[bars.length - 1])} text, expected ${show(want)} in the ${kind} appearance (all: ${bars.join(', ')})`);
+    error(`${title}: the status bar ends with ${show(bars[bars.length - 1])} text, expected ${show(want)} in the ${LOOK[kind]} appearance (all: ${bars.join(', ')})`);
   }
   if (ready && !failed) console.log(`${title}: ${READY_FACTS.length + 1} facts of ${c.MARKERS.ready} as required, status bar ${want}, one bridge, no error lines`);
 }
@@ -355,7 +359,10 @@ function selfTestChecks(lines, c, title, url) {
       const step = marker[name];
       if (!step || typeof step !== 'object') error(`${title}: the ${c.MARKERS.selftest} marker has no ${name} step (src/native/selftest.ts and the contract disagree)`);
       else if (step.ok !== true) error(`${title}: the ${name} step failed: ${step.error ?? show(step)}`);
+      // A step skips itself only outside the app, where what it tests isn't there (SelfTestStep.skipped): never here.
+      else if (step.skipped !== undefined) error(`${title}: the ${name} step was skipped (${show(step.skipped)}): in the app every step must run`);
     }
+    if (Array.isArray(marker.skipped) && marker.skipped.length) error(`${title}: ${c.MARKERS.selftest} lists skipped steps: ${marker.skipped.join(', ')}`);
     if (marker.ok !== true && SELF_TEST_STEPS.every((name) => marker[name] && marker[name].ok === true)) {
       error(`${title}: ${c.MARKERS.selftest} says ok ${show(marker.ok)}, though every step passed`);
     }
@@ -397,7 +404,7 @@ function selfTestChecks(lines, c, title, url) {
 
 async function launch(file, kind, infoFile, url) {
   const title = TITLES[kind];
-  if (!title) usage(`unknown launch "${kind}" (light, dark or selftest)`);
+  if (!title) usage(`unknown launch "${kind}" (light, dark, ipad or selftest)`);
   if (kind === 'selftest' && !url) usage('the self-test launch needs the probe URL');
   const c = await import(pathToFileURL(CONTRACT).href);
   const lines = readConsole(file);

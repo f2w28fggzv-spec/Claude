@@ -1,6 +1,6 @@
 // Saved sets as files in the iPhone app: the file names (src/native/setFiles.ts), the chunked video upload, and
 // src/sets/sets.ts itself running on the file adapter (src/native/setsDb.ts) against the in-memory fake native side.
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CHUNK, extFor, SET_FILE_NAME, setFileFor, toBase64, uploadVideo, VIDEO_EXTS } from '../src/native/setFiles';
@@ -37,10 +37,9 @@ describe('file names', () => {
     for (const bad of ['../x.mp4', 'a/b.mp4', `${'a'.repeat(65)}.mp4`, 'x.txt', '.mp4', 'x.mp4.part', 'index.unreadable-.json', 'x.replay.json/..', '']) expect(SET_FILE_NAME.test(bad), bad).toBe(false);
   });
 
-  // The Swift side checks the same pattern (the native contract). Its file comes with the iOS project.
-  const swift = join(ROOT, 'ios', 'App', 'App', 'FiteeFiles.swift');
-  it.skipIf(!existsSync(swift))('FiteeFiles.setFileName in Swift is the same pattern', () => {
-    const source = readFileSync(swift, 'utf8');
+  // The Swift side checks the same pattern (the native contract).
+  it('FiteeFiles.setFileName in Swift is the same pattern', () => {
+    const source = readFileSync(join(ROOT, 'ios', 'App', 'App', 'FiteeFiles.swift'), 'utf8');
     const m = /\bsetFileName\b[^=\n]*=\s*#"(.*?)"#/.exec(source);
     expect(m?.[1]).toBe(SET_FILE_NAME.source);
   });

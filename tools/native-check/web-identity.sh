@@ -64,8 +64,12 @@ hashes() {
 
 git -C "$repo" worktree add --detach "$tree" "$base" >/dev/null 2>&1
 cp -R "$repo/public/mediapipe" "$tree/public/mediapipe"
+# Each bash -c script reads its paths as "$1" and "$2", passed after the _, so its single quotes are meant.
+# shellcheck disable=SC2016
 step "$work/npm-ci-base.log" bash -c 'cd "$1" && npm ci --no-audit --no-fund' _ "$tree"
+# shellcheck disable=SC2016
 step "$work/build-base.log" bash -c 'cd "$1" && npx vite build --configLoader native --outDir "$2" --emptyOutDir' _ "$tree" "$work/out-base"
+# shellcheck disable=SC2016
 step "$work/build-head.log" bash -c 'cd "$1" && npx vite build --configLoader native --outDir "$2" --emptyOutDir' _ "$repo" "$work/out-head"
 
 hashes "$work/out-base" >"$work/base.sha256"

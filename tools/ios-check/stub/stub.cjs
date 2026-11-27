@@ -2,13 +2,19 @@
 // on Linux. tools/ios-check/stub/xcrun and stub/plutil run this file; CI's real run never does.
 //
 // STUB_DIR, the scenario (the test writes it):
-//   console-<launch>.txt  what a launch prints; <launch> is light, dark, selftest or release, told apart by the
-//                         appearance set last, the -fiteeSelfTest argument and an installed app whose path ends in
-//                         /release/App.app. "@sleep <seconds>" waits; "@exit <code>" ends the app there (a crash).
-//                         Lines go out with \r\n, as through simctl's pseudo-terminal, a segment at a time.
+//   console-<launch>.txt  what a launch prints; <launch> is light, dark, selftest, ipad or release, told apart by the
+//                         -fiteeSelfTest argument, the device (STUB_IPAD's launches are ipad), an installed app whose
+//                         path ends in /release/App.app, and the appearance set last on that device. "@sleep
+//                         <seconds>" waits; "@exit <code>" ends the app there (a crash). Lines go out with \r\n, as
+//                         through simctl's pseudo-terminal, a segment at a time.
 //   screen-<launch>.png   what `simctl io <udid> screenshot <file>` writes during that launch (else screen.png).
-// STUB_STATE, the stub's own state: appearance, installed, pid, launch, and calls.log (each call's arguments as a
-// JSON array, one per line).
+// STUB_IPAD, the iPad simulator's UDID: it starts shut down (the workflow boots only the iPhone), so installing,
+// launching or setting its appearance fails as on the runner until `simctl bootstatus <udid> -b` has booted it. Any
+// other device counts as booted.
+// STUB_FAIL, optional: "<command>@<udid>" words (e.g. "bootstatus@<udid> install@<udid>"): that simctl command fails
+// on that device.
+// STUB_STATE, the stub's own state, per device: installed-<udid>, appearance-<udid>, booted-<udid>, pid-<udid>,
+// launch-<udid>; and calls.log (each call's arguments as a JSON array, one per line).
 //
 // plutil: `plutil -convert json -o - <file>` prints the file, which must hold JSON (the test writes Info.plist as JSON:
 // the real plutil reads JSON property lists too); `plutil -lint <file>…` passes files that start with "<?xml" or hold
@@ -69,26 +75,47 @@ function kill(pid) {
   }
 }
 
+const ipad = process.env.STUB_IPAD || '';
+const failing = (process.env.STUB_FAIL || '').split(/\s+/).filter(Boolean);
+
+/** Fails as simctl does for a device that isn't booted, or as the scenario asks (STUB_FAIL). */
+function ready(command, udid) {
+  if (failing.includes(`${command}@${udid}`)) fail(`An error was encountered processing the command (the scenario fails ${command} on ${udid})`);
+  if (udid === ipad && readState(`booted-${udid}`) !== 'yes') {
+    fail('An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):\nUnable to lookup in current state: Shutdown');
+  }
+}
+
 function simctl() {
   const [command, ...rest] = args.slice(1);
+  if (command === 'bootstatus' && rest.length === 2 && rest[1] === '-b') {
+    if (failing.includes(`bootstatus@${rest[0]}`)) fail(`Unable to boot device ${rest[0]} (the scenario)`);
+    if (readState(`booted-${rest[0]}`) === 'yes' || rest[0] !== ipad) process.stdout.write('Device already booted, nothing to do.\n');
+    else process.stdout.write(`Monitoring boot status for iPad (A16) (${rest[0]}).\nDevice booted.\n`);
+    writeState(`booted-${rest[0]}`, 'yes');
+    return;
+  }
   if (command === 'install' && rest.length === 2) {
+    ready('install', rest[0]);
     if (!fs.existsSync(rest[1])) fail(`An error was encountered processing the command: no app at ${rest[1]}`);
-    writeState('installed', path.resolve(rest[1]));
+    writeState(`installed-${rest[0]}`, path.resolve(rest[1]));
     return;
   }
   if (command === 'ui' && rest.length === 3 && rest[1] === 'appearance') {
+    ready('ui', rest[0]);
     if (!['light', 'dark'].includes(rest[2])) fail(`unknown appearance ${rest[2]}`);
-    writeState('appearance', rest[2]);
+    writeState(`appearance-${rest[0]}`, rest[2]);
     return;
   }
   if (command === 'terminate' && rest.length === 2) {
-    const pid = readState('pid');
+    const pid = readState(`pid-${rest[0]}`);
     if (pid) kill(pid);
-    if (fs.existsSync(stateFile('pid'))) fs.rmSync(stateFile('pid'));
+    if (fs.existsSync(stateFile(`pid-${rest[0]}`))) fs.rmSync(stateFile(`pid-${rest[0]}`));
     return;
   }
   if (command === 'io' && rest.length === 3 && rest[1] === 'screenshot') {
-    const launch = readState('launch');
+    ready('io', rest[0]);
+    const launch = readState(`launch-${rest[0]}`);
     const picture = [path.join(dir, `screen-${launch}.png`), path.join(dir, 'screen.png')].find((f) => fs.existsSync(f));
     if (!picture) fail('no screenshot in the scenario');
     fs.copyFileSync(picture, rest[2]);
@@ -98,13 +125,21 @@ function simctl() {
     const options = [];
     while (rest[0] && rest[0].startsWith('--')) options.push(rest.shift());
     if (!options.includes('--console-pty')) fail('the check reads every launch through --console-pty', 2);
-    const [, bundle, ...appArgs] = rest;
+    const [udid, bundle, ...appArgs] = rest;
     if (!bundle) fail('launch without a bundle ID', 2);
-    if (options.includes('--terminate-running-process') && readState('pid')) kill(readState('pid'));
-    const installed = readState('installed');
-    const launch = appArgs.includes('-fiteeSelfTest') ? 'selftest' : installed.endsWith(`${path.sep}release${path.sep}App.app`) ? 'release' : readState('appearance', 'light');
-    writeState('pid', process.pid);
-    writeState('launch', launch);
+    ready('launch', udid);
+    const installed = readState(`installed-${udid}`);
+    if (!installed) fail(`The request to open "${bundle}" failed: it isn't installed on ${udid}`);
+    if (options.includes('--terminate-running-process') && readState(`pid-${udid}`)) kill(readState(`pid-${udid}`));
+    const launch = appArgs.includes('-fiteeSelfTest')
+      ? 'selftest'
+      : udid === ipad
+        ? 'ipad'
+        : installed.endsWith(`${path.sep}release${path.sep}App.app`)
+          ? 'release'
+          : readState(`appearance-${udid}`, 'light');
+    writeState(`pid-${udid}`, process.pid);
+    writeState(`launch-${udid}`, launch);
     process.on('SIGTERM', () => process.exit(0));
     const file = path.join(dir, `console-${launch}.txt`);
     const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\n$/, '').split('\n') : [];

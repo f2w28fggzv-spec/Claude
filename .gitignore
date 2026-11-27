@@ -5,3 +5,6 @@ public/mediapipe/
 
 # The iPhone app's web files (npm run build:native)
 dist-native/
+
+# Other checkouts of this repo that tools keep inside it (git worktrees)
+.claude/worktrees/

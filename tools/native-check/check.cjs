@@ -1292,7 +1292,7 @@ async function selfTest() {
     m.video?.ok === true && rec.played === true && rec.listed && rec.range && rec.sha256 && rec.removed && m.video.random.listed && m.video.random.range && m.video.random.sha256 && m.video.random.removed && m.video.folderExcluded,
     `recorded ${rec.type} ${rec.bytes} bytes, played ${rec.played}; random ${m.video?.random?.bytes} bytes`,
   );
-  check('self-test: snapshot, pose (GPU or CPU), csp (img-src), outside (blocked), keepAwake', m.snapshot?.revMatches && m.snapshot?.unitMatches && ['GPU', 'CPU'].includes(m.pose?.delegate) && m.csp?.directive === 'img-src' && m.outside?.result === 'blocked' && m.keepAwake?.ok, `pose ${m.pose?.delegate} in ${m.pose?.ms} ms, csp ${m.csp?.directive}, outside ${m.outside?.result}`);
+  check('self-test: snapshot (two copies, the first rotated to snapshot.prev.json), pose (GPU or CPU), csp (img-src), outside (blocked), keepAwake', m.snapshot?.revMatches && m.snapshot?.unitMatches && m.snapshot?.rotated === true && ['GPU', 'CPU'].includes(m.pose?.delegate) && m.csp?.directive === 'img-src' && m.outside?.result === 'blocked' && m.keepAwake?.ok, `pose ${m.pose?.delegate} in ${m.pose?.ms} ms, csp ${m.csp?.directive}, outside ${m.outside?.result}`);
   const probe = run.native.find((l2) => l2.includes(`${C.MARKERS.cspProbe} `));
   check('self-test: its CSP probe logs fitee:csp-probe (info), never fitee:csp', !!probe && consoleCall(probe)?.level === 'info' && !run.native.some((l2) => l2.includes(`${C.MARKERS.csp} `)), short(probe, 160));
   const leftovers = [...fake.sets.keys()].filter((k) => k.startsWith('selftest'));

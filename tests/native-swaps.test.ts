@@ -66,12 +66,8 @@ describe('the app’s own Terms and Privacy policy', () => {
     for (const l of LICENCES) expect(readFileSync(join(dir, l.file), 'utf8').length, l.file).toBeGreaterThan(100);
   });
 
-  it('keeps the font licence, Capacitor’s and Preact’s as their packages have them', () => {
-    const lic = (f: string) => readFileSync(join(ROOT, 'src', 'native', 'licenses', f), 'utf8');
-    expect(lic('bricolage-grotesque-OFL.txt')).toBe(readFileSync(join(ROOT, 'public', 'licenses', 'bricolage-grotesque-OFL.txt'), 'utf8'));
-    expect(lic('capacitor-mit.txt').startsWith(readFileSync(join(ROOT, 'node_modules', '@capacitor', 'ios', 'LICENSE'), 'utf8').trimEnd())).toBe(true);
-    expect(lic('preact-mit.txt').startsWith(readFileSync(join(ROOT, 'node_modules', 'preact', 'LICENSE'), 'utf8').trimEnd())).toBe(true);
-  });
+  // The font licence, Capacitor's and Preact's as their packages have them, and the pods the app compiles:
+  // tests/native-project.test.ts.
 
   it('says where each runtime library’s text came from', () => {
     const lic = (f: string) => readFileSync(join(ROOT, 'src', 'native', 'licenses', f), 'utf8');

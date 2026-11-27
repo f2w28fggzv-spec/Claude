@@ -482,8 +482,12 @@ export interface SelfTestMarker {
     recorded: Partial<SelfTestVideo> & SelfTestStep & { played: boolean | 'skipped' };
     random: SelfTestVideo;
   };
-  /** setItem('formcheck.v1.unit', its value or '"kg"'), flushNow(), readSnapshot(): current parses (rev: its rev), its rev equals formcheck.v1.device.snapshotRev, its data has the unit. */
-  snapshot: SelfTestStep & { rev: number; revMatches: boolean; unitMatches: boolean };
+  /**
+   * setItem('formcheck.v1.unit', its value or '"kg"') and flushNow(), twice (so the second write rotates the first copy
+   * into snapshot.prev.json), then readSnapshot(): current parses (rev: its rev), its rev equals
+   * formcheck.v1.device.snapshotRev, its data has the unit, and `rotated`: prev parses and its rev is one less.
+   */
+  snapshot: SelfTestStep & { rev: number; revMatches: boolean; unitMatches: boolean; rotated: boolean };
   /** createPoseLandmarker('full') (src/pose.ts) resolved, GPU or CPU, then closed: judged by that, not by MediaPipe's log lines. ms: how long it took. */
   pose: SelfTestStep & { delegate: 'GPU' | 'CPU' | ''; ms: number };
   /** new Image().src = PROBE_ORIGIN + '/fitee-csp-probe.png' raised a securitypolicyviolation within 2 s (its effectiveDirective). */

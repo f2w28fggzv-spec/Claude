@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
@@ -25,5 +26,8 @@ export default defineConfig(({ mode }) => {
     plugins: native ? [preact(), nativeBuild()] : [preact(), basicSsl(), webHasNoNativeCode(), offlineBuild(), landingBuild()],
     server: { host: true },
     build: native ? { target: 'es2022', outDir: 'dist-native', emptyOutDir: true } : { target: 'es2022' },
+    // npm test (Vitest reads this file too): this checkout's tests only, not those of other checkouts of the repo that
+    // tools keep inside it (.claude/worktrees/). The first two are Vitest's own defaults.
+    test: { exclude: ['**/node_modules/**', '**/.git/**', '.claude/**'] },
   };
 });

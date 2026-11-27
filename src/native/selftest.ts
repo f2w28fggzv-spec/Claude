@@ -37,14 +37,20 @@ async function step<T extends SelfTestStep>(what: string, ms: number, failed: Om
 
 async function snapshotStep(): Promise<SelfTestMarker['snapshot']> {
   const unit = localStorage.getItem(UNIT_KEY) ?? '"kg"';
-  localStorage.setItem(UNIT_KEY, unit); // the same value: the copy writer schedules a write
-  flushNow(); // posted before the read below, and the bridge runs calls in order
-  const { current } = await native().readSnapshot();
+  // Two copies, so the second moves the first to snapshot.prev.json (FiteeFiles.writeSnapshot's rename(2)s).
+  for (let i = 0; i < 2; i++) {
+    localStorage.setItem(UNIT_KEY, unit); // the same value: the copy writer schedules a write
+    flushNow(); // posted at once, before the read below, and the bridge runs calls in order
+  }
+  const { current, prev } = await native().readSnapshot();
   const parsed = current === undefined ? undefined : parseCopy(current);
   const copy = parsed?.ok ? parsed.copy : undefined;
+  const before = prev === undefined ? undefined : parseCopy(prev);
   const revMatches = !!copy && copy.rev === localRevOf(localStorage);
   const unitMatches = !!copy && JSON.stringify(copy.data[UNIT_KEY]) === JSON.stringify(JSON.parse(unit));
-  return { ok: revMatches && unitMatches, rev: copy?.rev ?? 0, revMatches, unitMatches, ...(copy ? {} : { error: 'snapshot.json is missing or not a valid copy' }) };
+  const rotated = !!copy && !!before?.ok && before.copy.rev === copy.rev - 1;
+  const error = !copy ? 'snapshot.json is missing or not a valid copy' : !rotated ? 'snapshot.prev.json isn’t the copy written just before snapshot.json' : undefined;
+  return { ok: revMatches && unitMatches && rotated, rev: copy?.rev ?? 0, revMatches, unitMatches, rotated, ...(error ? { error } : {}) };
 }
 
 // ---- video -----------------------------------------------------------------------------------------------------
@@ -249,7 +255,7 @@ async function poseStep(): Promise<SelfTestMarker['pose']> {
 
 /** Runs every step one after another and logs the marker. */
 export async function run(info: AppInfo): Promise<SelfTestMarker> {
-  const snapshot = await step('snapshot', 10_000, { rev: 0, revMatches: false, unitMatches: false }, snapshotStep);
+  const snapshot = await step('snapshot', 10_000, { rev: 0, revMatches: false, unitMatches: false, rotated: false }, snapshotStep);
   const keepAwake = await step<SelfTestStep>('keepAwake', 5_000, {}, async () => {
     await native().setKeepAwake({ on: true });
     await native().setKeepAwake({ on: false });

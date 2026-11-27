@@ -6,8 +6,9 @@ name: iPhone app
 # simulator: every push to a claude/** branch, and every manual run. No pull_request trigger: this project's pull
 #   requests come from claude/** branches, whose pushes run it already, so each commit runs once. Builds Debug and
 #   Release for the iOS simulator without signing, then tools/ios-check/simulator-check.sh installs them and checks
-#   both bundles, a light and a dark launch, the self-test launch and a Release launch (its header says what each must
-#   show). The screenshots, consoles and logs are kept as an artifact for 14 days: Debug consoles of made-up data only.
+#   both bundles, a light and a dark launch, the self-test launch, a launch of the Debug build on an iPad (an
+#   iPhone-only app also runs there, in compatibility mode) and a Release launch (its header says what each must show).
+#   The screenshots, consoles and logs are kept as an artifact for 14 days: Debug consoles of made-up data only.
 #
 # testflight: manual runs only (Actions > iPhone app > Run workflow), once the simulator job has passed, and only when
 #   the App Store Connect secrets exist: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (the .p8 file's text) and
@@ -55,8 +56,10 @@ env:
   # Uploads to App Store Connect must be built with Xcode 26 or later and an iOS 26 SDK (Apple, since April 28, 2026).
   # Pinned rather than the image's default, so an image update can't change the toolchain unannounced.
   DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-  # A device every iOS 26 runtime on the macos-26 image has.
+  # Devices every iOS 26 runtime on the macos-26 image has (its readme's list of installed simulators).
   SIMULATOR: iPhone 17
+  # The iPad for the compatibility launch: the App Store offers an iPhone-only app on iPads too.
+  IPAD_SIMULATOR: iPad (A16)
 
 jobs:
   simulator:
@@ -92,11 +95,14 @@ jobs:
       - name: Copy them into the Xcode project
         run: npm run native:sync
 
-      - name: Pick and boot a simulator
+      - name: Pick the simulators and boot the iPhone
         run: |
           udid=$(xcrun simctl list devices available --json | node tools/ios-check/pick-simulator.cjs "$SIMULATOR")
           echo "UDID=$udid" >> "$GITHUB_ENV"
           xcrun simctl boot "$udid"
+          # The check boots the iPad itself when it gets to it, so two simulators run at once only for that launch.
+          ipad=$(xcrun simctl list devices available --json | node tools/ios-check/pick-simulator.cjs "$IPAD_SIMULATOR")
+          echo "IPAD_UDID=$ipad" >> "$GITHUB_ENV"
 
       - name: Build Debug for the simulator, without signing
         run: |
@@ -131,7 +137,7 @@ jobs:
           # localhost, not 127.0.0.1: since iOS 17, App Transport Security refuses plain HTTP to an IP address.
           echo "PROBE_URL=http://localhost:$(cat "$RUNNER_TEMP/probe-port")/fitee-rules-probe" >> "$GITHUB_ENV"
 
-      - name: Launch and check (bundles, light, dark, self-test, Release)
+      - name: Launch and check (bundles, light, dark, self-test, iPad, Release)
         env:
           # Belt and braces next to --console-pty: Foundation leaves stdout unbuffered.
           SIMCTL_CHILD_NSUnbufferedIO: 'YES'
@@ -140,7 +146,7 @@ jobs:
           tools/ios-check/simulator-check.sh "$UDID" \
             "$RUNNER_TEMP/derived/Build/Products/Debug-iphonesimulator/App.app" \
             "$RUNNER_TEMP/derived-release/Build/Products/Release-iphonesimulator/App.app" \
-            ios-check "$PROBE_URL"
+            ios-check "$PROBE_URL" "$IPAD_UDID"
 
       - name: System log of the app and its web content
         if: failure() && env.UDID != ''
@@ -148,6 +154,11 @@ jobs:
           mkdir -p ios-check
           xcrun simctl spawn "$UDID" log show --last 15m --style compact \
             --predicate 'process == "App" OR process CONTAINS "WebContent"' > ios-check/system.log || true
+          # The iPad's too, if the check got as far as booting it.
+          if [ -n "${IPAD_UDID:-}" ]; then
+            xcrun simctl spawn "$IPAD_UDID" log show --last 15m --style compact \
+              --predicate 'process == "App" OR process CONTAINS "WebContent"' > ios-check/system-ipad.log 2>&1 || true
+          fi
 
       - name: Keep the screenshots, consoles and logs
         if: always()

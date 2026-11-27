@@ -19,6 +19,8 @@ const TOOLS = join(ROOT, 'tools/ios-check');
 const SCRIPT = join(TOOLS, 'simulator-check.sh');
 const BASH = process.env.IOS_CHECK_BASH || 'bash';
 const UDID = '0F1E2D3C-4B5A-6978-8796-A5B4C3D2E1F0';
+/** The iPad simulator: shut down until the script boots it (the stub's STUB_IPAD). */
+const IPAD = 'A0B1C2D3-E4F5-4A6B-8C7D-9E0F1A2B3C4D';
 
 const dirs: string[] = [];
 const tmp = (prefix: string) => {
@@ -116,7 +118,7 @@ const SCREEN = png(60, 120, welcome);
 /** The launch colour alone, with the status bar and the home indicator a blank page still has. */
 const BLANK = png(60, 120, (_, y) => (y < 8 || y > 112 ? INK : PAPER));
 
-// ---- a scenario: two app bundles, four consoles, the screenshots --------------------------------------------------
+// ---- a scenario: two app bundles, five consoles, the screenshots --------------------------------------------------
 
 const ready = (over: Partial<ReadyMarker> = {}): ReadyMarker => ({
   version: '1.0.0',
@@ -142,7 +144,7 @@ const VIDEO = { ok: true, type: 'video/mp4', bytes: 48211, listed: true, exclude
 const selftest = (over: Partial<SelfTestMarker> = {}): SelfTestMarker => ({
   ok: true,
   video: { ok: true, folderExcluded: true, recorded: { ...VIDEO, played: true }, random: { ...VIDEO, bytes: 3145733 } },
-  snapshot: { ok: true, rev: 3, revMatches: true, unitMatches: true },
+  snapshot: { ok: true, rev: 3, revMatches: true, unitMatches: true, rotated: true },
   pose: { ok: true, delegate: 'GPU', ms: 4210 },
   csp: { ok: true, directive: 'img-src' },
   outside: { ok: true, result: 'blocked' },
@@ -187,7 +189,7 @@ const selftestConsole = (marker: SelfTestMarker | string = selftest(), rulesMark
   info(`${MARKERS.selftest} ${typeof marker === 'string' ? marker : JSON.stringify(marker)}`),
 ];
 
-type Launch = 'light' | 'dark' | 'selftest' | 'release';
+type Launch = 'light' | 'dark' | 'selftest' | 'ipad' | 'release';
 
 interface Scenario {
   /** Replaces a launch's console. */
@@ -199,7 +201,7 @@ interface Scenario {
   env?: Record<string, string>;
   /** The probe URL passed to the script (default: the probe server's). */
   probe?: string;
-  /** The script's arguments, in place of the usual five. */
+  /** The script's arguments, in place of the usual six. */
   args?: string[];
 }
 
@@ -272,6 +274,7 @@ function run(scenario: Scenario = {}): Promise<Result> {
     light: lookConsole('light'),
     dark: lookConsole('dark'),
     selftest: selftestConsole(),
+    ipad: lookConsole('light'),
     release: ['2026-11-27 09:41:00.000 App[4211:90210] a system message that says nothing about fitee'],
     ...scenario.consoles,
   };
@@ -279,12 +282,13 @@ function run(scenario: Scenario = {}): Promise<Result> {
   writeFileSync(join(stubDir, 'screen.png'), SCREEN);
   for (const [launch, picture] of Object.entries(scenario.screens ?? {})) writeFileSync(join(stubDir, `screen-${launch}.png`), picture);
 
-  const args = scenario.args ?? [UDID, debugApp, releaseApp, join(dir, 'out'), scenario.probe ?? PROBE];
+  const args = scenario.args ?? [UDID, debugApp, releaseApp, join(dir, 'out'), scenario.probe ?? PROBE, IPAD];
   const env = {
     ...process.env,
     PATH: `${join(TOOLS, 'stub')}:${process.env.PATH}`,
     STUB_DIR: stubDir,
     STUB_STATE: state,
+    STUB_IPAD: IPAD,
     READY_TIMEOUT: '3',
     SELFTEST_TIMEOUT: '3',
     RELEASE_ALIVE_SECONDS: '1',
@@ -352,7 +356,7 @@ function check(args: string[], env: NodeJS.ProcessEnv = process.env): Promise<Ju
 }
 
 /** check.cjs launch, on a console written as simctl's pseudo-terminal writes it (each line ending in \r\n). */
-function judgeLaunch(kind: 'light' | 'dark' | 'selftest', lines: string[]) {
+function judgeLaunch(kind: 'light' | 'dark' | 'ipad' | 'selftest', lines: string[]) {
   const dir = tmp('ios-launch-');
   writeFileSync(join(dir, 'console.log'), lines.map((line) => `${line}\r\n`).join(''));
   writeFileSync(join(dir, 'info.json'), JSON.stringify({ CFBundleIdentifier: config.appId, CFBundleShortVersionString: '1.0.0', CFBundleVersion: '1' }));
@@ -371,26 +375,42 @@ const SLOW = { timeout: 30_000 };
 // ---- whole runs of the script -------------------------------------------------------------------------------------
 
 describe('the simulator check, on a good run', SLOW, () => {
-  it('passes, launches light, dark, the self-test and the Release build, and keeps every console and screenshot', async () => {
+  it('passes, launches light, dark, the self-test, the iPad and the Release build, and keeps every console and screenshot', async () => {
     const result = await run();
     expect(result.errors, result.out).toEqual([]);
     expect(result.warnings, result.out).toEqual([]);
     expect(result.code, result.out).toBe(0);
 
     const simctl = result.calls.filter((c) => c[0] === 'xcrun').map((c) => c.slice(1));
-    const installs = simctl.filter((c) => c[1] === 'install').map((c) => c[3]);
-    expect(installs).toEqual([join(result.dir, 'debug/App.app'), join(result.dir, 'release/App.app')]);
+    const installs = simctl.filter((c) => c[1] === 'install').map((c) => [c[2], c[3]]);
+    const debugApp = join(result.dir, 'debug/App.app');
+    expect(installs).toEqual([
+      [UDID, debugApp],
+      [IPAD, debugApp],
+      [UDID, join(result.dir, 'release/App.app')],
+    ]);
     const launches = simctl.filter((c) => c[1] === 'launch');
-    expect(launches).toHaveLength(4);
-    for (const launch of launches) expect(launch.slice(2, 6)).toEqual(['--console-pty', '--terminate-running-process', UDID, config.appId]);
-    expect(launches.map((l) => l.slice(6))).toEqual([[], [], [SELF_TEST_ARG, PROBE_URL_ARG, PROBE], []]);
-    const looks = simctl.filter((c) => c[1] === 'ui').map((c) => c[4]);
-    expect(looks).toEqual(['light', 'dark', 'light']);
-    expect(simctl.filter((c) => c[1] === 'terminate')).toHaveLength(4);
+    expect(launches).toHaveLength(5);
+    for (const launch of launches) expect(launch.slice(2, 4)).toEqual(['--console-pty', '--terminate-running-process']);
+    expect(launches.map((l) => [l[4], l[5]])).toEqual([...Array(3).fill([UDID, config.appId]), [IPAD, config.appId], [UDID, config.appId]]);
+    expect(launches.map((l) => l.slice(6))).toEqual([[], [], [SELF_TEST_ARG, PROBE_URL_ARG, PROBE], [], []]);
+    const looks = simctl.filter((c) => c[1] === 'ui').map((c) => [c[2], c[4]]);
+    expect(looks).toEqual([
+      [UDID, 'light'],
+      [UDID, 'dark'],
+      [IPAD, 'light'],
+      [UDID, 'light'],
+    ]);
+    expect(simctl.filter((c) => c[1] === 'terminate').map((c) => c[2])).toEqual([UDID, UDID, UDID, IPAD, UDID]);
+    // The iPad is booted (it starts shut down) before anything is installed on it.
+    const ipadCalls = simctl.filter((c) => c.includes(IPAD)).map((c) => c[1]);
+    expect(ipadCalls.slice(0, 3)).toEqual(['bootstatus', 'install', 'ui']);
+    expect(simctl.find((c) => c[1] === 'bootstatus')).toEqual(['simctl', 'bootstatus', IPAD, '-b']);
 
-    for (const file of ['console-light.log', 'console-dark.log', 'console-selftest.log', 'console-release.log', 'welcome-light.png', 'welcome-dark.png', 'release.png']) {
+    for (const file of ['console-light.log', 'console-dark.log', 'console-selftest.log', 'console-ipad.log', 'console-release.log', 'welcome-light.png', 'welcome-dark.png', 'welcome-ipad.png', 'release.png']) {
       expect(existsSync(join(result.dir, 'out', file)), file).toBe(true);
     }
+    expect(result.out).toContain('iPad launch: 13 facts of fitee:ready as required, status bar dark-text');
     expect(readFileSync(join(result.dir, 'out/console-light.log'), 'utf8')).toContain(`${MARKERS.ready} `);
     // The consoles are printed with workflow commands off, so no line of theirs can act as one.
     expect(result.out).toMatch(/::stop-commands::(fitee-console-\d+-\d+)[\s\S]*?::\1::/);
@@ -422,6 +442,22 @@ describe.concurrent('the simulator check fails, in a whole run,', SLOW, () => {
   it('a self-test launch with a failed step', () =>
     fails({ consoles: { selftest: selftestConsole(selftest({ ok: false, pose: { ok: false, delegate: '', ms: 90000, error: 'createPoseLandmarker: no result within 90 s' } })) } }, 'Self-test launch', 'the pose step failed'));
 
+  // The iPad: the same Debug build, on a simulator the script boots, launched once in the light appearance.
+  it('an iPad launch whose ready marker reports a fact the light launch must not', () =>
+    fails({ consoles: { ipad: lookConsole('light', { ownFile: 404 }) } }, 'iPad launch', 'ownFile is 404'));
+  it('an iPad launch with the light text of a dark page', () =>
+    fails({ consoles: { ipad: lookConsole('dark') } }, 'iPad launch', '"light-text"', 'expected "dark-text" in the light appearance'));
+  it('an iPad launch that never logs its ready marker', () => fails({ consoles: { ipad: lookConsole('light').slice(0, -1) } }, 'iPad launch', 'no fitee:ready marker after 3 s'));
+  it('an iPad launch whose app ends before it is ready', () =>
+    fails({ consoles: { ipad: ['⚡️  Loading app at capacitor://localhost...', '⚡️  WebView process terminated', '@exit 1'] } }, 'iPad launch', 'the app ended before its fitee:ready marker'));
+  it("an iPad simulator that can't boot, and still launches the Release build", async () => {
+    const result = await run({ env: { STUB_FAIL: `bootstatus@${IPAD}` } });
+    expectError(result, 'iPad launch', `the iPad simulator (${IPAD}) couldn't be booted`);
+    expect(result.calls.some((c) => c[1] === 'simctl' && c[2] === 'install' && c[3] === IPAD)).toBe(false);
+    expect(readFileSync(join(result.dir, 'out/console-release.log'), 'utf8')).toContain('a system message');
+  });
+  it("an iPad simulator the Debug build can't be installed on", () => fails({ env: { STUB_FAIL: `install@${IPAD}` } }, 'iPad launch', "couldn't be installed in the iPad simulator"));
+
   // What only a run can show: the launches' timing.
   it('a launch that never logs its ready marker', () => fails({ consoles: { light: lookConsole('light').slice(0, -1) } }, 'Light launch', 'no fitee:ready marker after 3 s'));
   it('a launch whose app ends before it is ready', () =>
@@ -444,10 +480,17 @@ describe.concurrent('the simulator check fails, in a whole run,', SLOW, () => {
     expect(result.errors.join('\n')).toContain("isn't plain HTTP to this machine");
     expect(result.calls.filter((c) => c[0] === 'xcrun')).toEqual([]);
   });
-  it('by asking for five arguments', async () => {
+  it('by asking for six arguments', async () => {
     const result = await run({ args: [UDID] });
     expect(result.code).toBe(2);
     expect(result.out).toContain('Usage:');
+  });
+  it('by refusing the iPhone simulator as the iPad, before any launch', async () => {
+    const dir = tmp('ios-same-');
+    const result = await run({ args: [UDID, join(dir, 'debug/App.app'), join(dir, 'release/App.app'), join(dir, 'out'), PROBE, UDID] });
+    expect(result.code).toBe(2);
+    expect(result.out).toContain('the iPad simulator must be another device');
+    expect(result.calls).toEqual([]);
   });
 });
 
@@ -553,6 +596,16 @@ describe.concurrent('a light or dark launch', SLOW, () => {
   it('fails a dark launch whose status bar has dark text', async () =>
     expectError(await judgeLaunch('dark', replace(lookConsole('dark'), 'fitee:statusbar light-text', 'fitee:statusbar dark-text')), 'Dark launch', '"dark-text"', 'expected "light-text"'));
 
+  it('judges an iPad launch as the light one: it passes as the app logs it, and fails as the light launch does', async () => {
+    const passed = await judgeLaunch('ipad', lookConsole('light'));
+    expect(passed.errors, passed.out).toEqual([]);
+    expect(passed.code).toBe(0);
+    expect(passed.out).toContain('iPad launch: 13 facts of fitee:ready as required, status bar dark-text');
+    expectError(await judgeLaunch('ipad', lookConsole('light', { simd: false })), 'iPad launch', 'simd is false');
+    expectError(await judgeLaunch('ipad', [...L, `${MARKERS.dropped} message App.exitApp`]), 'iPad launch', 'the bridge gate dropped a call');
+    expectError(await judgeLaunch('ipad', replace(L, 'fitee:statusbar dark-text', 'fitee:statusbar light-text')), 'iPad launch', 'expected "dark-text" in the light appearance');
+  });
+
   const facts: [Partial<ReadyMarker>, string][] = [
     [{ origin: 'null' }, 'origin is "null"'],
     [{ urlOrigin: 'null' }, 'urlOrigin is "null"'],
@@ -590,8 +643,22 @@ describe.concurrent('the self-test launch', SLOW, () => {
   const [first] = GATE_PROBES;
   const failing: [string, string[], ...string[]][] = [
     ['a step failed', marker({ ok: false, csp: { ok: false, directive: '', error: 'no securitypolicyviolation within 2 s' } }), 'the csp step failed', 'no securitypolicyviolation within 2 s'],
-    ['a step failed though the marker says ok', marker({ snapshot: { ok: false, rev: 0, revMatches: false, unitMatches: false, error: 'snapshot.json is missing' } }), 'the snapshot step failed'],
+    ['a step failed though the marker says ok', marker({ snapshot: { ok: false, rev: 0, revMatches: false, unitMatches: false, rotated: false, error: 'snapshot.json is missing' } }), 'the snapshot step failed'],
+    [
+      'the copy of the log wasn’t rotated',
+      marker({ ok: false, snapshot: { ok: false, rev: 4, revMatches: true, unitMatches: true, rotated: false, error: 'snapshot.prev.json isn’t the copy written just before snapshot.json' } }),
+      'the snapshot step failed',
+      'snapshot.prev.json',
+    ],
     ['the marker says not ok though every step passed', marker({ ok: false }), 'though every step passed'],
+    // As the Chromium check's stand-in bridge reports it (tools/native-check/): never in the app.
+    [
+      'the gate step skipped itself',
+      marker({ skipped: ['gate'], gate: { ok: true, skipped: 'no webkit.messageHandlers.bridge here: only the app has the bridge gate', silent: [], answered: [], stateKept: false } }),
+      'the gate step was skipped',
+      'only the app has the bridge gate',
+    ],
+    ['the marker lists a skipped step', marker({ skipped: ['csp'] }), 'lists skipped steps: csp'],
     ['the pose step names no delegate', marker({ pose: { ok: true, delegate: '', ms: 10 } }), 'without saying which delegate'],
     ['a gated call got an answer', marker({ ok: false, gate: { ok: false, silent: PROBED.slice(1), answered: [PROBED[0]], stateKept: true } }), 'got an answer', PROBED[0]],
     ["the gate step didn't try a probe", marker({ gate: { ok: true, silent: PROBED.slice(1), answered: [], stateKept: true } }), "didn't try", PROBED[0]],
@@ -739,6 +806,18 @@ describe('tools/ios-check/pick-simulator.cjs', () => {
     expect(result.stdout.trim()).toBe('C');
   });
 
+  it('picks the iPad for the iPad launch the same way, by its name', () => {
+    const result = pick(
+      {
+        [runtime('26-5')]: [{ name: 'iPhone 17', udid: 'B' }, { name: 'iPad (A16)', udid: 'P' }, { name: 'iPad Pro 11-inch (M5)', udid: 'Q' }],
+        [runtime('26-2')]: [{ name: 'iPad (A16)', udid: 'O' }],
+      },
+      'iPad (A16)',
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe('P');
+  });
+
   it('skips a device that is not available, and fails when there is none', () => {
     expect(pick({ [runtime('26-5')]: [{ name: 'iPhone 17', udid: 'B', isAvailable: false }], [runtime('26-2')]: [{ name: 'iPhone 17', udid: 'A' }] }).stdout.trim()).toBe('A');
     const none = pick({ [runtime('26-5')]: [{ name: 'iPhone Air', udid: 'D' }] }, 'iPhone 17');
@@ -776,15 +855,18 @@ describe('.github/workflows/ios.yml', () => {
     expect(code).toContain('bash --version');
   });
 
-  it('builds Debug and Release for the simulator without signing, then runs the check with both and the probe server', () => {
+  it('builds Debug and Release for the simulator without signing, then runs the check with both, the probe server and an iPad', () => {
     for (const configuration of ['Debug', 'Release']) expect(code).toMatch(new RegExp(`-configuration ${configuration}[^\\n]*\\\\\\n[\\s\\S]*?CODE_SIGNING_ALLOWED=NO`));
     expect(code).toContain('npm run build:native');
     expect(code).toContain('npm run native:sync');
     expect(code).not.toMatch(/\bcap (copy|sync)\b|pod install/);
     expect(code).toContain('node tools/ios-check/probe-server.cjs');
     expect(code).toContain('PROBE_URL=http://localhost:');
+    // An iPad that every iOS 26 runtime on the macos-26 image has, picked as the iPhone is; the check boots it.
+    expect(code).toContain('IPAD_SIMULATOR: iPad (A16)');
+    expect(code).toMatch(/node tools\/ios-check\/pick-simulator\.cjs "\$IPAD_SIMULATOR"\)\n\s+echo "IPAD_UDID=\$ipad" >> "\$GITHUB_ENV"/);
     expect(code).toMatch(
-      /tools\/ios-check\/simulator-check\.sh "\$UDID" \\\n\s+"\$RUNNER_TEMP\/derived\/Build\/Products\/Debug-iphonesimulator\/App\.app" \\\n\s+"\$RUNNER_TEMP\/derived-release\/Build\/Products\/Release-iphonesimulator\/App\.app" \\\n\s+ios-check "\$PROBE_URL"/,
+      /tools\/ios-check\/simulator-check\.sh "\$UDID" \\\n\s+"\$RUNNER_TEMP\/derived\/Build\/Products\/Debug-iphonesimulator\/App\.app" \\\n\s+"\$RUNNER_TEMP\/derived-release\/Build\/Products\/Release-iphonesimulator\/App\.app" \\\n\s+ios-check "\$PROBE_URL" "\$IPAD_UDID"/,
     );
     expect(code).toMatch(/if: always\(\)\n\s+uses: actions\/upload-artifact@v4\n\s+with:\n[\s\S]*?path: ios-check\//);
   });

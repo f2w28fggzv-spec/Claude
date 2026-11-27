@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 # CI's check of the iPhone app in the iOS simulator (.github/workflows/ios.yml runs it on the macOS runner):
 #
-#   tools/ios-check/simulator-check.sh <udid> <Debug App.app> <Release App.app> <out dir> <probe url>
+#   tools/ios-check/simulator-check.sh <udid> <Debug App.app> <Release App.app> <out dir> <probe url> <iPad udid>
 #
+# <udid> is a booted iPhone simulator; <iPad udid> an iPad simulator, which this script boots when it gets to it.
 # 1. Both bundles: Info.plist's keys, the web and pose files in public/ and none the app mustn't ship, and the privacy
 #    manifests of the app, Capacitor and Cordova, wherever CocoaPods put them.
-# 2. Installs the Debug build and launches it three times, each console (the app's stdout and stderr) in
+# 2. Installs the Debug build on the iPhone and launches it three times, each console (the app's stdout and stderr) in
 #    <out>/console-<launch>.log:
 #    - light, then dark appearance: waits for the fitee:ready marker, takes <out>/welcome-<appearance>.png, then
 #      checks every fact the marker reports, the status bar text, one bridge, and that nothing logged an error;
 #    - the self-test (-fiteeSelfTest, and -fiteeProbeURL <probe url> for the content rules' probe): waits for the
 #      fitee:selftest and fitee:rules markers, then checks every step, that the rules blocked the probe, and a
 #      fitee:dropped line for each call the bridge gate must drop (MediaPipe's own stderr lines are allowed here).
-# 3. Installs the Release build and launches it once: it must keep running for 15 s, its screenshot
+# 3. Installs the same Debug build on the iPad and launches it once in the light appearance, as the light launch: an
+#    iPhone-only app also runs on an iPad (in its iPhone compatibility mode), and the App Store offers it there. Same
+#    checks, its screenshot in <out>/welcome-ipad.png and its console in <out>/console-ipad.log.
+# 4. Installs the Release build on the iPhone and launches it once: it must keep running for 15 s, its screenshot
 #    (<out>/release.png) mustn't be blank, and it must log nothing.
 # Each problem prints one "::error::" line, and the run goes on to the next check; the exit status is 0 only when
 # every check passed (1 otherwise, 2 for wrong arguments). The marker formats, the gate's probes and the launch
@@ -35,8 +39,8 @@
 # animation and the console's last lines) can be changed through the environment.
 set -euo pipefail
 
-if [ "$#" -ne 5 ]; then
-  echo "Usage: $0 <udid> <Debug App.app> <Release App.app> <out dir> <probe url>" >&2
+if [ "$#" -ne 6 ]; then
+  echo "Usage: $0 <udid> <Debug App.app> <Release App.app> <out dir> <probe url> <iPad udid>" >&2
   exit 2
 fi
 udid=$1
@@ -44,6 +48,11 @@ debug_app=$2
 release_app=$3
 out=$4
 probe_url=$5
+ipad_udid=$6
+if [ "$ipad_udid" = "$udid" ]; then
+  echo "$0: the iPad simulator must be another device than the iPhone simulator ($udid)" >&2
+  exit 2
+fi
 here=$(cd "$(dirname "$0")" && pwd)
 ready_timeout=${READY_TIMEOUT:-120}
 selftest_timeout=${SELFTEST_TIMEOUT:-300}
@@ -53,6 +62,8 @@ mkdir -p "$out"
 status=0
 app_pid=
 bundle=
+# The simulator the launch functions below act on: the iPhone, then the iPad for its launch.
+device=$udid
 
 check() {
   node "$here/check.cjs" "$@"
@@ -72,7 +83,7 @@ start() {
   local log=$1
   shift
   : >"$log"
-  xcrun simctl launch --console-pty --terminate-running-process "$udid" "$bundle" ${1+"$@"} >"$log" 2>&1 &
+  xcrun simctl launch --console-pty --terminate-running-process "$device" "$bundle" ${1+"$@"} >"$log" 2>&1 &
   app_pid=$!
 }
 
@@ -83,7 +94,7 @@ running() {
 # stop: ends the app (simctl's console session ends with it), giving it up to 10 s.
 stop() {
   local tick=0
-  xcrun simctl terminate "$udid" "$bundle" >/dev/null 2>&1 || true
+  xcrun simctl terminate "$device" "$bundle" >/dev/null 2>&1 || true
   while running && [ "$tick" -lt 50 ]; do
     sleep 0.2
     tick=$((tick + 1))
@@ -131,13 +142,14 @@ show() {
 }
 
 shot() {
-  xcrun simctl io "$udid" screenshot "$1" >/dev/null 2>&1
+  xcrun simctl io "$device" screenshot "$1" >/dev/null 2>&1
 }
 
-# launch_look <light|dark> <Title>: the Debug build in that appearance, up to its ready marker.
+# launch_look <light|dark|ipad> <light|dark> <Title>: the Debug build in that appearance, up to its ready marker; its
+# console in <out>/console-<name>.log, its screenshot <out>/welcome-<name>.png, judged as check.cjs's <name> launch.
 launch_look() {
-  local look=$1 title=$2 log="$out/console-$1.log" result=0
-  if ! xcrun simctl ui "$udid" appearance "$look"; then
+  local name=$1 look=$2 title=$3 log="$out/console-$1.log" result=0
+  if ! xcrun simctl ui "$device" appearance "$look"; then
     echo "::error::$title launch: the simulator's appearance couldn't be set to $look"
     return 1
   fi
@@ -153,13 +165,33 @@ launch_look() {
       echo "::error::$title launch: the app ended after its fitee:ready marker"
       result=1
     fi
-    if shot "$out/welcome-$look.png"; then
-      check screen "$out/welcome-$look.png" "welcome-$look.png" || true
+    if shot "$out/welcome-$name.png"; then
+      check screen "$out/welcome-$name.png" "welcome-$name.png" || true
     fi
   fi
   stop
-  show "Console, $look appearance" "$log"
-  check launch "$log" "$look" "$out/info-debug.json" || result=1
+  show "Console, $title launch" "$log"
+  check launch "$log" "$name" "$out/info-debug.json" || result=1
+  [ "$result" -eq 0 ]
+}
+
+# launch_ipad: the Debug build on the iPad simulator, booted first (bootstatus -b boots a device that isn't, then
+# waits until it has finished booting).
+launch_ipad() {
+  device=$ipad_udid
+  if ! xcrun simctl bootstatus "$device" -b >"$out/ipad-boot.log" 2>&1; then
+    echo "::error::iPad launch: the iPad simulator ($device) couldn't be booted ($out/ipad-boot.log)"
+    device=$udid
+    return 1
+  fi
+  if ! xcrun simctl install "$device" "$debug_app"; then
+    echo "::error::iPad launch: the Debug build couldn't be installed in the iPad simulator"
+    device=$udid
+    return 1
+  fi
+  local result=0
+  launch_look ipad light iPad || result=1
+  device=$udid
   [ "$result" -eq 0 ]
 }
 
@@ -188,7 +220,7 @@ launch_selftest() {
 # launch_release: the Release build keeps running, shows a page and logs nothing.
 launch_release() {
   local log="$out/console-release.log" waited=0 result=0
-  xcrun simctl ui "$udid" appearance light >/dev/null 2>&1 || true
+  xcrun simctl ui "$device" appearance light >/dev/null 2>&1 || true
   start "$log"
   while [ "$waited" -lt "$alive_seconds" ]; do
     sleep 1
@@ -239,9 +271,10 @@ if ! xcrun simctl install "$udid" "$debug_app"; then
   echo "::error::The Debug build couldn't be installed in the simulator"
   exit 1
 fi
-launch_look light Light || status=1
-launch_look dark Dark || status=1
+launch_look light light Light || status=1
+launch_look dark dark Dark || status=1
 launch_selftest || status=1
+launch_ipad || status=1
 
 if xcrun simctl install "$udid" "$release_app"; then
   if [ -n "$release_bundle" ]; then
