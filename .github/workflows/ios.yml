@@ -1,0 +1,326 @@
+name: iPhone app
+
+# The iPhone app: the same web code built for it (npm run build:native, into dist-native/) inside a Capacitor shell
+# (ios/). There is no Mac in this project, so this is where the Xcode project is compiled and run.
+#
+# simulator: every push to a claude/** branch, and every manual run. No pull_request trigger: this project's pull
+#   requests come from claude/** branches, whose pushes run it already, so each commit runs once. Builds Debug and
+#   Release for the iOS simulator without signing, then tools/ios-check/simulator-check.sh installs them and checks
+#   both bundles, a light and a dark launch, the self-test launch and a Release launch (its header says what each must
+#   show). The screenshots, consoles and logs are kept as an artifact for 14 days: Debug consoles of made-up data only.
+#
+# testflight: manual runs only (Actions > iPhone app > Run workflow), once the simulator job has passed, and only when
+#   the App Store Connect secrets exist: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (the .p8 file's text) and
+#   APPLE_TEAM_ID. Without them it archives nothing and says so. It archives the Release build and uploads it to
+#   TestFlight, signed for distribution by Apple's cloud signing (the export, with the API key). Before its first run
+#   the account owner:
+#   - makes the key a Team key (not an individual one) with the Admin role: cloud signing refuses other roles;
+#   - registers the bundle ID (appId in capacitor.config.ts), creates the app's record in App Store Connect (the API
+#     can't), and accepts any pending agreement in the developer account;
+#   - checks the team's name: with accented or other non-ASCII letters, cloud-signed uploads are currently refused
+#     with ITMS-90035 (Apple feedback FB24633162); use archive_signing development then.
+#   archive_signing (in the Run workflow form): adhoc, the default, archives with a local ad hoc signature, as Xcode
+#   Cloud does: no certificate, profile or registered device. development signs the archive for development through
+#   the API key instead: that needs one iPhone registered in the developer account, and makes a new "Apple
+#   Development" certificate on every run (its private key goes with the runner), which the owner deletes in the
+#   developer account now and then, before the account's limit. No certificate is ever put in a keychain here.
+#   The build number is the run's number: a re-run of a run reuses it, and App Store Connect refuses a build number it
+#   already has for that version, so start a new run instead.
+
+on:
+  push:
+    branches: ['claude/**']
+  workflow_dispatch:
+    inputs:
+      archive_signing:
+        description: 'TestFlight: sign the archive adhoc (no registered device needed) or development (needs one registered iPhone)'
+        type: choice
+        options: [adhoc, development]
+        default: adhoc
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # bash -eo pipefail: a failing command anywhere in a pipe fails the step. On the macOS runner that is bash 3.2.
+    shell: bash
+
+concurrency:
+  # A newer push replaces the run of an older one; a manual run (which may be uploading to TestFlight) is never cancelled.
+  group: ios-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
+env:
+  # Uploads to App Store Connect must be built with Xcode 26 or later and an iOS 26 SDK (Apple, since April 28, 2026).
+  # Pinned rather than the image's default, so an image update can't change the toolchain unannounced.
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  # A device every iOS 26 runtime on the macos-26 image has.
+  SIMULATOR: iPhone 17
+
+jobs:
+  simulator:
+    name: Build and check in the simulator
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          # tools/ios-check/simulator-check.sh is written for this bash (3.2 on the image).
+          bash --version | head -n 1
+          node --version
+
+      - name: Install (postinstall fetches the pose runtime and models)
+        run: npm ci
+
+      - name: Test the simulator check against its stubs, with this runner's bash
+        env:
+          IOS_CHECK_BASH: /bin/bash
+        run: npx vitest run tests/ios-check.test.ts
+
+      - name: Build the app's web files into dist-native/ (typechecks, and checks the pinned pose files)
+        run: npm run build:native
+
+      - name: Copy them into the Xcode project
+        run: npm run native:sync
+
+      - name: Pick and boot a simulator
+        run: |
+          udid=$(xcrun simctl list devices available --json | node tools/ios-check/pick-simulator.cjs "$SIMULATOR")
+          echo "UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+
+      - name: Build Debug for the simulator, without signing
+        run: |
+          xcodebuild build -quiet \
+            -workspace ios/App/App.xcworkspace -scheme App -configuration Debug \
+            -destination "id=$UDID" \
+            -derivedDataPath "$RUNNER_TEMP/derived" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Build Release for the simulator, without signing (what TestFlight gets, without the Debug code)
+        run: |
+          xcodebuild build -quiet \
+            -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
+            -destination "id=$UDID" \
+            -derivedDataPath "$RUNNER_TEMP/derived-release" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Start a server on this machine for the content rules' probe
+        run: |
+          mkdir -p ios-check
+          # It runs until the job ends. Its output goes to a file rather than the step's, so the step doesn't wait for it.
+          node tools/ios-check/probe-server.cjs "$RUNNER_TEMP/probe-port" > ios-check/probe-server.log 2>&1 < /dev/null &
+          for _ in 1 2 3 4 5 6 7 8 9 10; do
+            if [ -s "$RUNNER_TEMP/probe-port" ]; then break; fi
+            sleep 1
+          done
+          if [ ! -s "$RUNNER_TEMP/probe-port" ]; then
+            echo "::error::The probe server didn't start"
+            cat ios-check/probe-server.log
+            exit 1
+          fi
+          # localhost, not 127.0.0.1: since iOS 17, App Transport Security refuses plain HTTP to an IP address.
+          echo "PROBE_URL=http://localhost:$(cat "$RUNNER_TEMP/probe-port")/fitee-rules-probe" >> "$GITHUB_ENV"
+
+      - name: Launch and check (bundles, light, dark, self-test, Release)
+        env:
+          # Belt and braces next to --console-pty: Foundation leaves stdout unbuffered.
+          SIMCTL_CHILD_NSUnbufferedIO: 'YES'
+        run: |
+          xcrun simctl bootstatus "$UDID"
+          tools/ios-check/simulator-check.sh "$UDID" \
+            "$RUNNER_TEMP/derived/Build/Products/Debug-iphonesimulator/App.app" \
+            "$RUNNER_TEMP/derived-release/Build/Products/Release-iphonesimulator/App.app" \
+            ios-check "$PROBE_URL"
+
+      - name: System log of the app and its web content
+        if: failure() && env.UDID != ''
+        run: |
+          mkdir -p ios-check
+          xcrun simctl spawn "$UDID" log show --last 15m --style compact \
+            --predicate 'process == "App" OR process CONTAINS "WebContent"' > ios-check/system.log || true
+
+      - name: Keep the screenshots, consoles and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-${{ github.run_number }}-${{ github.run_attempt }}
+          path: ios-check/
+          if-no-files-found: warn
+          retention-days: 14
+
+  testflight:
+    name: Archive and upload to TestFlight
+    if: github.event_name == 'workflow_dispatch'
+    needs: simulator
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      # Secrets can't be read in a job's `if`, so this step reads them and the other steps follow its answer. Each
+      # secret goes only to the steps that use it (never to npm ci or the build).
+      - name: Check for the App Store Connect secrets
+        id: asc
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ARCHIVE_SIGNING: ${{ inputs.archive_signing }}
+        run: |
+          case "$ARCHIVE_SIGNING" in
+            adhoc | development) ;;
+            *)
+              echo "::error::archive_signing is \"$ARCHIVE_SIGNING\"; it must be adhoc or development"
+              exit 1
+              ;;
+          esac
+          if [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ] && [ -n "$ASC_KEY_P8" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::The App Store Connect secrets (ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8, APPLE_TEAM_ID) aren't all set: nothing was archived or uploaded."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.asc.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.asc.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install, build dist-native/, copy it into the Xcode project
+        if: steps.asc.outputs.ready == 'true'
+        run: |
+          npm ci
+          npm run build:native
+          npm run native:sync
+
+      - name: Write the API key
+        if: steps.asc.outputs.ready == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          key="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          # The .p8 file's text as downloaded (a copy pasted with Windows line ends is put right), readable by this user only.
+          (umask 077 && printf '%s\n' "$ASC_KEY_P8" | tr -d '\r' > "$key")
+          if ! grep -q -- '-----BEGIN PRIVATE KEY-----' "$key"; then
+            echo "::error::ASC_KEY_P8 isn't the text of the .p8 file (it starts with -----BEGIN PRIVATE KEY-----)"
+            exit 1
+          fi
+          echo "ASC_KEY_PATH=$key" >> "$GITHUB_ENV"
+
+      - name: Archive the Release build
+        if: steps.asc.outputs.ready == 'true'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ARCHIVE_SIGNING: ${{ inputs.archive_signing }}
+        run: |
+          if [ "$ARCHIVE_SIGNING" = development ]; then
+            # Signed for development through the API key: needs one registered iPhone, and makes a new
+            # "Apple Development" certificate on every run.
+            xcodebuild archive -quiet \
+              -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath "$RUNNER_TEMP/App.xcarchive" \
+              -allowProvisioningUpdates \
+              -authenticationKeyPath "$ASC_KEY_PATH" \
+              -authenticationKeyID "$ASC_KEY_ID" \
+              -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+              CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+              CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
+          else
+            # A local ad hoc signature with Xcode Cloud's own flags: no Apple login, certificate, profile or device, so
+            # no -allowProvisioningUpdates or key here. Never CODE_SIGNING_ALLOWED=NO: the embedded frameworks would
+            # keep the linker's signature, and the upload would be refused.
+            xcodebuild archive -quiet \
+              -workspace ios/App/App.xcworkspace -scheme App -configuration Release \
+              -destination 'generic/platform=iOS' \
+              -archivePath "$RUNNER_TEMP/App.xcarchive" \
+              CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+              CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES \
+              CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"
+          fi
+
+      - name: Check the archive's signature
+        if: steps.asc.outputs.ready == 'true'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ARCHIVE_SIGNING: ${{ inputs.archive_signing }}
+        run: |
+          app="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          signature=$(codesign -dv "$app" 2>&1)
+          echo "$signature" | grep -E '^(Identifier|Signature|TeamIdentifier|Authority)=' || true
+          if [ "$ARCHIVE_SIGNING" = development ]; then
+            if echo "$signature" | grep -q '^Signature=adhoc' || ! echo "$signature" | grep -q "^TeamIdentifier=$APPLE_TEAM_ID\$"; then
+              echo "::error::The archive isn't signed for development by the team"
+              exit 1
+            fi
+          elif ! echo "$signature" | grep -q '^Signature=adhoc'; then
+            echo "::error::The archive isn't ad hoc signed"
+            exit 1
+          fi
+          # Each embedded framework is signed under its own identifier, not the linker's ("arm64…").
+          for framework in "$app"/Frameworks/*.framework; do
+            [ -e "$framework" ] || continue
+            id=$(codesign -dv "$framework" 2>&1 | sed -n 's/^Identifier=//p')
+            echo "$(basename "$framework"): $id"
+            case "$id" in
+              '' | arm64*)
+                echo "::error::$(basename "$framework") isn't signed under an identifier of its own ($id)"
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Export and upload to TestFlight (cloud signing with the API key)
+        if: steps.asc.outputs.ready == 'true'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          options="$RUNNER_TEMP/ExportOptions.plist"
+          # teamID: an archive no team certificate signed records no team. No certificate or profiles: the export
+          # signs with the team's cloud-managed distribution certificate (the Admin key's), and uploads.
+          cat > "$options" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$options"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$options" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "::notice::Build $GITHUB_RUN_NUMBER was sent to App Store Connect; it shows in TestFlight once Apple has processed it."
+
+      - name: Remove the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP"/AuthKey_*.p8
