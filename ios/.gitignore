@@ -1,0 +1,12 @@
+App/build
+App/output
+App/App/public
+DerivedData
+xcuserdata
+
+# Cordova plugins for Capacitor (fitee has none; the Capacitor CLI writes this folder)
+capacitor-cordova-ios-plugins
+
+# Written by npm run native:sync (scripts/native-sync.ts), with App/App/public
+App/App/capacitor.config.json
+App/App/config.xml
