@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="1024" height="1024">
+  <!-- The iPhone app's icon (npm run app-icon renders it): the Molten icon of public/icon-512.png, a Black oxide
+       square with the heat barbell (src/ui/Logo.tsx, in the dark-theme colours of public/favicon.svg) centred at
+       scale 2.4. Opaque everywhere: App Store Connect refuses an icon with transparency. -->
+  <rect width="512" height="512" fill="#1B1D20"/>
+  <g transform="translate(102.4 136) scale(2.4)">
+    <rect fill="#9DA1A6" x="0" y="45.5" width="128" height="9" rx="4.5"/>
+    <rect fill="#B08D57" x="2" y="28" width="8" height="44" rx="2"/>
+    <rect fill="#F7B23B" x="14" y="0" width="14" height="100" rx="7"/>
+    <rect fill="#F48A32" x="31" y="0" width="14" height="100" rx="7"/>
+    <rect fill="#EF6235" x="48" y="0" width="14" height="100" rx="7"/>
+    <rect fill="#E5443A" x="65" y="0" width="14" height="100" rx="7"/>
+    <rect fill="#B08D57" x="83" y="28" width="8" height="44" rx="2"/>
+  </g>
+</svg>
