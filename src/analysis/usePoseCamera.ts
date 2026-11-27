@@ -29,7 +29,10 @@ export interface CameraStats {
 
 export function cameraErrorMessage(err: unknown): string {
   const name = (err as DOMException)?.name;
-  if (name === 'NotAllowedError') return 'Camera permission was denied. Allow camera access in your browser settings and try again.';
+  if (name === 'NotAllowedError')
+    return __NATIVE__
+      ? 'Camera access is off for fitee. Turn it on in the iPhone Settings app, under fitee, then try again.'
+      : 'Camera permission was denied. Allow camera access in your browser settings and try again.';
   if (name === 'NotFoundError') return 'No camera found on this device.';
   if (name === 'NotReadableError') return 'The camera is in use by another app.';
   return (err as Error)?.message ?? String(err);
@@ -79,7 +82,8 @@ export function usePoseCamera(
         setModelError(
           modelErrorMessage({
             online: navigator.onLine,
-            saved: poseFilesSaved(variant),
+            // The iPhone app carries the pose model, so a failure never asks for a connection.
+            saved: __NATIVE__ || poseFilesSaved(variant),
             offlineAvailable: offlineAvailable(),
             error: err,
             choice,

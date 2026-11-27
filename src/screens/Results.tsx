@@ -41,7 +41,18 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
   const result = useMemo(() => analyze(exercise, seq, { proportions: proportions ?? undefined, overrides }), [exercise, seq, overrides]);
 
   // Pictures are only ever in memory; release them when leaving results.
-  useEffect(() => () => shots.clear(), [shots]);
+  useEffect(
+    () =>
+      __NATIVE__
+        ? () => {
+            shots.clear();
+            // In the iPhone app a picked video (or one filmed with Take Video) is also a temporary copy iOS made for
+            // the app: no longer in use once the results that hold it close, so deleted now too (src/native/setsDb.ts).
+            if (seq.source === 'file') void import('../native/setsDb').then((m) => (video ? m.releasePickedFile(video.blob) : m.clearPickedFiles()));
+          }
+        : () => shots.clear(),
+    [shots],
+  );
 
   // Save the outcome to the training log (numbers only) so the coach can use
   // it, and keep a skeleton replay of the set (landmarks + analysis).
@@ -58,7 +69,15 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
       ? Number(result.hold.checks.every((c) => c.status !== 'fail'))
       : result.reps.filter((r) => r.checks.every((c) => c.status !== 'fail')).length;
     if (result.reps.length > 0) saveTechnique({ exerciseId: exercise.id, at, reps: result.reps.length, faults, cleanReps, setId: id });
-    void saveSet(
+    // In the iPhone app the replay is a file, which a full iPhone can refuse: say so, and give the set no id (no
+    // "Save video" or replay link for a set that isn't kept), so this chain stops there.
+    void (__NATIVE__
+      ? (...args: Parameters<typeof saveSet>) =>
+          saveSet(...args).catch(() => {
+            showToast('Couldn’t keep this set’s replay: your iPhone may be out of space.');
+            return new Promise<void>(() => {});
+          })
+      : saveSet)(
       {
         id,
         exerciseId: exercise.id,
@@ -212,11 +231,17 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
               <Icon name="video" size={18} /> Save video on this phone ({mb(video.blob.size)})
             </button>
           )}
-          {videoState === 'saved' && (
-            <p class="saved-note">
-              <Icon name="check" size={16} /> Video saved on this phone. It’s never uploaded.
-            </p>
-          )}
+          {videoState === 'saved' &&
+            (__NATIVE__ ? (
+              // The iPhone app says what fitee does: it asks iOS to leave saved videos out of backups, and can't promise more.
+              <p class="saved-note">
+                <Icon name="check" size={16} /> Video saved on this iPhone. fitee never uploads it.
+              </p>
+            ) : (
+              <p class="saved-note">
+                <Icon name="check" size={16} /> Video saved on this phone. It’s never uploaded.
+              </p>
+            ))}
           {setId && (
             <a class="link center" href={`#/set/${setId}`}>
               <Icon name="play" size={16} /> Watch {videoState === 'saved' ? 'the video' : 'the replay'}

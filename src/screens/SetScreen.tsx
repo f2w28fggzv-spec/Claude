@@ -26,6 +26,12 @@ export function SetScreen({ id }: { id: string }) {
       const data = meta ? await loadSetData(id) : undefined;
       if (!alive) return;
       if (!meta || !data) return setState('missing');
+      if (__NATIVE__) {
+        // In the iPhone app a saved video plays from its file's URL (not an object URL: nothing to revoke).
+        const fileUrl = meta.video ? await (await import('../native/setsDb')).videoUrl(id, meta.video.type).catch(() => undefined) : undefined;
+        if (!alive) return;
+        return setState({ meta, data, url: fileUrl });
+      }
       const blob = meta.video ? await loadSetVideo(id) : undefined;
       if (!alive) return;
       url = blob ? URL.createObjectURL(blob) : undefined;
@@ -47,7 +53,14 @@ export function SetScreen({ id }: { id: string }) {
   if (state === 'missing') {
     return (
       <Screen title="Saved set" back="log" tab="log">
-        <p class="muted">This set isn’t saved on this phone any more. Older replays are removed to save space; sets with a saved video are kept.</p>
+        {__NATIVE__ ? (
+          <p class="muted">
+            This set isn’t saved on this iPhone any more. Older replays are removed to save space, sets with a saved video are kept, and fitee asks iOS to
+            leave saved sets out of iPhone backups, so a restored phone doesn’t have them.
+          </p>
+        ) : (
+          <p class="muted">This set isn’t saved on this phone any more. Older replays are removed to save space; sets with a saved video are kept.</p>
+        )}
       </Screen>
     );
   }
@@ -152,7 +165,9 @@ export function SetScreen({ id }: { id: string }) {
 
       <p class="muted small">
         {url
-          ? `Video saved on this phone (${mb(meta.video?.bytes ?? 0)}). It’s never uploaded.`
+          ? __NATIVE__
+            ? `Video saved on this iPhone (${mb(meta.video?.bytes ?? 0)}). fitee never uploads it.`
+            : `Video saved on this phone (${mb(meta.video?.bytes ?? 0)}). It’s never uploaded.`
           : 'Skeleton replay: the movement of your body as numbers, no video. Save the video right after a technique check to keep it.'}
       </p>
       <div class="stack">

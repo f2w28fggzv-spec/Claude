@@ -3,7 +3,8 @@
 Mobile web app: pick muscle groups, get a workout program, and get technique
 feedback from your phone camera. All pose detection runs on the phone with
 MediaPipe; video never leaves the device, and the app blocks every request to
-other websites.
+other websites. The same code is also built into an iPhone app (see
+[iPhone app](#iphone-app)).
 See [CLAUDE.md](CLAUDE.md) for the full brief.
 
 ## Run locally
@@ -161,6 +162,224 @@ npm run landing:screens -- --work /tmp/landing-screens --port 4405
 
 In `npm run dev` the page is at `/about/`, and reloads when you edit a module
 that writes its HTML (`src/landing/prerender.ts`, `src/landing/signup.ts`).
+
+## iPhone app
+
+fitee's iPhone app (`ios/`) is the same web code, built for it with
+`npm run build:native` (into `dist-native/`), inside a Capacitor 8.6.3 shell:
+iPhone only, iOS 17 or later (an iPhone-only app also runs on iPads, in
+compatibility mode). The pose model ships inside it, and it makes no network
+requests: the page's own guard, its Content Security Policy and a content
+blocker in the web view refuse them, and a gate in front of Capacitor's bridge
+lets the page reach only fitee's own plugin, console logging and the status
+bar. The plans, log, profile and settings stay in the web view's storage with
+a copy in the app's folder (in the phone's backups, like any app's data);
+saved sets and videos are files the app asks iOS to leave out of backups.
+"Back up my data" opens iOS's Save to Files panel. CLAUDE.md has the rules and
+the design (its hard rules, and "iPhone app" under Decisions);
+`src/native/bridge.ts` is the contract between the page and the Swift code.
+
+### No Mac needed
+
+GitHub's macOS runner builds and runs the app (`.github/workflows/ios.yml`);
+everything else works on Linux. To put the app's web files into the Xcode
+project:
+
+```sh
+npm run build:native   # typecheck, then dist-native/ (pose files checked against scripts/native-pose-files.json)
+npm run native:sync    # dist-native/ into ios/App/App/public/, Capacitor's two config files, the bundle ID
+```
+
+`native:sync` does what the Capacitor CLI's `cap copy ios` does (its output
+was compared once with the CLI's, byte for byte); the CLI isn't a dependency.
+What it writes is git-ignored, except the bundle ID in
+`ios/App/App.xcodeproj/project.pbxproj`, which it writes only when `appId`
+has changed (below). Run it before every `xcodebuild`.
+
+A new pose model from Google's "latest" URLs (which `npm install` fetches)
+fails `build:native` on purpose: the app ships the files it was tested with.
+If the new model is the one wanted, update `scripts/native-pose-files.json` in
+a commit of its own.
+
+On Linux, check the native build in Chromium with a stand-in for the native
+side, and check that the web build hasn't changed by a single byte (after any
+change to a file the two builds share; quote the last line in the pull
+request):
+
+```sh
+npm run native:check -- --work /tmp/native-check --port 4460
+tools/native-check/web-identity.sh <base commit> /tmp/web-identity
+```
+
+### The Xcode project
+
+`ios/` was generated once, in a scratch copy of the repo, with a throwaway
+CLI (not in `package.json`; `CI=1` keeps it from asking anything or sending
+telemetry), then edited by hand (iOS 17.0, iPhone only, no storyboard but the
+launch screen, fitee's Swift files: CLAUDE.md's code layout lists them):
+
+```sh
+CI=1 npx --yes @capacitor/cli@8.6.3 add ios --packagemanager CocoaPods
+```
+
+CocoaPods compiles Capacitor from `node_modules/@capacitor/ios`. Its output
+(`ios/App/Pods/`, `ios/App/Podfile.lock`, `ios/App/App.xcworkspace`) is
+committed, and CI never runs `pod install`. Run it again only when
+`ios/App/Podfile` or Capacitor's version changes, with CocoaPods 1.17.0 (the
+runner's), which runs on Linux too (`$GEMS` and `$SCRATCH` are folders of your
+choice; `--allow-root` only as root):
+
+```sh
+gem install --no-document --install-dir "$GEMS" cocoapods -v 1.17.0
+cd ios/App && LANG=C.UTF-8 GEM_HOME="$GEMS" GEM_PATH="$GEMS" PATH="$GEMS/bin:$PATH" \
+  CP_HOME_DIR="$SCRATCH/.cocoapods" pod install --allow-root
+```
+
+No pod comes from CocoaPods' trunk (both are local `:path` pods), but with a
+new `CP_HOME_DIR` `pod install` still registers the trunk and fetches
+https://cdn.cocoapods.org/CocoaPods-version.yml, so that host must be
+reachable the first time; later runs with the same `CP_HOME_DIR` need no
+network, so keep that folder rather than a fresh one each time. Then run
+`npx vitest run tests/native-project.test.ts`: `Podfile.lock` must equal
+`Pods/Manifest.lock`, and nothing committed may hold an absolute path.
+
+**The bundle ID** is `appId` in `capacitor.config.ts` (the placeholder
+`app.fitee`) and nowhere else: change it there, run
+`npm run build:native && npm run native:sync` (the sync needs the build, and
+writes both `PRODUCT_BUNDLE_IDENTIFIER` lines of the Xcode project), and
+commit both files. Do it before the App Store Connect record is made: a
+bundle ID can't change after release.
+
+**The icon** is `tools/app-icon/icon.svg`: `npm run app-icon` renders
+`AppIcon-1024.png` (opaque RGB: App Store Connect refuses an icon with alpha).
+
+### The simulator check (CI)
+
+Every push to a `claude/**` branch, and every manual run (Actions → iPhone
+app → Run workflow), runs the `simulator` job on `macos-26` with Xcode 26.6.
+It builds the web files, copies them in, builds Debug and Release for the
+simulator without signing, and runs `tools/ios-check/simulator-check.sh`
+(its header says what each launch must show):
+
+- both bundles: Info.plist's keys, the files the app must and mustn't ship,
+  the privacy manifests of the app, Capacitor and Cordova;
+- the Debug build on an iPhone 17, in light and then dark appearance: the
+  `fitee:ready` marker's facts (the app's own origin, the pose model loaded
+  through the privacy guard, the runtime served as `application/wasm`, an
+  outside request refused, the content rules and the bridge gate in place),
+  the status bar text, one bridge, no error line;
+- the self-test (`-fiteeSelfTest`): video files saved, served by range, left
+  out of backups and played; the copy of the log, written twice (the second
+  write moves the first to `snapshot.prev.json`); the pose model; the CSP's
+  and the privacy guard's refusals; keep-awake; the bridge gate on all three
+  ways out of the page (ten calls to plugins the page must never reach, each
+  unanswered; a `prompt()` answered with nothing; no window opened; a
+  navigation to another site cancelled); and the content rules blocking a
+  request to a server on the runner (`probe-server.cjs`) that loads without
+  them;
+- the Release build: it keeps running for 15 s, shows a page and logs nothing;
+- last, the same Debug build on an iPad (A16), in compatibility mode and the
+  light appearance, checked as the iPhone's light launch (so a second
+  simulator runs only then).
+
+Every stop of a launch is bounded (a stuck `simctl terminate` once held a
+run up for almost five minutes), and the step has its own time limit under
+the job's, so a hang fails the step and the system logs are still kept.
+
+The artifact `ios-simulator-<run>-<attempt>` (kept 14 days) holds each
+launch's console (`console-light.log`, `console-dark.log`,
+`console-selftest.log`, `console-ipad.log`, `console-release.log`), the
+screenshots (`welcome-light.png`, `welcome-dark.png`, `welcome-ipad.png`,
+`release.png`), both bundles' Info.plist as JSON, the probe server's log and,
+when the job failed, the simulators' system logs. Debug builds print every
+plugin call: these consoles are of made-up data, so never give a Debug build
+to a tester or upload a console from a real phone. `tests/ios-check.test.ts`
+runs the same script on Linux against stand-in `xcrun` and `plutil`, and the
+workflow runs it again under the runner's own bash (3.2) before building.
+
+### TestFlight
+
+The `testflight` job runs only by hand (Run workflow), after the simulator
+job has passed, and only when four repository secrets exist: `ASC_KEY_ID`,
+`ASC_ISSUER_ID`, `ASC_KEY_P8` (the text of the `.p8` file) and
+`APPLE_TEAM_ID`. Without them it says so and does nothing. It hasn't run yet:
+its first run is a launch-checklist step. Before it, the account owner:
+
+- makes the App Store Connect API key a **Team** key (not an individual one)
+  with the **Admin** role: cloud signing refuses the other roles, and a key's
+  role can't be raised later (make a new key);
+- registers the bundle ID and creates the app's record in App Store Connect
+  (the API can't create an app);
+- accepts any pending agreement in the developer account (the Account Holder
+  must have signed the latest one);
+- checks the team's name: with accented or other non-ASCII letters, this
+  workflow's uploads are refused with ITMS-90035 whichever `archive_signing`
+  is picked, because both are cloud-signed at export (Apple feedback
+  FB24633162). Ask Apple Developer Programs to rename the team, then revoke
+  the distribution certificates that carry the old name.
+
+The Run workflow form's `archive_signing` picks how the archive is signed,
+and nothing else: the export is the same for both, signing the app for
+distribution with Apple's cloud signing, through the API key, and uploading
+it.
+
+- `adhoc` (the default): a local ad hoc signature, as Xcode Cloud does: no
+  certificate, profile or registered device.
+- `development`: the archive is signed for development through the API key.
+  That needs one iPhone registered in the developer account, and every run
+  has xcodebuild make a new "Apple Development" certificate: delete those in
+  the developer account now and then, before the account's limit (reported
+  at about ten).
+
+The workflow imports no certificate and `adhoc` creates none; `development`
+has xcodebuild create an Apple Development identity in the runner's login
+keychain, which is discarded with the runner. The build number is the run's
+number, and App Store Connect refuses a build number it already has, so
+start a new run rather than re-running one. Make the first upload the bare
+shell, before any subscription work: App Store Connect might refuse
+Capacitor's frameworks built from source (ITMS-91065); the fallbacks are in
+CLAUDE.md ("iPhone app" under Decisions).
+
+### What only the simulator run, or a real iPhone, can show
+
+No Swift toolchain runs here, so the first macOS run is the first compile.
+The simulator run shows that the Swift compiles against Capacitor 8.6.3 with
+Xcode 26.6 and the committed pods build with `xcodebuild` alone; that the app
+launches with one bridge; WebKit's facts (the page's origin
+`capacitor://localhost`, the CSP's `'self'`, a secure context, the camera and
+MediaRecorder APIs, SIMD, no service worker); that the content rules compile
+and block, the gate drops what it must (a prompt answered with nothing, no
+window, a navigation to another site cancelled) and the status bar follows
+the appearance; that saved videos are served with Range requests and play, with
+their backup flags read back, and that the copy of the log is written,
+rotated into `snapshot.prev.json` by the next write, and read back; that
+MediaPipe loads in the web view; the bundles' contents; that the Release
+configuration compiles and runs; and that the app opens on an iPad.
+
+Only a real iPhone can show (the launch checklist):
+
+- the live camera, the skeleton overlay and an MP4 recording of the camera;
+  saving a real 20–40 MB recording (time, memory);
+- the camera and microphone prompts (Take Video in the picker), and that a
+  picked or filmed video's temporary copy is gone once its check is left
+  (from its results, or while it's analysed) and when the picker is closed
+  without a file (whether iOS fires the input's `cancel` event);
+- `confirm()` (every delete asks with it) through the app's own UI delegate;
+- Delete all my data stopped part way (the app killed while it runs): the
+  next launch finishes it;
+- that iCloud backups leave `sets/` out and keep `data/`; an iCloud restore
+  onto a second phone; WebKit clearing its storage, and the restore toast;
+  file protection with the phone locked;
+- the screen staying on during a hands-free recording, and sleeping again
+  after the web process dies during a check; a copy written as the app goes
+  to the background;
+- beeps with the Silent switch on and with music playing;
+- the App Privacy Report showing no network activity for fitee;
+- Save to Files (Back up my data) and Restore from a backup;
+- the status-bar strip in landscape and with a pinned theme;
+- the keyboard opening by itself where a screen focuses a field (the app lets
+  script focus open it, unlike Safari);
+- iOS 17 (CI has iOS 26 only), and speed on an older iPhone.
 
 ## Deploy (GitHub Pages)
 

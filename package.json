@@ -9,6 +9,7 @@
     "fetch-assets": "node scripts/fetch-assets.mjs",
     "dev": "vite --host",
     "build": "tsc --noEmit && tsc --noEmit -p tests && tsc --noEmit -p src/offline && vite build",
+    "build:native": "tsc --noEmit && tsc --noEmit -p tests && tsc --noEmit -p src/offline && vite build --mode native",
     "preview": "vite preview --host",
     "test": "vitest run",
     "fixtures": "node scripts/make-fixtures.ts",
@@ -17,7 +18,10 @@
     "demo:contact": "DEMO_TOOL=tools/demo-sheets/contact.tool.ts vitest run --config tools/demo-sheets/vitest.config.ts --silent=false",
     "offline:check": "node tools/offline-check/check.cjs",
     "landing:check": "node tools/landing-check/check.cjs",
-    "landing:screens": "node tools/landing-screens/shoot.cjs"
+    "landing:screens": "node tools/landing-screens/shoot.cjs",
+    "native:sync": "node scripts/native-sync.ts",
+    "native:check": "node tools/native-check/check.cjs",
+    "app-icon": "node tools/app-icon/render.cjs tools/app-icon/icon.svg ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png 1024"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
@@ -25,6 +29,8 @@
     "preact": "^11.1.1"
   },
   "devDependencies": {
+    "@capacitor/core": "8.6.3",
+    "@capacitor/ios": "8.6.3",
     "@preact/preset-vite": "^2.10.6",
     "@types/node": "^22.20.5",
     "@vitejs/plugin-basic-ssl": "^2.3.0",

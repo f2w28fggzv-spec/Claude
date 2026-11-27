@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Stand-in for xcrun (only `xcrun simctl …`) on Linux, for tests/ios-check.test.ts: see stub.cjs.
+exec node "$(dirname "$0")/stub.cjs" xcrun "$@"

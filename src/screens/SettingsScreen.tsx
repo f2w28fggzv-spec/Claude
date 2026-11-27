@@ -116,11 +116,19 @@ export function SettingsScreen() {
       </ul>
 
       <h2 class="field">Saved sets</h2>
-      <p class="muted small">
-        {stored
-          ? `${stored.sets} saved set${stored.sets === 1 ? '' : 's'} on this phone, ${stored.videos} with video (${(stored.bytes / 1e6).toFixed(1)} MB). Replays are kept for your last 60 checks; videos until you delete them.`
-          : 'Loading…'}
-      </p>
+      {__NATIVE__ ? (
+        <p class="muted small">
+          {stored
+            ? `${stored.sets} saved set${stored.sets === 1 ? '' : 's'} on this iPhone, ${stored.videos} with video (${(stored.bytes / 1e6).toFixed(1)} MB). Replays are kept for your last 60 checks; videos until you delete them. fitee asks iOS to leave saved sets out of your iPhone’s backups.`
+            : 'Loading…'}
+        </p>
+      ) : (
+        <p class="muted small">
+          {stored
+            ? `${stored.sets} saved set${stored.sets === 1 ? '' : 's'} on this phone, ${stored.videos} with video (${(stored.bytes / 1e6).toFixed(1)} MB). Replays are kept for your last 60 checks; videos until you delete them.`
+            : 'Loading…'}
+        </p>
+      )}
       {stored && stored.videos > 0 && (
         <button
           type="button"
@@ -137,12 +145,21 @@ export function SettingsScreen() {
         </button>
       )}
 
-      <OfflineSection />
+      {!__NATIVE__ && <OfflineSection />}
 
       <h2 class="field">Your data</h2>
-      <p class="muted small">
-        {PRIVACY} Your plan, log, profile and settings live only in this browser. Back them up to a file to move them to another phone (saved videos and replays aren’t included in backups).
-      </p>
+      {__NATIVE__ ? (
+        <p class="muted small">
+          Everything runs on your iPhone. fitee never uploads video, and keeps it only if you choose to save it. Your plan, log, profile and settings are
+          kept in fitee on this iPhone, with a copy in the app’s own folder in case iOS clears its web storage. Your iPhone’s backups (iCloud or a computer)
+          include them; fitee asks iOS to leave saved sets and videos out. To move them to another phone, or between this app and fitee in a browser, back
+          them up to a file (saved sets and videos aren’t in it).
+        </p>
+      ) : (
+        <p class="muted small">
+          {PRIVACY} Your plan, log, profile and settings live only in this browser. Back them up to a file to move them to another phone (saved videos and replays aren’t included in backups).
+        </p>
+      )}
       <div class="stack">
         <button type="button" class="secondary" onClick={() => downloadJson(`fitee-backup-${new Date().toISOString().slice(0, 10)}.json`, exportAll())}>
           Back up my data
@@ -155,6 +172,11 @@ export function SettingsScreen() {
           type="button"
           class="link danger center"
           onClick={() => {
+            if (__NATIVE__) {
+              // The app deletes its files and the web view's own stores natively, then reloads (src/native/data.ts).
+              void import('../native/data').then((m) => m.deleteEverything());
+              return;
+            }
             if (
               confirm(
                 'Delete your plans, workout log, profile, saved sets and videos, and settings from this phone? This can’t be undone. The app’s offline copy stays: it holds none of your data.',
@@ -202,11 +224,16 @@ export function SettingsScreen() {
           </a>
         </li>
       </ul>
-      <p class="footer small">
-        <button type="button" class="link version" onClick={tapVersion}>
-          fitee {APP_VERSION}
-        </button>
-      </p>
+      {__NATIVE__ ? (
+        // The app's version and build (src/native/entry.ts sets them); no hidden developer pages in the app.
+        <p class="footer small">fitee {document.documentElement.dataset.appVersion}</p>
+      ) : (
+        <p class="footer small">
+          <button type="button" class="link version" onClick={tapVersion}>
+            fitee {APP_VERSION}
+          </button>
+        </p>
+      )}
     </Screen>
   );
 }

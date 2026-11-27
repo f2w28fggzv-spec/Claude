@@ -23,6 +23,12 @@ export interface Profile {
 /** Bump when the terms or privacy policy change in a way people must re-accept. */
 export const TERMS_VERSION = '2026-11-25';
 
+/**
+ * The iPhone app's own Terms and Privacy policy (src/native/screens/Legal.tsx) have a version of their own, so a
+ * backup from the web app never accepts them, nor the reverse. Bump it when those texts change.
+ */
+export const NATIVE_TERMS_VERSION = 'ios-2026-11-27';
+
 const KEY = 'formcheck.v1.profile';
 let cache: Profile | null = null;
 
@@ -77,6 +83,9 @@ export const trainingSex = (p: Profile): Sex | undefined => (p.sex === 'female' 
 export const figureOf = (p: Profile): Figure => p.figure ?? (p.sex === 'female' ? 'female' : 'male');
 
 export const termsAccepted = (p: Profile) => p.termsVersion === TERMS_VERSION && !!p.termsAcceptedAt;
+
+/** The iPhone app's terms (NATIVE_TERMS_VERSION) were accepted. */
+export const nativeTermsAccepted = (p: Profile) => p.termsVersion === NATIVE_TERMS_VERSION && !!p.termsAcceptedAt;
 
 /** Height for display: cm with kg, feet and inches with lb. */
 export function formatHeight(cm: number, imperial: boolean): string {

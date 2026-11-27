@@ -170,6 +170,8 @@ let persistAsked = false;
 const UPDATE_CHECK_MS = 60 * 60_000;
 
 export function startOffline(): void {
+  // The iPhone app carries every file, the pose model included: no service worker (src/native/).
+  if (__NATIVE__) return;
   launchedAt = performance.now();
   lastUpdateCheck = Date.now(); // the browser checks for a new version when the app opens
   saveAfterUpdate = takeSaveAfterUpdate();

@@ -93,7 +93,12 @@ export function ProgramView({ id }: { id: string }) {
   };
   return (
     <Screen title="Your plan" subtitle={planSubtitle(program)} back="" tab="plan">
-      {!saved && <p class="note">Your browser wouldn’t let us save this plan, so it will be gone when you close the page.</p>}
+      {!saved &&
+        (__NATIVE__ ? (
+          <p class="note">fitee couldn’t save this plan on this iPhone (it may be out of space), so it will be gone when you close the app.</p>
+        ) : (
+          <p class="note">Your browser wouldn’t let us save this plan, so it will be gone when you close the page.</p>
+        ))}
       <PlanDays program={program} />
       {saved && (
         <button type="button" class="link danger center" onClick={remove}>
