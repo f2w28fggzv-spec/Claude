@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { refreshOffline } from './offline/client';
-import { loadProfile, termsAccepted } from './profile';
+import { loadProfile, nativeTermsAccepted, termsAccepted } from './profile';
 import { useRoute } from './router';
 import { PrivacyScreen, TermsScreen, Welcome } from './screens/Legal';
 import { ProfileScreen } from './screens/ProfileScreen';
@@ -31,8 +31,8 @@ const OPEN = new Set(['terms', 'privacy']);
 export function App() {
   const route = useRoute();
   const [, rerender] = useState(0);
-  // First launch (or new terms): the welcome screen until they're accepted.
-  const gate = !termsAccepted(loadProfile()) && !OPEN.has(route.path[0] ?? '');
+  // First launch (or new terms): the welcome screen until they're accepted. The iPhone app has terms of its own.
+  const gate = !(__NATIVE__ ? nativeTermsAccepted(loadProfile()) : termsAccepted(loadProfile())) && !OPEN.has(route.path[0] ?? '');
   // Keyed wrapper so the CSS entrance animation replays on every navigation
   // (used where the View Transitions API isn't available).
   return (
@@ -91,12 +91,14 @@ function Routes({ path, query }: ReturnType<typeof useRoute>) {
     case 'exercise':
       return <ExerciseDetail id={id ?? ''} />;
     case 'dev':
+      // No developer pages in the iPhone app (the web app keeps them).
+      if (__NATIVE__) return <Home />;
       if (id === 'demos') return <DevDemos still={query.has('still')} ids={query.get('ids')?.split(',').filter(Boolean)} body={query.get('body') === 'female' ? 'female' : query.get('body') === 'male' ? 'male' : undefined} />;
       if (id === 'anatomy') return <DevAnatomy />;
       if (id === 'calibrate') return <DevCalibrate exerciseId={query.get('exercise') ?? undefined} />;
       return <Home />;
     case 'analyze':
-      return <Analyze id={id ?? ''} calibrate={query.has('calibrate')} />;
+      return <Analyze id={id ?? ''} calibrate={!__NATIVE__ && query.has('calibrate')} />;
     case 'camera':
       return <Camera exerciseId={query.get('exercise') ?? undefined} />;
     default:

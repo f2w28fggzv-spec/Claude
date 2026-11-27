@@ -35,6 +35,15 @@ let lock: Sentinel | undefined;
 
 /** Keeps the screen on while the camera is in use (where supported). */
 export async function keepAwake(on: boolean): Promise<void> {
+  if (__NATIVE__) {
+    // The iPhone app keeps the screen on natively (UIKit's idle timer, src/native/bridge.ts).
+    try {
+      await (await import('../native/bridge')).native().setKeepAwake({ on });
+    } catch {
+      // The screen may sleep: a nicety.
+    }
+    return;
+  }
   try {
     if (on && !lock) {
       const wl = (navigator as unknown as { wakeLock?: { request(type: 'screen'): Promise<Sentinel> } }).wakeLock;

@@ -377,6 +377,9 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
       }
       setStage({ kind: 'results', ...out, video: { blob: file, offsetMs: 0, mirrored: false } });
     } catch (err) {
+      // The check ended without results (cancelled, or the video couldn't be read): in the iPhone app the temporary
+      // copy iOS made of the picked video goes now (src/native/setsDb.ts).
+      if (__NATIVE__) void import('../native/setsDb').then((m) => m.clearPickedFiles());
       if ((err as DOMException).name !== 'AbortError') setError((err as Error).message ?? String(err));
       setStage({ kind: 'intro' });
     } finally {

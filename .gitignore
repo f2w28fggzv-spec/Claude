@@ -2,3 +2,6 @@ node_modules
 dist/
 public/mediapipe/
 *.local
+
+# The iPhone app's web files (npm run build:native)
+dist-native/

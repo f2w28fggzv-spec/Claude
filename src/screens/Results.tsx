@@ -41,7 +41,18 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
   const result = useMemo(() => analyze(exercise, seq, { proportions: proportions ?? undefined, overrides }), [exercise, seq, overrides]);
 
   // Pictures are only ever in memory; release them when leaving results.
-  useEffect(() => () => shots.clear(), [shots]);
+  useEffect(
+    () =>
+      __NATIVE__
+        ? () => {
+            shots.clear();
+            // In the iPhone app a picked video (or one filmed with Take Video) is also a temporary copy iOS made for
+            // the app: deleted now too, once the results that hold it close (src/native/setsDb.ts).
+            if (seq.source === 'file') void import('../native/setsDb').then((m) => m.clearPickedFiles());
+          }
+        : () => shots.clear(),
+    [shots],
+  );
 
   // Save the outcome to the training log (numbers only) so the coach can use
   // it, and keep a skeleton replay of the set (landmarks + analysis).
@@ -58,7 +69,15 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
       ? Number(result.hold.checks.every((c) => c.status !== 'fail'))
       : result.reps.filter((r) => r.checks.every((c) => c.status !== 'fail')).length;
     if (result.reps.length > 0) saveTechnique({ exerciseId: exercise.id, at, reps: result.reps.length, faults, cleanReps, setId: id });
-    void saveSet(
+    // In the iPhone app the replay is a file, which a full iPhone can refuse: say so, and give the set no id (no
+    // "Save video" or replay link for a set that isn't kept), so this chain stops there.
+    void (__NATIVE__
+      ? (...args: Parameters<typeof saveSet>) =>
+          saveSet(...args).catch(() => {
+            showToast('Couldn’t keep this set’s replay: your iPhone may be out of space.');
+            return new Promise<void>(() => {});
+          })
+      : saveSet)(
       {
         id,
         exerciseId: exercise.id,

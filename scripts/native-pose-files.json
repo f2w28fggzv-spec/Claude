@@ -1,0 +1,6 @@
+{
+  "mediapipe/models/pose_landmarker_full.task": { "bytes": 9398198, "sha256": "4eaa5eb7a98365221087693fcc286334cf0858e2eb6e15b506aa4a7ecdcec4ad" },
+  "mediapipe/models/pose_landmarker_lite.task": { "bytes": 5777746, "sha256": "59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a" },
+  "mediapipe/wasm/vision_wasm_internal.js": { "bytes": 334128, "sha256": "85c1a342be70427987f900969a5f26e17557351111364e6585e97fb03e93e108" },
+  "mediapipe/wasm/vision_wasm_internal.wasm": { "bytes": 14466654, "sha256": "bcc13df22d3d69ec8cbe8e280989356d844ae00f4523eb82072d2484f44134dc" }
+}
