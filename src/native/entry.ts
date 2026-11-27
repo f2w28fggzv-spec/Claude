@@ -33,7 +33,7 @@ function afterFirstRender(): Promise<void> {
 
 /**
  * Plain DOM (the app never renders): the bridge is missing, or the copy of the data couldn't be read, or (`deleting`) a
- * Delete all my data that didn't finish couldn't be finished now.
+ * Delete all my data that didn't finish (it stopped part way, or failed with its marker left) couldn't be finished now.
  */
 function showStartError(deleting = false): void {
   applyTheme();
@@ -42,7 +42,7 @@ function showStartError(deleting = false): void {
   title.textContent = deleting ? 'fitee couldn’t finish deleting your data' : 'fitee couldn’t open your data';
   const text = document.createElement('p');
   text.textContent = deleting
-    ? 'It was deleting your data when it last closed and couldn’t finish just now, so it hasn’t started. Try again; if this keeps happening, restart your iPhone.'
+    ? 'It began deleting your data and couldn’t finish, so it hasn’t started. Try again; if this keeps happening, restart your iPhone.'
     : 'It keeps a copy of your data on this iPhone and couldn’t read it just now, so it hasn’t started: starting without it could replace your data. Try again; if this keeps happening, restart your iPhone.';
   const retry = document.createElement('button');
   retry.type = 'button';

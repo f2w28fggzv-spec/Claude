@@ -5,7 +5,9 @@
 //
 // A delete the app didn't finish (it, or its page, stopped part way: AppInfo.deleting) is finished at the next launch,
 // before anything reads the data (openData): starting on what it left, the user's keys still in localStorage and no
-// copy, would copy the deleted data back.
+// copy, would copy the deleted data back. A delete that fails says which it is by its marker (src/native/bridge.ts):
+// gone, nothing of the web view's was touched, so the data stays (the copy written again at once, the failure said);
+// still there, the delete isn't over, so the page reloads and the launch finishes it.
 import { ALL_KEYS_PREFIX, deleteAll } from '../log/store';
 import { showToast } from '../ui/toast';
 import type { AppInfo, FiteeNative } from './bridge';
@@ -27,27 +29,53 @@ export function takeDeletedFlag(loc: Pick<Location, 'hash'> = location, hist: Pi
   return true;
 }
 
-export async function deleteEverything(): Promise<void> {
-  if (!confirm(DELETE_CONFIRM)) return;
+/** The page's location and history, as openData uses them (tests pass stand-ins). */
+export interface PageNav {
+  location: Pick<Location, 'reload'>;
+  history: Pick<History, 'replaceState'>;
+}
+
+/** What deleteEverything uses of the page: its location and history, the confirm and the toast (tests pass stand-ins). */
+export interface DeletePage extends PageNav {
+  confirm(message: string): boolean;
+  toast(message: string): void;
+}
+
+const thisPage = (): DeletePage => ({ location, history, confirm: (message) => confirm(message), toast: (message) => showToast(message) });
+
+export async function deleteEverything(page: DeletePage = thisPage()): Promise<void> {
+  if (!page.confirm(DELETE_CONFIRM)) return;
   pauseWriter();
   try {
     await native().deleteAllData();
   } catch {
-    resumeWriter();
-    showToast(DELETE_FAILED_TOAST);
+    if (await stillDeleting()) {
+      // The marker is still there (it couldn't be removed, after the web view's stores went or after the folder
+      // failed): the delete isn't over, so nothing goes on with the data here. The reload's launch finishes it
+      // (openData), or says it couldn't.
+      page.location.reload();
+      return;
+    }
+    // Nothing of the web view's was touched and the marker is gone: the data stays. fitee/ may be partly gone, the
+    // copy with it, so it's written again at once.
+    resumeWriter(true);
+    page.toast(DELETE_FAILED_TOAST);
     return;
   }
   // The web view's stores are already gone; this only makes sure no key of the user's is left in this page's
   // localStorage for anything to copy back (the writer stays paused until the reload).
   deleteAll();
-  history.replaceState(null, '', DELETED_HASH);
-  location.reload();
+  page.history.replaceState(null, '', DELETED_HASH);
+  page.location.reload();
 }
 
-/** The page's location and history, as openData uses them (tests pass stand-ins). */
-export interface PageNav {
-  location: Pick<Location, 'reload'>;
-  history: Pick<History, 'replaceState'>;
+/** After a deleteAllData that failed: whether its marker is still there (AppInfo.deleting); true if that can't be told, since the reload's launch reads the marker itself. */
+async function stillDeleting(): Promise<boolean> {
+  try {
+    return (await native().appInfo()).deleting;
+  } catch {
+    return true;
+  }
 }
 
 /**

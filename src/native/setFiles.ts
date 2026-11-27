@@ -28,7 +28,10 @@ export const EXPORT_NAME = /^[A-Za-z0-9._-]{1,100}\.json$/;
 /** The index of saved sets. */
 export const INDEX_FILE = 'index.json';
 
-/** An index set aside because it couldn't be read (src/native/setsDb.ts): while one exists, no file is deleted as an orphan. */
+/**
+ * An index set aside because it couldn't be read (src/native/setsDb.ts): while one exists, only files whose id time is
+ * later than the newest set-aside's are deleted as orphans, and never a set-aside index itself.
+ */
 export const UNREADABLE_INDEX = /^index\.unreadable-[0-9]{1,16}\.json$/;
 
 /** A set's replay file (its landmarks and analysis). */

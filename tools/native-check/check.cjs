@@ -14,13 +14,15 @@
 // src/native/bridge.ts, in memory; kept across reloads), and the console a Debug build prints, which the check reads
 // as CI reads the simulator's (markers through readMarker(), "[error]" lines, "fitee:dropped" lines). Then:
 //   1. the build: index.html with the native entry and the native CSP, no home-screen tags; dist-native/ without a
-//      service worker, landing page, web manifest or no-SIMD runtime;
+//      service worker, landing page, web manifest or no-SIMD runtime, and no file with the web's "Video is never
+//      uploaded" or "It’s never uploaded";
 //   2. first launch with nothing stored: Welcome; fitee:ready with the page's own origin for the pose model too,
 //      the model fetched (200), the runtime as application/wasm, the outside probe blocked by src/privacy.ts, SIMD;
 //      the status strip over the safe area's top (an iPhone's, emulated) in the page colour;
-//   3. "Skip for now": the app's own terms version; within 2.5 s a copy whose rev is the one localStorage
-//      remembers; revs strictly increase; hiding the page, or the page going (pagehide), with a change waiting
-//      writes at once, and a change made just before a reload is in the copy after the next launch;
+//   3. "Skip for now": the app's own terms version; the Train tab's privacy line (the app's); within 2.5 s a copy
+//      whose rev is the one localStorage remembers; revs strictly increase; hiding the page, or the page going
+//      (pagehide), with a change waiting writes at once, and a change made just before a reload is in the copy
+//      after the next launch;
 //   4. restore: localStorage cleared (no write follows), reload: the Train tab, "Your data was restored…", keys back;
 //   5. a newer copy replaces localStorage (Pounds in Settings), an older one loses and a write with the next rev
 //      follows, an equal rev with other data is written again, an equal one with the same data isn't;
@@ -35,17 +37,18 @@
 //  11. a copy that can't be written: one toast per session, later writes go on;
 //  12. Delete all my data: the confirm's text, deleteAllData called while the page still had its keys, then the
 //      reload to Welcome with "All data deleted", nothing left (localStorage, the fake's files), no copy written
-//      after it; cancelled: nothing deleted; failed: its toast, and the copy writer still on; stopped part way (the
-//      marker, AppInfo.deleting): the next launch deletes again before it reads the copy, then Welcome;
+//      after it; cancelled: nothing deleted; failed before the web view's stores: its toast, no marker, the copy
+//      written again at once and the writer still on, and the next launch deleting nothing; failed at the end (the
+//      marker left): the page reloads and that launch finishes it; stopped part way (the marker, AppInfo.deleting):
+//      the next launch deletes again before it reads the copy, then Welcome;
 //  13. status bar and Appearance: a launch on a dark phone starts with light text; dark text on a light phone,
 //      light text on a dark one, a pinned Appearance wins over the phone's, setAppearance follows it, and a pinned
 //      theme is right from the first style set;
 //  14. a saved set: the <video> plays from the fake's videoUrl (loadedmetadata, Range requests), the note under it
-//      says fitee never uploads it, Delete video
-//      removes every extension and clears the index's video, Delete this saved set removes the replay and the
-//      entry, and its page then says why it's gone; the launch's reconcile: an unreadable index set aside and
-//      rebuilt from the replays with nothing deleted, and on a "restored phone" a missing video cleared from its
-//      entry, a leftover part and an orphan replay removed;
+//      says fitee never uploads it, Delete video removes every extension and clears the index's video, Delete this
+//      saved set removes the replay and the entry, and its page then says why it's gone; the launch's reconcile: an
+//      unreadable index rebuilt from the replays and set aside, no file that isn't newer than it deleted, and on a
+//      "restored phone" a missing video cleared from its entry, a leftover part and an orphan replay removed;
 //  15. a technique check: the camera keeps the screen on (setKeepAwake) and leaving lets it sleep; a picked video
 //      checked to its results, then a video the app can't read: the temporary copies deleted after each
 //      (clearPickedFiles); the app's privacy line; the picker closing without a file (its cancel event) and a check
@@ -152,10 +155,11 @@ async function loadContract() {
   T.deleted = sourceConst('src/native/data.ts', 'DELETED_TOAST');
   T.exportFailed = sourceConst('src/native/download.ts', 'EXPORT_FAILED_TOAST');
   T.updated = sourceConst('src/native/screens/Legal.tsx', 'NATIVE_UPDATED');
-  // The app's privacy line (src/screens/Analyze.tsx's native branch; Settings says the same), and its profile note.
-  const privacyLine = /__NATIVE__ \? '([^']+)' : PRIVACY/.exec(read('src/screens/Analyze.tsx'));
-  if (!privacyLine) throw new Error('native-check: no native privacy line in src/screens/Analyze.tsx');
-  T.nativePrivacy = privacyLine[1];
+  // The app's privacy line (the native branch in place of PRIVACY on the technique check and the Train tab, one wording;
+  // Settings says the same), and its profile note.
+  const privacyLines = ['src/screens/Analyze.tsx', 'src/screens/Home.tsx'].map((f) => /__NATIVE__ \? '([^']+)' : PRIVACY/.exec(read(f))?.[1]);
+  if (!privacyLines[0] || privacyLines.some((line) => line !== privacyLines[0])) throw new Error('native-check: src/screens/Analyze.tsx and Home.tsx need the same native privacy line');
+  T.nativePrivacy = privacyLines[0];
   T.profileNote = 'Your profile stays on this iPhone and in its own backups (iCloud or a computer); fitee sends nothing anywhere.';
   T.licences = [...read('src/native/screens/Legal.tsx').matchAll(/\{ file: '([^']+)', name: '([^']+)', licence: '([^']+)' \}/g)].map((m) => ({ file: m[1], name: m[2], licence: m[3] }));
 }
@@ -572,6 +576,11 @@ async function checkBuild() {
     JSON.stringify(top) === JSON.stringify(['assets', 'index.html', 'licenses', 'mediapipe']) && JSON.stringify(wasm) === JSON.stringify(['vision_wasm_internal.js', 'vision_wasm_internal.wasm']),
     `${top.join(', ')}; mediapipe/wasm: ${wasm.join(', ')}`,
   );
+  // No screen of the app can say what the web says of video ("Video is never uploaded", "It’s never uploaded"): the app
+  // says what fitee does instead (it can't promise more of iOS's backups).
+  const assets = fs.readdirSync(path.join(DIST, 'assets')).filter((f) => /\.(js|css|html)$/.test(f));
+  const webLines = assets.filter((f) => /Video is never uploaded|It’s never uploaded/.test(fs.readFileSync(path.join(DIST, 'assets', f), 'utf8')));
+  check('build: no file of the app holds the web’s "Video is never uploaded" or "It’s never uploaded"', assets.length > 0 && webLines.length === 0, webLines.join(', ') || `${assets.length} files`);
 }
 
 /** 2–4: first launch, "Skip for now" and the copy writer, restore. */
@@ -628,6 +637,12 @@ async function firstLaunch() {
   // 3. Skip for now: the app's own terms version, and the copy.
   const clicked = Date.now();
   check('skip: "Skip for now" opens the Train tab', await skip(page));
+  const today = await page.locator('main').innerText();
+  check(
+    'train tab: with no plan, the privacy line under "Create my plan" is the app’s (fitee never uploads video), not "Video is never uploaded"',
+    (await visible(page, T.nativePrivacy)) && today.includes('Create my plan') && !today.includes('Video is never uploaded'),
+    short(today.slice(today.indexOf('Create my plan')), 200),
+  );
   const profile = JSON.parse((await local(page))['formcheck.v1.profile'] ?? '{}');
   check('skip: the profile accepts the app’s own terms (NATIVE_TERMS_VERSION)', profile.termsVersion === T.termsVersion && !!profile.termsAcceptedAt, JSON.stringify(profile));
   const first = await nextWrite(fake, 0, 4000);
@@ -965,15 +980,31 @@ async function deleteAll() {
   await sleep(500);
   check('delete all: cancelled, nothing is deleted', fake.callsTo('deleteAllData').length === 0 && Object.keys(await local(page)).some((k) => k === 'formcheck.v1.profile'));
 
-  // Failed: its toast, and the copy writer goes on.
+  // Failed before the web view's stores were touched (fitee/ couldn't be removed): no marker left, its toast, the copy
+  // written again at once and later changes copied; and the next launch keeps the data, deleting nothing.
   fake.failNext('deleteAllData', 'IO_ERROR', 'Couldn’t remove the folder');
+  const n0 = writes(fake).length;
   page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: 'Delete all my data' }).click();
   const failedToast = await visible(page, T.deleteFailed, 4000);
+  const rewritten = await nextWrite(fake, n0, 2000);
   const n = writes(fake).length;
   await page.getByRole('button', { name: /Pounds/ }).click();
   const after = await nextWrite(fake, n);
-  check(`delete all: a failure shows "${T.deleteFailed}", the data stays and later changes are copied`, failedToast && !!after && Object.keys(await local(page)).includes('formcheck.v1.profile'));
+  check(
+    `delete all: a failure before the web view's stores shows "${T.deleteFailed}", leaves no marker, keeps the data, writes the copy again at once and copies later changes`,
+    failedToast && fake.deleting === false && !!rewritten && !!after && Object.keys(await local(page)).includes('formcheck.v1.profile'),
+    `marker ${fake.deleting}; copy written again ${!!rewritten}; next change copied ${!!after}`,
+  );
+  const deletes = fake.callsTo('deleteAllData').length;
+  await reload(l);
+  await heading(page, 'Settings');
+  const kept = await local(page);
+  check(
+    'delete all: after that failure the next launch deletes nothing and starts with the data (Pounds still picked)',
+    fake.callsTo('deleteAllData').length === deletes && Object.keys(kept).includes('formcheck.v1.profile') && kept['formcheck.v1.unit'] === '"lb"' && (await page.getByRole('button', { name: /Pounds/ }).getAttribute('aria-pressed')) === 'true',
+    `${fake.callsTo('deleteAllData').length - deletes} deletes at launch; unit ${kept['formcheck.v1.unit']}`,
+  );
 
   // Done: the native side deletes everything, then the page reloads to Welcome.
   let message = '';
@@ -1001,6 +1032,40 @@ async function deleteAll() {
   await sleep(2500);
   check('delete all: no copy written after it', !fake.calls.slice(callIndex).some((c) => c.method === 'writeSnapshot'), `${fake.calls.slice(callIndex).filter((c) => c.method === 'writeSnapshot').length} writes`);
   await finish(l);
+
+  // Failed at the end (everything deleted, the web view's stores too, but the marker couldn't be removed): the delete
+  // isn't over, so the page reloads, and that launch finishes it: Welcome with "All data deleted", no copy written.
+  const holder3 = {};
+  const fake3 = new Fake.FakeNative({ fileBase: ORIGIN, onDeleteAll: () => holder3.page?.evaluate(() => window.__fiteeWebsiteDataRemoved?.()) });
+  const s3 = await launch('delete all, failed at the end', { fake: fake3, allow: { codes: ['IO_ERROR'] } });
+  holder3.page = s3.page;
+  await open(s3);
+  await skip(s3.page);
+  await nextWrite(fake3, 0);
+  await s3.page.goto(`${BASE}#/settings`);
+  await heading(s3.page, 'Settings');
+  fake3.failMarkerRemovalNext();
+  const loads3 = markerLines(s3.run, C.MARKERS.ready).length;
+  const writes3 = writes(fake3).length;
+  s3.page.once('dialog', (d) => void d.accept());
+  await s3.page.getByRole('button', { name: 'Delete all my data' }).click();
+  const toast3 = visible(s3.page, T.deleted, 15_000);
+  const reloaded3 = await ready(s3.run, loads3 + 1, 15_000); // Welcome's (the load that finishes the delete renders nothing)
+  const shown3 = await toast3;
+  const order3 = fake3.calls.slice(fake3.calls.indexOf(fake3.callsTo('deleteAllData')[0])).map((c) => c.method);
+  check(
+    'delete all, failed at the end: the page reloads and the launch finishes the delete (deleteAllData again before the copy is read), then Welcome with "All data deleted"; no copy written',
+    !!reloaded3 &&
+      shown3 &&
+      (await heading(s3.page, 'Welcome to fitee')) &&
+      fake3.callsTo('deleteAllData').length === 2 &&
+      order3.indexOf('deleteAllData', 1) < order3.indexOf('readSnapshot') &&
+      fake3.deleting === false &&
+      writes(fake3).length === writes3 &&
+      Object.keys(await local(s3.page)).every((k) => !k.startsWith('formcheck.v1.')),
+    `${order3.join(', ')}; marker ${fake3.deleting}; ${writes(fake3).length - writes3} writes`,
+  );
+  await finish(s3);
 
   // Stopped part way (the marker still there): fitee/ was removed, the web view's stores weren't. The next launch
   // finishes the delete before it reads the copy, and starts at Welcome with "All data deleted".
@@ -1187,9 +1252,10 @@ async function savedSet(sample, video) {
 }
 
 /**
- * 14b: the launch's reconcile through the app. An index that exists but can't be read deletes nothing: it is set
- * aside and rebuilt from the replays (S2). An index naming a video that isn't there (sets/ isn't restored from an
- * iPhone backup) loses the video; a leftover upload part and a file no entry names go.
+ * 14b: the launch's reconcile through the app. An index that exists but can't be read is rebuilt from the replays and
+ * set aside (S2); while it's set aside, a file no entry names goes only if its id time is later than the set-aside's.
+ * An index naming a video that isn't there (sets/ isn't restored from an iPhone backup) loses the video; a leftover
+ * upload part and a file no entry names go.
  */
 async function reconcile(sample, video) {
   const ext = Files.extFor(video.type);
@@ -1215,7 +1281,11 @@ async function reconcile(sample, video) {
     listed && aside.length === 1 && fake.file(aside[0])?.toString() === '[{"id":"' && index?.length === 1 && index[0].id === a && index[0].video?.type === Files.typeForExt(ext) && index[0].video?.bytes === video.bytes && index[0].reps === sample.result.reps.length,
     `${aside.join(', ') || 'nothing set aside'}; index ${short(index, 160)}`,
   );
-  check('reconcile: while an index is set aside, no file is deleted as an orphan', names.includes(`stray.${ext}`) && names.includes(`${a}.replay.json`) && names.includes(`${a}.${ext}`), names.join(', '));
+  check(
+    'reconcile: while an index is set aside, a file no entry names is deleted only if its id time is later than the set-aside (here none is: a file with no id time and the rebuilt set’s stay)',
+    names.includes(`stray.${ext}`) && names.includes(`${a}.replay.json`) && names.includes(`${a}.${ext}`),
+    names.join(', '),
+  );
   await l.page.goto(`${BASE}#/set/${a}`);
   const plays = await l.page
     .waitForFunction(() => (document.querySelector('video')?.readyState ?? 0) >= 1, null, { timeout: 10_000 })

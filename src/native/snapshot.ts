@@ -285,6 +285,11 @@ export function pauseWriter(): void {
   writer?.pause();
 }
 
-export function resumeWriter(): void {
+/**
+ * Ends a pause. With `writeNow` the copy is written at once, changes or not: after a Delete all my data that failed,
+ * which may have removed the copy before it stopped, and whose pause dropped a waiting write.
+ */
+export function resumeWriter(writeNow = false): void {
   writer?.resume();
+  if (writeNow) writer?.flush(true);
 }

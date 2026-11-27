@@ -14,7 +14,8 @@ import Darwin
 ///   Library/Application Support/fitee-deleting
 ///            An empty file while Delete all my data runs (deleteAll() writes it before it removes anything, and
 ///            finishDeleting() removes it once the web view's stores are gone too): if the app or its page stops part
-///            way, the next launch finishes the delete (AppInfo.deleting) instead of copying the data back. Outside
+///            way, the next launch finishes the delete (AppInfo.deleting) instead of copying the data back. A delete
+///            that fails before the web view's stores are touched leaves it as it was before (deleteAll()). Outside
 ///            fitee/, so it outlives the folder it guards; excluded from backup (it's about this phone, not the user).
 ///   tmp/     fitee-export/<name> while a Save to Files panel is open, and the copies iOS makes of a video picked for a
 ///            technique check or filmed with Take Video (WebKit's file panel puts them here and would keep them until
@@ -328,13 +329,20 @@ final class FiteeFiles {
     /// deleteAllData's files: first the marker, then the whole fitee/ folder (the copy of the log and every saved set)
     /// and everything in tmp/. The marker is written as well as it can be: a phone too full for an empty file still
     /// gets its data deleted (only a stop part way through then goes unnoticed). A failure to remove fitee/ throws
-    /// (IO_ERROR): tmp/ is then left as it was, and the marker stays, so the next launch finishes the delete.
+    /// (IO_ERROR) before anything of the web view's is touched, leaving tmp/ as it was and the marker as it was before
+    /// the call: a delete that began with this call takes its marker away again (the page keeps its data, says the
+    /// delete failed and copies the data again, so the next launch mustn't finish it), while one already under way
+    /// (the launch finishing a delete that stopped part way) keeps it, so the next launch tries again.
     func deleteAll() throws {
+        let underWay = isDeleting
         markDeleting()
         _ = locked { activeParts.removeAll() }
         do {
             try removeIfPresent(root)
         } catch {
+            if !underWay {
+                try? removeIfPresent(deletingMarker)
+            }
             throw Failure.from(error)
         }
         FiteeFiles.empty(temporaryFolder, keeping: nil)

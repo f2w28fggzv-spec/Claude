@@ -238,7 +238,7 @@ describe('src/sets/sets.ts on files', () => {
     expect(aside).toHaveLength(1);
     expect(fake.file(aside[0])?.toString()).toBe('{"truncated');
     for (const name of before) expect(fake.file(name), name).toBeDefined();
-    // The next launch keeps what no entry names too, while an index is set aside.
+    // The next launch keeps what no entry names too: none of it is newer than the set-aside index.
     vi.resetModules();
     vi.doMock('../src/db', () => import('../src/native/setsDb'));
     const again = await import('../src/sets/sets');
@@ -338,6 +338,17 @@ describe('src/sets/sets.ts on files', () => {
     expect(names()).toEqual(
       [`index.unreadable-${setAside}.json`, 'index.json', `${ID(1)}.replay.json`, `${ID(2)}.replay.json`, `${ID(3)}.mov`, 'selftest1764237600000a.mp4'].sort(),
     );
+  });
+
+  it('rebuilding again beside a set-aside index, a replay it can’t read goes as an orphan only if it was saved after the set-aside', async () => {
+    const setAside = Date.UTC(2026, 10, 1) + 5 * 60_000; // between ID(4) and ID(6); no index.json beside it
+    put(`index.unreadable-${setAside}.json`, '{"truncated');
+    put(`${ID(1)}.replay.json`, replay());
+    put(`${ID(2)}.replay.json`, '{broken'); // older: maybe a set the set-aside index named
+    put(`${ID(6)}.replay.json`, '{broken'); // newer: a save after the set-aside that left a replay no one can read
+    put(`${ID(7)}.replay.json`, replay()); // newer and readable: rebuilt into the index
+    expect((await sets.loadSets()).map((m) => m.id)).toEqual([ID(7), ID(1)]);
+    expect(names()).toEqual([`index.unreadable-${setAside}.json`, 'index.json', `${ID(1)}.replay.json`, `${ID(2)}.replay.json`, `${ID(7)}.replay.json`].sort());
   });
 
   it('never takes an index that went bad mid-session for an empty one', async () => {

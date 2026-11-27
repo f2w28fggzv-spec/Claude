@@ -124,7 +124,7 @@ function CoachToday({ workouts, technique, unit, begin, refresh, useOwn }: PaneP
             Prefer to plan your own? Use My workouts
           </button>
         </section>
-        <p class="privacy small center">{PRIVACY}</p>
+        <p class="privacy small center">{__NATIVE__ ? 'Everything runs on your iPhone. fitee never uploads video, and keeps it only if you choose to save it.' : PRIVACY}</p>
       </>
     );
   }

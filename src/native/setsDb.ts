@@ -98,7 +98,9 @@ async function rebuild(files: Map<string, SetFile>): Promise<SavedSetMeta[]> {
     try {
       replay = JSON.parse((await native().readSetFile({ name })).text ?? '');
     } catch {
-      continue; // kept as it is: nothing is deleted while an unreadable index is set aside
+      // Left out of the index. The reconcile keeps it if its id time isn't later than the newest set-aside index (a set
+      // that index may have named), and deletes it as an orphan if it is (see the header).
+      continue;
     }
     const ext = VIDEO_EXTS.find((e) => files.has(videoFile(id, e)));
     const entry = entryFromReplay(id, replay, ext ? { ext, bytes: files.get(videoFile(id, ext))?.bytes ?? 0 } : undefined);

@@ -967,7 +967,12 @@ describe('Swift: the network guards and what Release builds hold', () => {
   it('Delete all: the marker before anything is removed and after the web view\'s stores and the cookies, which appInfo reports', () => {
     const files = swiftSource('FiteeFiles.swift');
     expect(files).toContain('appendingPathComponent("fitee-deleting", isDirectory: false)');
-    expect(files).toMatch(/func deleteAll\(\) throws \{\n\s+markDeleting\(\)\n/);
+    expect(files).toMatch(/func deleteAll\(\) throws \{\n\s+let underWay = isDeleting\n\s+markDeleting\(\)\n/);
+    // fitee/ that can't be removed leaves the marker as it was before the call: a delete begun now takes it away again
+    // (the page keeps its data, so the next launch mustn't finish it); one already under way keeps it.
+    expect(files).toMatch(
+      /try removeIfPresent\(root\)\n\s+\} catch \{\n\s+if !underWay \{\n\s+try\? removeIfPresent\(deletingMarker\)\n\s+\}\n\s+throw Failure\.from\(error\)\n\s+\}/,
+    );
     expect(files).toMatch(/private func markDeleting\(\) \{[\s\S]*?try FiteeFiles\.exclude\(marker\)/);
     const del = SWIFT_METHODS.get('deleteAllData') as string;
     const removed = del.indexOf('removeData(ofTypes:');

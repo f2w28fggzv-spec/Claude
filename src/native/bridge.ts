@@ -176,9 +176,10 @@ export interface AppInfo {
    */
   gate: boolean;
   /**
-   * A Delete all my data began and didn't finish (the app or its page stopped part way: the marker
-   * Library/Application Support/fitee-deleting is there). src/native/entry.ts then finishes it (deleteAllData again)
-   * before anything reads the data, instead of putting the copy back, which would write the deleted data again.
+   * A Delete all my data began and didn't finish (the app or its page stopped part way, or its marker couldn't be
+   * removed: the marker Library/Application Support/fitee-deleting is there). src/native/entry.ts then finishes it
+   * (deleteAllData again) before anything reads the data, instead of putting the copy back, which would write the
+   * deleted data again. After a deleteAllData that failed, it says whether the delete is still under way.
    */
   deleting: boolean;
 }
@@ -370,8 +371,13 @@ export interface FiteeNative {
    * WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince:
    * .distantPast) (localStorage, IndexedDB and the web view's other stores), then HTTPCookieStorage.shared's cookies
    * (Capacitor copies the web view's there), then removes the marker, and resolves.
-   * Errors: IO_ERROR (fitee/ couldn't be removed: the web view's data is then left as it was; or the marker couldn't be
-   * removed). Either way the marker stays, so the next launch finishes the delete.
+   * Errors: IO_ERROR, in two ways, which AppInfo.deleting tells apart afterwards (src/native/data.ts asks):
+   * - fitee/ couldn't be removed (part of it may be gone): nothing of the web view's has been touched, and the marker
+   *   is as it was before the call. A delete that began with the call leaves none, so the data stays: the page says
+   *   the delete failed and copies its data again, and the next launch deletes nothing. One already under way (the
+   *   launch finishing a delete that stopped part way) keeps it, so the next launch tries again.
+   * - the marker couldn't be removed at the end: everything else is gone, and it stays, so the delete isn't over: the
+   *   page reloads, and the launch finishes it.
    */
   deleteAllData(): Promise<Empty>;
 }

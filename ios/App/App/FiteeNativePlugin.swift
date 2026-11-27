@@ -316,7 +316,8 @@ public class FiteeNativePlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func deleteAllData(_ call: CAPPluginCall) {
         let store = files
         do {
-            // The marker first (AppInfo.deleting until the end), then fitee/ and tmp/.
+            // The marker first (AppInfo.deleting until the end), then fitee/ and tmp/. If fitee/ can't be removed, the
+            // marker is left as it was before this call (FiteeFiles.deleteAll): nothing of the web view's is touched yet.
             try store.deleteAll()
         } catch {
             let failure = FiteeFiles.Failure.from(error)
@@ -327,7 +328,8 @@ public class FiteeNativePlugin: CAPPlugin, CAPBridgedPlugin {
             // Then the web view's own stores (localStorage, IndexedDB and the rest), which are SQLite files that could
             // keep deleted rows in their free pages, and the cookies Capacitor keeps in Foundation's shared store too
             // (CapacitorCookieManager.swift, CapacitorWKCookieObserver: the web view's are copied there). The page
-            // reloads to the Welcome screen once this answers; until then the marker says a delete is under way.
+            // reloads to the Welcome screen once this answers; until then the marker says a delete is under way. A
+            // marker that can't be removed now stays: the page reloads, and the launch finishes the delete.
             let websiteData = WKWebsiteDataStore.default()
             websiteData.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: Date.distantPast) {
                 HTTPCookieStorage.shared.removeCookies(since: Date.distantPast)

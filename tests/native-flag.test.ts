@@ -40,6 +40,7 @@ const SHARED_WITH_FLAG = [
   'src/app.tsx',
   'src/offline/client.ts',
   'src/screens/Analyze.tsx',
+  'src/screens/Home.tsx',
   'src/screens/ProfileScreen.tsx',
   'src/screens/ProgramView.tsx',
   'src/screens/Results.tsx',
@@ -186,6 +187,17 @@ describe('the builds', () => {
     const native = await bundle(true);
     expect(native.some((o) => text(o).includes('FiteeNative'))).toBe(true);
     expect(native.some((o) => text(o).includes('status-strip'))).toBe(true);
+    // The app says what fitee does ("fitee never uploads video"/"… it"), one way on every screen: the web's privacy
+    // line and saved-video notes, which it can't promise of iOS's backups, are in no file of the native build.
+    const NATIVE_PRIVACY = 'Everything runs on your iPhone. fitee never uploads video, and keeps it only if you choose to save it.';
+    for (const line of ['Video is never uploaded', 'It’s never uploaded']) {
+      expect(web.some((o) => text(o).includes(line)), line).toBe(true);
+      expect(native.filter((o) => text(o).includes(line)).map((o) => o.fileName), line).toEqual([]);
+    }
+    expect(native.some((o) => text(o).includes(NATIVE_PRIVACY))).toBe(true);
+    for (const f of ['src/screens/Analyze.tsx', 'src/screens/Home.tsx']) {
+      expect([...readFileSync(join(ROOT, f), 'utf8').matchAll(/__NATIVE__ \? '([^']+)' : PRIVACY/g)].map((m) => m[1]), f).toEqual([NATIVE_PRIVACY]);
+    }
     const entry = entryOf(native);
     expect(has(entry, 'src/native/entry.ts')).toBe(true);
     expect(has(entry, 'src/main.tsx')).toBe(false); // the entry imports the app with import() once the copy is back

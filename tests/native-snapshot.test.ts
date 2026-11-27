@@ -25,8 +25,8 @@ import {
   type Copy,
   type StartResult,
 } from '../src/native/snapshot';
-import { DELETED_HASH, openData } from '../src/native/data';
-import { FakeNative } from './fixtures/fakeNative';
+import { DELETE_CONFIRM, DELETE_FAILED_TOAST, DELETED_HASH, deleteEverything, openData } from '../src/native/data';
+import { fakeCapacitor, FakeNative } from './fixtures/fakeNative';
 
 /** A Storage-like class: the writer wraps its prototype as it wraps Storage.prototype in the app. */
 class FakeStorage {
@@ -260,7 +260,7 @@ describe('a Delete all my data the app didn’t finish', () => {
     expect(run.page.location.reload).toHaveBeenCalledTimes(1);
   });
 
-  it('if it fails again it rejects (the start-error screen), and the marker stays for the launch after', async () => {
+  it('if it fails again it rejects (the start-error screen), and the marker, there before the call, stays for the launch after', async () => {
     const run = stopped();
     run.fake.failNext('deleteAllData', 'IO_ERROR');
     await expect(launch(run)).rejects.toMatchObject({ code: 'IO_ERROR' });
@@ -284,6 +284,108 @@ describe('a Delete all my data the app didn’t finish', () => {
     expect((await fake.appInfo()).deleting).toBe(false);
     await fake.deleteAllData();
     expect((await fake.appInfo()).deleting).toBe(false);
+  });
+});
+
+describe('Delete all my data from Settings', () => {
+  // Settings as Delete all finds it: the user's keys in localStorage and the copy writer running, FiteeNative the fake.
+  // Its onDeleteAll clears localStorage beneath the page, as WKWebsiteDataStore.removeData does.
+  let stop: () => void = () => undefined;
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    stop();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+  const settings = () => {
+    const s = filled({ 'formcheck.v1.unit': 'lb', 'formcheck.v1.workouts': [{ id: 'w1' }], 'formcheck.v1.profile': { name: 'A' }, [REV_KEY]: 3 });
+    const fake = new FakeNative({ onDeleteAll: () => s.clear() });
+    fake.snapshot = { current: copyText({ 'formcheck.v1.unit': 'lb' }, 3) };
+    vi.stubGlobal('Capacitor', fakeCapacitor(fake));
+    vi.stubGlobal('localStorage', asStorage(s)); // src/log/store.ts's deleteAll() after a delete that went through
+    const keep: StartResult = { action: 'keep', copyRev: 3, writeNow: false };
+    stop = startWriter(fake, keep, { storage: asStorage(s), proto: FakeStorage.prototype as unknown as Storage, events: new EventTarget(), doc: Object.assign(new EventTarget(), { hidden: false }), toast: () => undefined });
+    const page = { location: { reload: vi.fn() }, history: { replaceState: vi.fn() }, confirm: vi.fn(() => true), toast: vi.fn() };
+    return { s, fake, page };
+  };
+  /** The next launch's step with the data (src/native/entry.ts: appInfo, then openData), the writer of this page gone. */
+  const relaunch = async ({ s, fake }: ReturnType<typeof settings>) => {
+    stop();
+    const page = { location: { reload: vi.fn() }, history: { replaceState: vi.fn() } };
+    return { result: await openData(fake, await fake.appInfo(), asStorage(s), page), page };
+  };
+  const userKeys = (s: FakeStorage) => s.keys().filter(isUserKey).sort();
+
+  it('fitee/ couldn’t be removed: the marker goes, the data stays, the copy is written again at once, and the next launch deletes nothing', async () => {
+    const run = settings();
+    run.fake.failNext('deleteAllData', 'IO_ERROR');
+    await deleteEverything(run.page);
+    expect(run.page.confirm).toHaveBeenCalledWith(DELETE_CONFIRM);
+    expect(run.page.toast).toHaveBeenCalledWith(DELETE_FAILED_TOAST);
+    expect(run.page.location.reload).not.toHaveBeenCalled();
+    expect(run.fake.deleting).toBe(false);
+    expect(run.fake.calls.map((c) => c.method)).toEqual(['deleteAllData', 'appInfo', 'writeSnapshot']);
+    expect(run.fake.currentCopy()).toMatchObject({ rev: 4, data: { 'formcheck.v1.unit': 'lb' } });
+    // Later changes are copied as before.
+    run.s.setItem('formcheck.v1.unit', '"kg"');
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    expect(run.fake.currentCopy()).toMatchObject({ rev: 5, data: { 'formcheck.v1.unit': 'kg' } });
+    const { result, page } = await relaunch(run);
+    expect(result).toMatchObject({ action: 'keep', copyRev: 5 });
+    expect(run.fake.callsTo('deleteAllData')).toHaveLength(1);
+    expect(userKeys(run.s)).toEqual(['formcheck.v1.profile', 'formcheck.v1.unit', 'formcheck.v1.workouts']);
+    expect(page.location.reload).not.toHaveBeenCalled();
+  });
+
+  it('the marker couldn’t be removed at the end: the delete isn’t over, so the page reloads with nothing copied, and the launch finishes it', async () => {
+    const run = settings();
+    run.fake.failMarkerRemovalNext();
+    await deleteEverything(run.page);
+    expect(run.fake.deleting).toBe(true);
+    expect(run.page.toast).not.toHaveBeenCalled();
+    expect(run.page.location.reload).toHaveBeenCalledTimes(1);
+    expect(run.page.history.replaceState).not.toHaveBeenCalled();
+    // On the way out the writer stays paused: a change (or the page going) writes nothing.
+    run.s.setItem('formcheck.v1.unit', '"kg"');
+    vi.advanceTimersByTime(MAX_WAIT_MS);
+    flushNow();
+    expect(run.fake.callsTo('writeSnapshot')).toEqual([]);
+    const { result, page } = await relaunch(run);
+    expect(result).toBeUndefined();
+    expect(run.fake.callsTo('deleteAllData')).toHaveLength(2);
+    expect(run.fake.deleting).toBe(false);
+    expect(run.fake.currentCopy()).toBeUndefined();
+    expect(userKeys(run.s)).toEqual([]);
+    expect(page.history.replaceState).toHaveBeenCalledWith(null, '', DELETED_HASH);
+    expect(page.location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('when the marker can’t be told (appInfo fails too), the page reloads and the launch goes by the marker', async () => {
+    const run = settings();
+    run.fake.failNext('deleteAllData', 'IO_ERROR');
+    run.fake.failNext('appInfo', 'IO_ERROR');
+    await deleteEverything(run.page);
+    expect(run.page.toast).not.toHaveBeenCalled();
+    expect(run.page.location.reload).toHaveBeenCalledTimes(1);
+    expect(run.fake.callsTo('writeSnapshot')).toEqual([]);
+    const { result } = await relaunch(run); // no marker: nothing was deleted, and nothing is now
+    expect(result).toMatchObject({ action: 'keep' });
+    expect(run.fake.callsTo('deleteAllData')).toHaveLength(1);
+    expect(userKeys(run.s)).toEqual(['formcheck.v1.profile', 'formcheck.v1.unit', 'formcheck.v1.workouts']);
+  });
+
+  it('cancelled, nothing happens; done, the page reloads to Welcome with no key of the user’s left', async () => {
+    const run = settings();
+    run.page.confirm.mockReturnValueOnce(false);
+    await deleteEverything(run.page);
+    expect(run.fake.calls).toEqual([]);
+    await deleteEverything(run.page);
+    expect(run.fake.calls.map((c) => c.method)).toEqual(['deleteAllData']);
+    expect(run.fake.deleting).toBe(false);
+    expect(userKeys(run.s)).toEqual([]);
+    expect(run.page.history.replaceState).toHaveBeenCalledWith(null, '', DELETED_HASH);
+    expect(run.page.location.reload).toHaveBeenCalledTimes(1);
+    expect(run.fake.callsTo('writeSnapshot')).toEqual([]);
   });
 });
 
@@ -411,6 +513,17 @@ describe('the copy writer', () => {
     resumeWriter();
     local.setItem('formcheck.v1.unit', '"kg"');
     vi.advanceTimersByTime(DEBOUNCE_MS);
+    expect(writes()).toHaveLength(1);
+  });
+
+  it('resuming with writeNow writes the copy at once, with no change waiting (after a Delete all that failed)', () => {
+    start();
+    local.setItem('formcheck.v1.unit', '"kg"');
+    pauseWriter();
+    resumeWriter(true);
+    expect(writes()).toHaveLength(1);
+    expect(fake.currentCopy()?.data['formcheck.v1.unit']).toBe('kg');
+    vi.advanceTimersByTime(MAX_WAIT_MS);
     expect(writes()).toHaveLength(1);
   });
 

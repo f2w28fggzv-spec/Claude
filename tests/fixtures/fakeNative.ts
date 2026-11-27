@@ -55,6 +55,8 @@ export class FakeNative implements FiteeNative {
   deleting = false;
   info: Omit<AppInfo, 'deleting'>;
   private readonly failures: { method: string; code: NativeErrorCode; message: string }[] = [];
+  /** failMarkerRemovalNext() was asked for. */
+  private markerStays = false;
   private readonly options: FakeOptions;
 
   constructor(options: FakeOptions = {}) {
@@ -67,6 +69,14 @@ export class FakeNative implements FiteeNative {
   /** The next call to `method` rejects with `code`. */
   failNext(method: keyof FiteeNative, code: NativeErrorCode = 'IO_ERROR', message = 'Failed on purpose'): void {
     this.failures.push({ method, code, message });
+  }
+
+  /**
+   * The next deleteAllData deletes everything, the web view's stores too (onDeleteAll), but can't remove its marker at
+   * the end: it rejects IO_ERROR and the marker stays, as FiteeNativePlugin's does when finishDeleting() fails.
+   */
+  failMarkerRemovalNext(): void {
+    this.markerStays = true;
   }
 
   /** Logs a call, then fails it if a failure was asked for. */
@@ -245,6 +255,9 @@ export class FakeNative implements FiteeNative {
   }
 
   async deleteAllData(_?: unknown, userKeys?: number): Promise<Empty> {
+    // A failure asked for with failNext is fitee/ that couldn't be removed (FiteeFiles.deleteAll): thrown before
+    // anything is touched, the web view's stores and the marker as they were before the call (a delete that began
+    // with it leaves no marker, one already under way keeps its own). failMarkerRemovalNext is the other way it fails.
     this.enter('deleteAllData', {}, userKeys);
     this.deleting = true;
     this.sets.clear();
@@ -252,6 +265,10 @@ export class FakeNative implements FiteeNative {
     this.snapshot = {};
     this.deletedAll++;
     await this.options.onDeleteAll?.(); // the web view's stores
+    if (this.markerStays) {
+      this.markerStays = false;
+      throw nativeError('IO_ERROR', 'The marker couldn’t be removed'); // as finishDeleting() fails: the marker stays
+    }
     this.deleting = false;
     return {};
   }
