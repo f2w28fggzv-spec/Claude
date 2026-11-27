@@ -1,4 +1,4 @@
-Eigen, compiled into MediaPipe’s WebAssembly runtime (through TensorFlow Lite), at commit ea13a98decd497a8c5588fb5de71b57bcf10d864, the version MediaPipe v1.2.0 builds with. Eigen is licensed under the Mozilla Public License 2.0, with some files under the BSD licence below. Its source code, the form the MPL asks to be offered, is at https://gitlab.com/libeigen/eigen/-/tree/ea13a98decd497a8c5588fb5de71b57bcf10d864
+Eigen, compiled into MediaPipe’s WebAssembly runtime (through TensorFlow Lite), at commit ea13a98decd497a8c5588fb5de71b57bcf10d864: the version MediaPipe’s public release v1.2.0 builds with. Google built the runtime from its internal source tree, and the runtime doesn’t record Eigen’s version, so the commit compiled in may differ (to be checked in the legal review). Eigen is licensed under the Mozilla Public License 2.0, with some files under the BSD licence below. Its source code, the form the MPL asks to be offered, is at https://gitlab.com/libeigen/eigen/-/tree/ea13a98decd497a8c5588fb5de71b57bcf10d864
 
 COPYING.README
 

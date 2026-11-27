@@ -1,4 +1,4 @@
-Libraries compiled into MediaPipe’s WebAssembly runtime (mediapipe/wasm/vision_wasm_internal.wasm), licensed under the Apache License 2.0 (its full text is listed separately). For each, the version is the one MediaPipe’s release v1.2.0 builds with, and its licence file there is the Apache License 2.0; TensorFlow’s adds the notice at the end.
+Libraries compiled into MediaPipe’s WebAssembly runtime (mediapipe/wasm/vision_wasm_internal.wasm), licensed under the Apache License 2.0 (its full text is listed separately). Google built the runtime from its own internal source tree, not from MediaPipe’s public build files (the runtime’s source paths say so). OpenCV’s version below is the one the runtime reports itself; the others are the versions MediaPipe’s public release v1.2.0 builds with, which may differ from those compiled in. Each library’s licence file at that version is the Apache License 2.0; TensorFlow’s adds the notice at the end.
 
 - TensorFlow Lite, part of TensorFlow, at commit a481b10260dfdf833a1b16007eead49c1d7febf3. Its authors for copyright purposes (its AUTHORS file): Google Inc., Yuan Tang, Arm Ltd.
   https://raw.githubusercontent.com/tensorflow/tensorflow/a481b10260dfdf833a1b16007eead49c1d7febf3/LICENSE
@@ -6,8 +6,8 @@ Libraries compiled into MediaPipe’s WebAssembly runtime (mediapipe/wasm/vision
   https://raw.githubusercontent.com/google-ai-edge/LiteRT/v2.3.0/LICENSE
 - Abseil 20260526.0. Its authors for copyright purposes (its AUTHORS file): Google Inc.
   https://raw.githubusercontent.com/abseil/abseil-cpp/20260526.0/LICENSE
-- OpenCV 4.10.0, with its COPYRIGHT file (below the list).
-  https://raw.githubusercontent.com/opencv/opencv/4.10.0/LICENSE
+- OpenCV 5.1.0-dev at commit 73a26a4, as the runtime reports it (“General configuration for OpenCV 5.1.0-dev”, “Version control: 73a26a4”), with its COPYRIGHT file (below the list); its core, imgproc and geometry modules are compiled in. OpenCV has no NOTICE file.
+  https://raw.githubusercontent.com/opencv/opencv/73a26a4/LICENSE
 - ruy, at commit 3286a34cc8de6149ac6844107dfdffac91531e72.
   https://raw.githubusercontent.com/google/ruy/3286a34cc8de6149ac6844107dfdffac91531e72/LICENSE
 - gemmlowp, at commit 16e8662c34917be0065110bfcd9cc27d30f52fdf. Its authors for copyright purposes (its AUTHORS file): Google Inc., Intel Corporation, ARM Ltd., Silk Labs Inc., MIPS Tech LLC, Wave Computing Inc.
@@ -19,7 +19,7 @@ Libraries compiled into MediaPipe’s WebAssembly runtime (mediapipe/wasm/vision
 - TCMalloc (a malloc hook). Neither MediaPipe’s nor TensorFlow’s build files pin a version, so this is its licence file on its main branch.
   https://raw.githubusercontent.com/google/tcmalloc/master/LICENSE
 
-OpenCV’s COPYRIGHT file (https://raw.githubusercontent.com/opencv/opencv/4.10.0/COPYRIGHT):
+OpenCV’s COPYRIGHT file (https://raw.githubusercontent.com/opencv/opencv/73a26a4/COPYRIGHT):
 
 Copyright (C) 2000-2022, Intel Corporation, all rights reserved.
 Copyright (C) 2009-2011, Willow Garage Inc., all rights reserved.
@@ -30,6 +30,8 @@ Copyright (C) 2008-2016, Itseez Inc., all rights reserved.
 Copyright (C) 2019-2023, Xperience AI, all rights reserved.
 Copyright (C) 2019-2022, Shenzhen Institute of Artificial Intelligence and Robotics for Society, all rights reserved.
 Copyright (C) 2022-2023, Southern University of Science And Technology, all rights reserved.
+Copyright (C) 2023-2025, OpenCV AI, all rights reserved.
+Copyright (C) 2024, Bigvision LLC, all rights reserved.
 
 Third party copyrights are property of their respective owners.
 
@@ -86,6 +88,6 @@ or otherwise, the contributor releases their content to the
 license and copyright terms herein.
 
 ----------------------------------------
-The libraries are those the runtime’s own strings name (their source paths and messages). The versions are from MediaPipe’s https://raw.githubusercontent.com/google-ai-edge/mediapipe/v1.2.0/WORKSPACE and https://raw.githubusercontent.com/google-ai-edge/mediapipe/v1.2.0/MODULE.bazel, and, for those TensorFlow brings in (ruy, gemmlowp, FlatBuffers, OR-Tools), from TensorFlow’s own build files at the commit above. The runtime also contains Google code that has no public repository of its own (ML Drift, gloop), which comes with MediaPipe under its licence.
+The libraries are those the runtime’s own strings name (their source paths and messages). OpenCV’s version is from the runtime itself (the only library whose version it records). The others are from MediaPipe’s https://raw.githubusercontent.com/google-ai-edge/mediapipe/v1.2.0/WORKSPACE and https://raw.githubusercontent.com/google-ai-edge/mediapipe/v1.2.0/MODULE.bazel, and, for those TensorFlow brings in (ruy, gemmlowp, FlatBuffers, OR-Tools), from TensorFlow’s own build files at the commit above: MediaPipe’s public pins, which the internal build Google published may not have used. The runtime also contains Google code that has no public repository of its own (ML Drift, gloop), which comes with MediaPipe under its licence.
 
 Every file was read on 27 November 2026.

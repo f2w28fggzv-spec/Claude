@@ -192,7 +192,9 @@ npm run native:sync    # dist-native/ into ios/App/App/public/, Capacitor's two 
 
 `native:sync` does what the Capacitor CLI's `cap copy ios` does (its output
 was compared once with the CLI's, byte for byte); the CLI isn't a dependency.
-What it writes is git-ignored. Run it before every `xcodebuild`.
+What it writes is git-ignored, except the bundle ID in
+`ios/App/App.xcodeproj/project.pbxproj`, which it writes only when `appId`
+has changed (below). Run it before every `xcodebuild`.
 
 A new pose model from Google's "latest" URLs (which `npm install` fetches)
 fails `build:native` on purpose: the app ships the files it was tested with.
@@ -233,15 +235,20 @@ cd ios/App && LANG=C.UTF-8 GEM_HOME="$GEMS" GEM_PATH="$GEMS" PATH="$GEMS/bin:$PA
   CP_HOME_DIR="$SCRATCH/.cocoapods" pod install --allow-root
 ```
 
-Every pod is a local `:path` pod, so CocoaPods' trunk isn't needed. Then run
+No pod comes from CocoaPods' trunk (both are local `:path` pods), but with a
+new `CP_HOME_DIR` `pod install` still registers the trunk and fetches
+https://cdn.cocoapods.org/CocoaPods-version.yml, so that host must be
+reachable the first time; later runs with the same `CP_HOME_DIR` need no
+network, so keep that folder rather than a fresh one each time. Then run
 `npx vitest run tests/native-project.test.ts`: `Podfile.lock` must equal
 `Pods/Manifest.lock`, and nothing committed may hold an absolute path.
 
 **The bundle ID** is `appId` in `capacitor.config.ts` (the placeholder
-`app.fitee`) and nowhere else: change it there, run `npm run native:sync`
-(it writes both `PRODUCT_BUNDLE_IDENTIFIER` lines of the Xcode project), and
-commit both. Do it before the App Store Connect record is made: a bundle ID
-can't change after release.
+`app.fitee`) and nowhere else: change it there, run
+`npm run build:native && npm run native:sync` (the sync needs the build, and
+writes both `PRODUCT_BUNDLE_IDENTIFIER` lines of the Xcode project), and
+commit both files. Do it before the App Store Connect record is made: a
+bundle ID can't change after release.
 
 **The icon** is `tools/app-icon/icon.svg`: `npm run app-icon` renders
 `AppIcon-1024.png` (opaque RGB: App Store Connect refuses an icon with alpha).
@@ -264,13 +271,20 @@ simulator without signing, and runs `tools/ios-check/simulator-check.sh`
 - the self-test (`-fiteeSelfTest`): video files saved, served by range, left
   out of backups and played; the copy of the log, written twice (the second
   write moves the first to `snapshot.prev.json`); the pose model; the CSP's
-  and the privacy guard's refusals; keep-awake; the bridge gate (ten calls to
-  plugins the page must never reach, each unanswered); and the content rules
-  blocking a request to a server on the runner (`probe-server.cjs`) that
-  loads without them;
-- the same Debug build on an iPad (A16), in compatibility mode and the light
-  appearance, checked as the iPhone's light launch;
-- the Release build: it keeps running for 15 s, shows a page and logs nothing.
+  and the privacy guard's refusals; keep-awake; the bridge gate on all three
+  ways out of the page (ten calls to plugins the page must never reach, each
+  unanswered; a `prompt()` answered with nothing; no window opened; a
+  navigation to another site cancelled); and the content rules blocking a
+  request to a server on the runner (`probe-server.cjs`) that loads without
+  them;
+- the Release build: it keeps running for 15 s, shows a page and logs nothing;
+- last, the same Debug build on an iPad (A16), in compatibility mode and the
+  light appearance, checked as the iPhone's light launch (so a second
+  simulator runs only then).
+
+Every stop of a launch is bounded (a stuck `simctl terminate` once held a
+run up for almost five minutes), and the step has its own time limit under
+the job's, so a hang fails the step and the system logs are still kept.
 
 The artifact `ios-simulator-<run>-<attempt>` (kept 14 days) holds each
 launch's console (`console-light.log`, `console-dark.log`,
@@ -298,24 +312,28 @@ its first run is a launch-checklist step. Before it, the account owner:
   (the API can't create an app);
 - accepts any pending agreement in the developer account (the Account Holder
   must have signed the latest one);
-- checks the team's name: with accented or other non-ASCII letters, cloud-
-  signed uploads are currently refused with ITMS-90035 (Apple feedback
-  FB24633162), so use `development` below until Apple fixes it (or renames
-  the team).
+- checks the team's name: with accented or other non-ASCII letters, this
+  workflow's uploads are refused with ITMS-90035 whichever `archive_signing`
+  is picked, because both are cloud-signed at export (Apple feedback
+  FB24633162). Ask Apple Developer Programs to rename the team, then revoke
+  the distribution certificates that carry the old name.
 
-The Run workflow form's `archive_signing` picks how the archive is signed:
+The Run workflow form's `archive_signing` picks how the archive is signed,
+and nothing else: the export is the same for both, signing the app for
+distribution with Apple's cloud signing, through the API key, and uploading
+it.
 
 - `adhoc` (the default): a local ad hoc signature, as Xcode Cloud does: no
-  certificate, profile or registered device. The export then signs the app
-  for distribution with Apple's cloud signing, through the API key, and
-  uploads it.
+  certificate, profile or registered device.
 - `development`: the archive is signed for development through the API key.
   That needs one iPhone registered in the developer account, and every run
-  makes a new "Apple Development" certificate whose private key goes with the
-  runner: delete those in the developer account now and then, before the
-  account's limit (reported at about ten).
+  has xcodebuild make a new "Apple Development" certificate: delete those in
+  the developer account now and then, before the account's limit (reported
+  at about ten).
 
-No certificate is ever put in a keychain. The build number is the run's
+The workflow imports no certificate and `adhoc` creates none; `development`
+has xcodebuild create an Apple Development identity in the runner's login
+keychain, which is discarded with the runner. The build number is the run's
 number, and App Store Connect refuses a build number it already has, so
 start a new run rather than re-running one. Make the first upload the bare
 shell, before any subscription work: App Store Connect might refuse
@@ -330,8 +348,9 @@ Xcode 26.6 and the committed pods build with `xcodebuild` alone; that the app
 launches with one bridge; WebKit's facts (the page's origin
 `capacitor://localhost`, the CSP's `'self'`, a secure context, the camera and
 MediaRecorder APIs, SIMD, no service worker); that the content rules compile
-and block, the gate drops what it must and the status bar follows the
-appearance; that saved videos are served with Range requests and play, with
+and block, the gate drops what it must (a prompt answered with nothing, no
+window, a navigation to another site cancelled) and the status bar follows
+the appearance; that saved videos are served with Range requests and play, with
 their backup flags read back, and that the copy of the log is written,
 rotated into `snapshot.prev.json` by the next write, and read back; that
 MediaPipe loads in the web view; the bundles' contents; that the Release
@@ -342,7 +361,12 @@ Only a real iPhone can show (the launch checklist):
 - the live camera, the skeleton overlay and an MP4 recording of the camera;
   saving a real 20–40 MB recording (time, memory);
 - the camera and microphone prompts (Take Video in the picker), and that a
-  picked or filmed video's temporary copy is gone after its results close;
+  picked or filmed video's temporary copy is gone once its check is left
+  (from its results, or while it's analysed) and when the picker is closed
+  without a file (whether iOS fires the input's `cancel` event);
+- `confirm()` (every delete asks with it) through the app's own UI delegate;
+- Delete all my data stopped part way (the app killed while it runs): the
+  next launch finishes it;
 - that iCloud backups leave `sets/` out and keep `data/`; an iCloud restore
   onto a second phone; WebKit clearing its storage, and the restore toast;
   file protection with the phone locked;

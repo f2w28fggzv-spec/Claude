@@ -36,7 +36,7 @@ The app's typeface is **Bricolage Grotesque** (variable, weight and optical-size
 
 ## Libraries inside MediaPipe's WebAssembly runtime
 
-The pose-detection runtime (`mediapipe/wasm/vision_wasm_internal.wasm` and `.js`, from `@mediapipe/tasks-vision` 1.2.0, Apache-2.0) is the same in the web app and the iPhone app, and has these libraries compiled into it. The list comes from the runtime's own strings (the source paths and messages it names), the versions from the build files of MediaPipe's release `v1.2.0` (`WORKSPACE`, `MODULE.bazel`) and of the TensorFlow commit it pins (`a481b10260dfdf833a1b16007eead49c1d7febf3`). Each licence text, with the version and the URL it was read from (27 November 2026), is in `src/native/licenses/`, which the iPhone app shows in its Terms (section 7).
+The pose-detection runtime (`mediapipe/wasm/vision_wasm_internal.wasm` and `.js`, from `@mediapipe/tasks-vision` 1.2.0, Apache-2.0) is the same in the web app and the iPhone app, and has these libraries compiled into it. The list comes from the runtime's own strings (the source paths and messages it names). Google built the runtime from its internal source tree, not from MediaPipe's public build files (its source paths show it), so only one version here is the one compiled in: OpenCV's, which the runtime reports itself. The others are MediaPipe's public pins, from the build files of its release `v1.2.0` (`WORKSPACE`, `MODULE.bazel`) and of the TensorFlow commit it pins (`a481b10260dfdf833a1b16007eead49c1d7febf3`), and may differ from what was compiled in. Each licence text, with the version and the URL it was read from (27 November 2026), is in `src/native/licenses/`, which the iPhone app shows in its Terms (section 7).
 
 | Library | Version | Licence | Text |
 |---|---|---|---|
@@ -44,7 +44,7 @@ The pose-detection runtime (`mediapipe/wasm/vision_wasm_internal.wasm` and `.js`
 | TensorFlow Lite (its licence adds a BSD notice for code derived from Caffe) | commit `a481b102…` | Apache-2.0 | `wasm-runtime-apache-2.0.txt` |
 | LiteRT | 2.3.0 | Apache-2.0 | `wasm-runtime-apache-2.0.txt` |
 | Abseil | 20260526.0 | Apache-2.0 | `wasm-runtime-apache-2.0.txt` |
-| OpenCV (its COPYRIGHT file is quoted) | 4.10.0 | Apache-2.0 | `wasm-runtime-apache-2.0.txt` |
+| OpenCV: core, imgproc and geometry (its COPYRIGHT file is quoted; version as the runtime reports it) | 5.1.0-dev, commit `73a26a4` | Apache-2.0 | `wasm-runtime-apache-2.0.txt` |
 | ruy | commit `3286a34c…` | Apache-2.0 | `wasm-runtime-apache-2.0.txt` |
 | gemmlowp | commit `16e8662c…` | Apache-2.0 | `wasm-runtime-apache-2.0.txt` |
 | FlatBuffers | 25.9.23 | Apache-2.0 | `wasm-runtime-apache-2.0.txt` |
@@ -58,7 +58,7 @@ The pose-detection runtime (`mediapipe/wasm/vision_wasm_internal.wasm` and `.js`
 | zlib and MiniZip (reading the `.task` model files, which are zip archives) | 1.3.1 | Zlib | `zlib.txt` |
 | Emscripten's JavaScript runtime and the musl C library (version not recorded in the runtime: main branch) | – | MIT (or NCSA) | `emscripten-mit.txt` |
 
-The runtime also holds Google code with no public repository of its own (ML Drift, gloop), which comes with MediaPipe under its licence; Emscripten's C++ library (LLVM's libc++ and libc++abi) is under Apache-2.0 with LLVM Exceptions, which asks no notice for compiled code. To be checked in the legal review before a public launch: this list, fft2d's terms ("You may distribute this ORIGINAL package"), and whether XNNPACK's header-only helpers (FP16, FXdiv, MIT) need listing too.
+The runtime also holds Google code with no public repository of its own (ML Drift, gloop), which comes with MediaPipe under its licence; Emscripten's C++ library (LLVM's libc++ and libc++abi) is under Apache-2.0 with LLVM Exceptions, which asks no notice for compiled code. To be checked in the legal review before a public launch: this list and its versions (all but OpenCV's are MediaPipe's public pins, not read from the runtime), the Eigen commit the MPL-2.0 source offer names (`ea13a98d…`, a public pin too), fft2d's terms ("You may distribute this ORIGINAL package"), and whether XNNPACK's header-only helpers (FP16, FXdiv, MIT) need listing too.
 
 ## The iPhone app
 
