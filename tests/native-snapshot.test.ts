@@ -25,6 +25,7 @@ import {
   type Copy,
   type StartResult,
 } from '../src/native/snapshot';
+import { DELETED_HASH, openData } from '../src/native/data';
 import { FakeNative } from './fixtures/fakeNative';
 
 /** A Storage-like class: the writer wraps its prototype as it wraps Storage.prototype in the app. */
@@ -217,6 +218,72 @@ describe('restoreBeforeStart', () => {
     const fake = new FakeNative();
     fake.failNext('readSnapshot', 'IO_ERROR');
     await expect(restoreBeforeStart(fake, asStorage(new FakeStorage()), NOW)).rejects.toMatchObject({ code: 'IO_ERROR' });
+  });
+});
+
+describe('a Delete all my data the app didn’t finish', () => {
+  // FiteeFiles.deleteAll() ran (the marker written, fitee/ and tmp/ removed), then the app or its web process stopped
+  // before WKWebsiteDataStore.removeData had deleted localStorage: the next launch finds the user's keys and no copy.
+  const stopped = () => {
+    const fake = new FakeNative();
+    fake.deleting = true;
+    const s = filled({ 'formcheck.v1.unit': 'lb', 'formcheck.v1.workouts': [{ id: 'w1' }], 'formcheck.v1.profile': { name: 'A' }, [REV_KEY]: 7 });
+    const page = { location: { reload: vi.fn() }, history: { replaceState: vi.fn() } };
+    return { fake, s, page };
+  };
+  /** src/native/entry.ts's launch: appInfo, openData, then the copy writer if the app starts; 10 s go by. */
+  const launch = async ({ fake, s, page }: ReturnType<typeof stopped>) => {
+    vi.useFakeTimers();
+    try {
+      const restored = await openData(fake, await fake.appInfo(), asStorage(s), page);
+      const stop = restored
+        ? startWriter(fake, restored, { storage: asStorage(s), proto: FakeStorage.prototype as unknown as Storage, events: new EventTarget(), doc: Object.assign(new EventTarget(), { hidden: false }), toast: () => undefined })
+        : () => undefined;
+      vi.advanceTimersByTime(MAX_WAIT_MS);
+      stop();
+      return restored;
+    } finally {
+      vi.useRealTimers();
+    }
+  };
+
+  it('the next launch finishes it and reloads to Welcome: no copy brings the deleted data back', async () => {
+    const run = stopped();
+    expect(await launch(run)).toBeUndefined();
+    expect(run.fake.callsTo('deleteAllData')).toHaveLength(1);
+    expect(run.fake.calls.map((c) => c.method)).toEqual(['appInfo', 'deleteAllData']); // the copy isn't even read
+    expect(run.fake.callsTo('writeSnapshot')).toEqual([]);
+    expect(run.fake.currentCopy()).toBeUndefined();
+    expect(run.fake.deleting).toBe(false);
+    expect(run.s.keys().filter((k) => k.startsWith('formcheck.v1.'))).toEqual([]);
+    expect(run.page.history.replaceState).toHaveBeenCalledWith(null, '', DELETED_HASH);
+    expect(run.page.location.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('if it fails again it rejects (the start-error screen), and the marker stays for the launch after', async () => {
+    const run = stopped();
+    run.fake.failNext('deleteAllData', 'IO_ERROR');
+    await expect(launch(run)).rejects.toMatchObject({ code: 'IO_ERROR' });
+    expect(run.fake.deleting).toBe(true);
+    expect(run.fake.callsTo('writeSnapshot')).toEqual([]);
+    expect(run.page.location.reload).not.toHaveBeenCalled();
+  });
+
+  it('without one, the launch puts the copy back as before', async () => {
+    const run = stopped();
+    run.fake.deleting = false;
+    run.fake.snapshot = { current: copyText({ 'formcheck.v1.unit': 'kg' }, 9) };
+    expect(await launch(run)).toMatchObject({ action: 'replace', copyRev: 9 });
+    expect(run.fake.callsTo('deleteAllData')).toEqual([]);
+    expect(run.s.getItem('formcheck.v1.unit')).toBe('"kg"');
+    expect(run.page.location.reload).not.toHaveBeenCalled();
+  });
+
+  it('the fake keeps the marker only while deleteAllData runs, as FiteeFiles does', async () => {
+    const fake = new FakeNative({ onDeleteAll: async () => expect((await fake.appInfo()).deleting).toBe(true) });
+    expect((await fake.appInfo()).deleting).toBe(false);
+    await fake.deleteAllData();
+    expect((await fake.appInfo()).deleting).toBe(false);
   });
 });
 

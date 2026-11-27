@@ -6,8 +6,8 @@ name: iPhone app
 # simulator: every push to a claude/** branch, and every manual run. No pull_request trigger: this project's pull
 #   requests come from claude/** branches, whose pushes run it already, so each commit runs once. Builds Debug and
 #   Release for the iOS simulator without signing, then tools/ios-check/simulator-check.sh installs them and checks
-#   both bundles, a light and a dark launch, the self-test launch, a launch of the Debug build on an iPad (an
-#   iPhone-only app also runs there, in compatibility mode) and a Release launch (its header says what each must show).
+#   both bundles, a light and a dark launch, the self-test launch, a Release launch and, last, a launch of the Debug
+#   build on an iPad (an iPhone-only app also runs there, in compatibility mode); its header says what each must show.
 #   The screenshots, consoles and logs are kept as an artifact for 14 days: Debug consoles of made-up data only.
 #
 # testflight: manual runs only (Actions > iPhone app > Run workflow), once the simulator job has passed, and only when
@@ -18,13 +18,17 @@ name: iPhone app
 #   - makes the key a Team key (not an individual one) with the Admin role: cloud signing refuses other roles;
 #   - registers the bundle ID (appId in capacitor.config.ts), creates the app's record in App Store Connect (the API
 #     can't), and accepts any pending agreement in the developer account;
-#   - checks the team's name: with accented or other non-ASCII letters, cloud-signed uploads are currently refused
-#     with ITMS-90035 (Apple feedback FB24633162); use archive_signing development then.
-#   archive_signing (in the Run workflow form): adhoc, the default, archives with a local ad hoc signature, as Xcode
-#   Cloud does: no certificate, profile or registered device. development signs the archive for development through
-#   the API key instead: that needs one iPhone registered in the developer account, and makes a new "Apple
-#   Development" certificate on every run (its private key goes with the runner), which the owner deletes in the
-#   developer account now and then, before the account's limit. No certificate is ever put in a keychain here.
+#   - checks the team's name: with accented or other non-ASCII letters, this workflow's uploads are refused with
+#     ITMS-90035 whichever archive_signing is picked, because both are cloud-signed at export (Apple feedback
+#     FB24633162). Ask Apple Developer Programs to rename the team, then revoke the distribution certificates that
+#     carry the old name.
+#   archive_signing (in the Run workflow form) changes only how the archive is signed; the export below is the same
+#   for both, cloud-signed for distribution. adhoc, the default, archives with a local ad hoc signature, as Xcode Cloud
+#   does: no certificate, profile or registered device. development signs the archive for development through the API
+#   key instead: that needs one iPhone registered in the developer account, and xcodebuild makes a new "Apple
+#   Development" certificate on every run, which the owner deletes in the developer account now and then, before the
+#   account's limit. The workflow imports no certificate and adhoc creates none; development has xcodebuild create an
+#   Apple Development identity in the runner's login keychain, which is discarded with the runner.
 #   The build number is the run's number: a re-run of a run reuses it, and App Store Connect refuses a build number it
 #   already has for that version, so start a new run instead.
 
@@ -100,7 +104,8 @@ jobs:
           udid=$(xcrun simctl list devices available --json | node tools/ios-check/pick-simulator.cjs "$SIMULATOR")
           echo "UDID=$udid" >> "$GITHUB_ENV"
           xcrun simctl boot "$udid"
-          # The check boots the iPad itself when it gets to it, so two simulators run at once only for that launch.
+          # The check boots the iPad itself for its launch, the last one, so two simulators run at once only for that
+          # launch (and the iPad stays booted for the system log below).
           ipad=$(xcrun simctl list devices available --json | node tools/ios-check/pick-simulator.cjs "$IPAD_SIMULATOR")
           echo "IPAD_UDID=$ipad" >> "$GITHUB_ENV"
 
@@ -137,7 +142,10 @@ jobs:
           # localhost, not 127.0.0.1: since iOS 17, App Transport Security refuses plain HTTP to an IP address.
           echo "PROBE_URL=http://localhost:$(cat "$RUNNER_TEMP/probe-port")/fitee-rules-probe" >> "$GITHUB_ENV"
 
-      - name: Launch and check (bundles, light, dark, self-test, iPad, Release)
+      - name: Launch and check (bundles, light, dark, self-test, Release, iPad)
+        # Its own limit, under the job's: a step that runs out fails, so the system log below still runs (a job that
+        # runs out is cancelled, and skips it). Every launch is bounded too (simulator-check.sh), so this is a backstop.
+        timeout-minutes: 25
         env:
           # Belt and braces next to --console-pty: Foundation leaves stdout unbuffered.
           SIMCTL_CHILD_NSUnbufferedIO: 'YES'

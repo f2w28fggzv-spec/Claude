@@ -17,21 +17,33 @@
 // whose `code` is a NativeErrorCode (CAPPluginCall.reject(message, code); JS.swift:85-112). Every name or id the page
 // passes is checked natively too: a call never names a path.
 //
-// THE BRIDGE GATE (FiteeBridgeGate, FiteeViewController.swift)
-// In capacitorDidLoad(), before the page loads, the gate replaces Capacitor's "bridge" script message handler on the
-// web view's user content controller (WebViewDelegationHandler.swift:18-22 adds it with add(_:name:), in the page's
-// content world; CAPBridgeViewController.swift:298 makes that controller the web view's). It forwards to Capacitor's
-// own handler (bridge.webViewDelegationHandler; userContentController(_:didReceive:) is open, :192) only:
-//   - type 'message' whose pluginId is in GATE_ALLOWED: FiteeNative (this contract), Console (native-bridge.js sends
-//     every console call there, native-bridge.js:771-788; only Debug builds print them) and SystemBars (the page
-//     sets the status bar text, src/native/statusBar.ts);
-//   - type 'js.error' (native-bridge.js's window.onerror in Debug builds, :852-874; printed, never answered).
-// Everything else is dropped, 'cordova' included, and gets no answer. native-bridge.js 8.6.3 calls nothing else by
-// itself: App (navigator.app.exitApp, a 'backbutton' listener) and WebView (Ionic.WebView.*) only when the page calls
-// them, and CapacitorHttp only when it's enabled (it's off: capacitor.config.ts). None of those, and nothing that can
-// make a request, set cookies or change the server path, is ever allowed. AppInfo.gate says the gate is in place;
-// the self-test's gate step proves it (GATE_PROBES). Outside the app (the Chromium check's stand-in bridge) there is
-// no webkit.messageHandlers.bridge to test, and the step reports itself skipped (SelfTestStep.skipped).
+// THE BRIDGE GATE (FiteeViewController.swift)
+// A page has three ways to native code, all of them Capacitor's WebViewDelegationHandler, and in capacitorDidLoad(),
+// before the page loads, the gate goes in front of each:
+//   1. Messages: every plugin call native-bridge.js makes is posted to the "bridge" script message handler.
+//      FiteeBridgeGate replaces Capacitor's handler on the web view's user content controller
+//      (WebViewDelegationHandler.swift:18-22 adds it with add(_:name:), in the page's content world;
+//      CAPBridgeViewController.swift:298 makes that controller the web view's) and forwards to Capacitor's own
+//      (bridge.webViewDelegationHandler; userContentController(_:didReceive:) is open, :192) only:
+//        - type 'message' whose pluginId is in GATE_ALLOWED: FiteeNative (this contract), Console (native-bridge.js sends
+//          every console call there, native-bridge.js:771-788; only Debug builds print them) and SystemBars (the page
+//          sets the status bar text, src/native/statusBar.ts);
+//        - type 'js.error' (native-bridge.js's window.onerror in Debug builds, :852-874; printed, never answered).
+//      Everything else is dropped, 'cordova' included, and gets no answer. native-bridge.js 8.6.3 calls nothing else by
+//      itself: App (navigator.app.exitApp, a 'backbutton' listener) and WebView (Ionic.WebView.*) only when the page
+//      calls them, and CapacitorHttp only when it's enabled (it's off: capacitor.config.ts). None of those, and nothing
+//      that can make a request, set cookies or change the server path, is ever allowed.
+//   2. Prompts and new windows: FiteeUIDelegate replaces Capacitor's as the web view's UI delegate. Capacitor's reads a
+//      prompt() whose text is {"type": "CapacitorCookies.get" or ".set"} as a cookie request whatever the config
+//      (WebViewDelegationHandler.swift:271-293), and hands a window.open's URL to iOS (Safari: :324-329). fitee's answers
+//      every prompt with null and opens no window; alert(), confirm() and the camera's and motion's permissions go on to
+//      Capacitor's handler, answered as before.
+//   3. Navigations: FiteeNativePlugin.shouldOverrideLoad, which Capacitor asks before it would hand a top-level
+//      navigation outside the app to iOS (:83-99, then :107-121), cancels every navigation that isn't to
+//      capacitor://localhost (scheme capacitor, host localhost: the app's own pages).
+// AppInfo.gate says all three are in place; the self-test's gate step proves each (GATE_PROBES, then a prompt, a
+// window.open and a navigation). Outside the app (the Chromium check's stand-in bridge) there is no
+// webkit.messageHandlers.bridge to test, and the step reports itself skipped (SelfTestStep.skipped).
 //
 // FILES (Library/Application Support/fitee/, FiteeFiles.swift; names in src/native/setFiles.ts)
 //   data/  snapshot.json, snapshot.next.json, snapshot.prev.json: the copy of the log (src/native/snapshot.ts).
@@ -42,6 +54,8 @@
 //   tmp/   The app's temporary folder: fitee-export/<name> while Save to Files is open, and the copies iOS makes of a
 //          video picked for a check or filmed with Take Video. Emptied at launch (before the web view exists), by
 //          clearPickedFiles() and by deleteAllData().
+//   Library/Application Support/fitee-deleting (beside fitee/, which it outlives): an empty file while Delete all my
+//          data runs (AppInfo.deleting), excluded from backup.
 // The Swift code uses no required-reason API (no creation or modification dates, attributesOfItem, stat, volume
 // capacity keys, systemUptime or UserDefaults), so the app's privacy manifest declares none.
 //
@@ -155,8 +169,18 @@ export interface AppInfo {
   selfTest: boolean;
   /** The content rules (FiteeContentRules.swift) are on the web view. */
   rules: boolean;
-  /** The bridge gate replaced Capacitor's "bridge" message handler (see the header). */
+  /**
+   * The bridge gate is in place on all three ways out (see the header): Capacitor's "bridge" message handler replaced,
+   * FiteeUIDelegate the web view's UI delegate (answering what it should: checked at run time) and FiteeNative
+   * registered (it cancels navigations).
+   */
   gate: boolean;
+  /**
+   * A Delete all my data began and didn't finish (the app or its page stopped part way: the marker
+   * Library/Application Support/fitee-deleting is there). src/native/entry.ts then finishes it (deleteAllData again)
+   * before anything reads the data, instead of putting the copy back, which would write the deleted data again.
+   */
+  deleting: boolean;
 }
 
 /** The look of what iOS draws over the page: the Appearance setting ('system' follows the phone). */
@@ -201,9 +225,9 @@ export interface VideoTarget {
 export interface FiteeNative {
   /**
    * The app's facts. src/native/entry.ts calls it first on every page load.
-   * Native: version, build from the bundle's Info.plist; `rules` and `gate` read on the main queue. Also turns the
-   * idle timer back on (isIdleTimerDisabled = false): a page that reloaded after its web process died can't have
-   * left the screen awake. Errors: none.
+   * Native: version, build from the bundle's Info.plist; `deleting` (whether the marker exists) on the bridge queue;
+   * `rules` and `gate` read on the main queue. Also turns the idle timer back on (isIdleTimerDisabled = false): a page
+   * that reloaded after its web process died can't have left the screen awake. Errors: none.
    */
   appInfo(): Promise<AppInfo>;
 
@@ -235,8 +259,10 @@ export interface FiteeNative {
 
   /**
    * Deletes the temporary copies iOS gave the app of videos picked for a technique check or filmed with Take Video
-   * (iOS would keep them until it empties the folder). The page calls it when the results of a check on such a video
-   * close, or its analysis ends without results.
+   * (iOS would keep them until it empties the folder). The page asks for it (src/native/setsDb.ts clearPickedFiles())
+   * when a check on such a video ends: its results close, its analysis ends without results, or the check is left
+   * while the video is analysed; and when the picker closes without a file. It's called only once no picked video is
+   * in use (being analysed, shown in results or saved) and none was picked since: that check's own end calls it then.
    * Native: deletes everything in FileManager.default.temporaryDirectory except tmp/fitee-export/ while a Save to
    * Files panel is open. Errors: none (what can't be deleted now goes at the next launch).
    */
@@ -336,13 +362,16 @@ export interface FiteeNative {
   videoUrl(options: { name: string }): Promise<{ url: string }>;
 
   /**
-   * Settings → Delete all my data. Resolves once everything the app stored is gone; the page then reloads to the
-   * Welcome screen and deletes nothing itself. Pause the copy writer first (src/native/snapshot.ts): a write after
-   * this would bring the data back.
-   * Native: removes the whole fitee/ folder and everything in tmp/, clears activeParts, then
+   * Settings → Delete all my data (and, at launch, the end of one that didn't finish: AppInfo.deleting). Resolves once
+   * everything the app stored is gone; the page then reloads to the Welcome screen and deletes nothing itself. Pause
+   * the copy writer first (src/native/snapshot.ts): a write after this would bring the data back.
+   * Native: writes the marker Library/Application Support/fitee-deleting (as well as it can: a phone too full for it
+   * still gets its data deleted), removes the whole fitee/ folder and everything in tmp/, clears activeParts, then
    * WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince:
-   * .distantPast) (localStorage, IndexedDB and the web view's other stores), and resolves when that has finished.
-   * Errors: IO_ERROR (fitee/ couldn't be removed; the web view's data is then left as it was).
+   * .distantPast) (localStorage, IndexedDB and the web view's other stores), then HTTPCookieStorage.shared's cookies
+   * (Capacitor copies the web view's there), then removes the marker, and resolves.
+   * Errors: IO_ERROR (fitee/ couldn't be removed: the web view's data is then left as it was; or the marker couldn't be
+   * removed). Either way the marker stays, so the next launch finishes the delete.
    */
   deleteAllData(): Promise<Empty>;
 }
@@ -497,12 +526,28 @@ export interface SelfTestMarker {
   /** setKeepAwake({ on: true }), then { on: false }, resolved. */
   keepAwake: SelfTestStep;
   /**
-   * The bridge gate: each GATE_PROBES call got no answer within 2 s (`silent`; any answer goes in `answered`), the page
-   * kept running, and an upload begun with beginVideo before the probes still took an appendVideo after them
-   * (`stateKept`: no second FiteeNative replaced the first; then aborted). ok: answered empty, stateKept and
-   * AppInfo.gate. CI also requires a "fitee:dropped message <pluginId>.<method>" line for each probe.
+   * The bridge gate, on its three ways out (see the header), the self-test's last step (if a way out were open and the
+   * app went to the background, the marker still comes): each GATE_PROBES call got no answer within 2 s (`silent`; any
+   * answer goes in `answered`); then `prompt`, `window` and `navigation`; and an upload begun with beginVideo before
+   * all of them still took an appendVideo after them (`stateKept`: the page still runs and no second FiteeNative
+   * replaced the first; then aborted). ok: answered empty, prompt, window, navigation, stateKept and AppInfo.gate. CI
+   * also requires a "fitee:dropped message <pluginId>.<method>" line for each probe.
    */
-  gate: SelfTestStep & { silent: string[]; answered: string[]; stateKept: boolean };
+  gate: SelfTestStep & {
+    silent: string[];
+    answered: string[];
+    stateKept: boolean;
+    /** prompt(JSON.stringify({ type: 'CapacitorCookies.get' })) returned null (Capacitor's UI delegate would answer it with the cookies). */
+    prompt: boolean;
+    /**
+     * window.open(PROBE_ORIGIN + '/fitee-window-probe') returned null and the page stayed (no pagehide, and no
+     * visibilitychange to hidden, within 2 s; Capacitor's UI delegate would hand the URL to Safari). WebKit's own popup
+     * blocker also stops a window.open without a tap: this guards the case where it wouldn't.
+     */
+    window: boolean;
+    /** location.href = PROBE_ORIGIN + '/fitee-nav-probe': the page stayed (no pagehide, and no visibilitychange to hidden, within 2 s): the navigation was cancelled. */
+    navigation: boolean;
+  };
 }
 
 /** `fitee:rules {json}`: the content rules tried in throwaway web views (a non-persistent data store, a blank page) fetching `url`. */

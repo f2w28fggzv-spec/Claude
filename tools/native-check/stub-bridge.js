@@ -29,8 +29,11 @@
 //     deleteAllData.
 // There is no window.webkit.messageHandlers.bridge, the channel the app's bridge gate guards: only the app has it,
 // so the self-test reports its gate step as skipped here (src/native/selftest.ts). With FITEE_STUB.gate the stub
-// puts an inert one there, so that one launch of the check runs that step against the stub's imitation of the gate
-// (above: calls to other plugins dropped, never answered), to prove the step's own code before CI runs it.
+// puts an inert one there, so that one launch of the check runs that step against the stub's imitation of the gate,
+// to prove the step's own code before CI runs it: calls to other plugins dropped, never answered (above); prompt()
+// answered with null and window.open opening nothing, as the app's UI delegate does (FiteeUIDelegate); and a
+// navigation to another origin cancelled, as FiteeNativePlugin.shouldOverrideLoad cancels it (here through the
+// Navigation API's navigate event).
 //
 // The check puts `var FITEE_STUB = { debug, gate, plugins: { <jsName>: { promise: [methods], none: [methods] } } };`
 // in front of this file (debug false: a Release build, which prints nothing).
@@ -228,9 +231,15 @@
     },
   });
 
-  // The stand-in for the gate's channel (see the header): inert, since every call above goes through toNative.
+  // The stand-in for the gate (see the header): the channel, inert, since every call above goes through toNative; the
+  // UI delegate's answers; and navigations that would leave the app's own origin cancelled.
   if (config.gate) {
     Object.defineProperty(window, 'webkit', { configurable: true, value: { messageHandlers: { bridge: { postMessage() {} } } } });
+    window.prompt = () => null;
+    window.open = () => null;
+    window.navigation?.addEventListener('navigate', (event) => {
+      if (new URL(event.destination.url).origin !== location.origin && event.cancelable) event.preventDefault();
+    });
   }
 
   window.Capacitor = cap;

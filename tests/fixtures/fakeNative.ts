@@ -48,13 +48,20 @@ export class FakeNative implements FiteeNative {
   appearance: Appearance = 'system';
   pickedFilesCleared = 0;
   deletedAll = 0;
-  info: AppInfo;
+  /**
+   * The marker Library/Application Support/fitee-deleting: set while deleteAllData runs, as the Swift side writes it
+   * first and removes it last. A test sets it (and clears the files itself) to stand for an app stopped part way.
+   */
+  deleting = false;
+  info: Omit<AppInfo, 'deleting'>;
   private readonly failures: { method: string; code: NativeErrorCode; message: string }[] = [];
   private readonly options: FakeOptions;
 
   constructor(options: FakeOptions = {}) {
     this.options = options;
-    this.info = { version: '1.0.0', build: '1', debug: true, selfTest: false, rules: true, gate: true, ...options.appInfo };
+    const { deleting, ...info } = { version: '1.0.0', build: '1', debug: true, selfTest: false, rules: true, gate: true, ...options.appInfo };
+    this.info = info;
+    this.deleting = deleting ?? false;
   }
 
   /** The next call to `method` rejects with `code`. */
@@ -89,7 +96,7 @@ export class FakeNative implements FiteeNative {
   async appInfo(_?: unknown, userKeys?: number): Promise<AppInfo> {
     this.enter('appInfo', {}, userKeys);
     this.keepAwake = false;
-    return { ...this.info };
+    return { ...this.info, deleting: this.deleting };
   }
 
   async setKeepAwake(o: { on: boolean }, userKeys?: number): Promise<Empty> {
@@ -142,7 +149,12 @@ export class FakeNative implements FiteeNative {
     this.enter('readSetFile', o, userKeys);
     if (!isJsonName(o.name)) throw nativeError('BAD_NAME', 'Not a set file name');
     const file = this.sets.get(o.name);
-    return file ? { text: file.toString('utf8') } : {};
+    if (!file) return {};
+    try {
+      return { text: new TextDecoder('utf-8', { fatal: true }).decode(file) };
+    } catch {
+      throw nativeError('BAD_DATA', `${o.name} isn’t UTF-8 text.`); // as FiteeFiles.readSetFile
+    }
   }
 
   async writeSetFile(o: { name: string; text: string }, userKeys?: number): Promise<Empty> {
@@ -234,11 +246,13 @@ export class FakeNative implements FiteeNative {
 
   async deleteAllData(_?: unknown, userKeys?: number): Promise<Empty> {
     this.enter('deleteAllData', {}, userKeys);
+    this.deleting = true;
     this.sets.clear();
     this.activeParts.clear();
     this.snapshot = {};
     this.deletedAll++;
-    await this.options.onDeleteAll?.();
+    await this.options.onDeleteAll?.(); // the web view's stores
+    this.deleting = false;
     return {};
   }
 

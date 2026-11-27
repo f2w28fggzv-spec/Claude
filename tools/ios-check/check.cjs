@@ -250,7 +250,7 @@ const READY_FACTS = [
   ['simd', (v) => v === true, 'true: the app ships only the SIMD pose runtime'],
   ['sw', (v) => v === false, 'false: a WKWebView app has no service worker'],
   ['rules', (v) => v === true, 'true: the content rules (FiteeContentRules.swift) must be on the web view'],
-  ['gate', (v) => v === true, "true: the bridge gate (FiteeViewController.swift) must be in front of Capacitor's message handler"],
+  ['gate', (v) => v === true, "true: the bridge gate (FiteeViewController.swift) must be in front of Capacitor's message handler, UI delegate and navigations"],
 ];
 
 /** The status bar text the page must leave in each appearance: dark text on Paper, light text on Molten. */
@@ -382,6 +382,9 @@ function selfTestChecks(lines, c, title, url) {
         const call = `${p.pluginId}.${p.method}`;
         if (!silent.includes(call) && !answered.includes(call)) error(`${title}: the gate step didn't try ${call} (GATE_PROBES)`);
       }
+      if (gate.prompt !== true) error(`${title}: a prompt() carrying Capacitor's cookie request got an answer: the app's UI delegate (FiteeUIDelegate) must answer every prompt with nothing`);
+      if (gate.window !== true) error(`${title}: window.open opened a window, or took the app away: the app's UI delegate (FiteeUIDelegate) must open none`);
+      if (gate.navigation !== true) error(`${title}: a navigation to another site wasn't cancelled (the page went, or the app went to the background): FiteeNativePlugin.shouldOverrideLoad must cancel it`);
       if (gate.stateKept !== true) error(`${title}: after the gate's probes FiteeNative had lost its state (a second FiteeNative took its place?)`);
     }
 
@@ -399,7 +402,9 @@ function selfTestChecks(lines, c, title, url) {
       warning(`${title}: without the content rules the probe's request was ${show(rules.withoutRules)}, not "loaded", so the probe can't show what the rules change`);
     }
   }
-  if (marker && rules && !failed) console.log(`${title}: every self-test step passed, the content rules blocked the probe, and the bridge gate dropped all ${c.GATE_PROBES.length} probes`);
+  if (marker && rules && !failed) {
+    console.log(`${title}: every self-test step passed, the content rules blocked the probe, and the bridge gate dropped all ${c.GATE_PROBES.length} probes and kept the page from a prompt, a window and a navigation`);
+  }
 }
 
 async function launch(file, kind, infoFile, url) {

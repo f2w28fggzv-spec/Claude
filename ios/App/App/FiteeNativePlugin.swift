@@ -4,7 +4,8 @@ import Capacitor
 
 /// FiteeNative, the page's one plugin. src/native/bridge.ts is the contract: method names, arguments, results and
 /// error codes; change the two together. Registered by FiteeViewController.capacitorDidLoad (registerPluginInstance:
-/// CapacitorBridge.swift:378-395); the bridge gate lets the page reach it by its JS name only.
+/// CapacitorBridge.swift:378-395); the bridge gate lets the page reach it by its JS name only. It is also the gate's
+/// third part: it cancels every navigation that would leave the app (shouldOverrideLoad).
 ///
 /// Capacitor calls every method on its bridge queue, one at a time in the order sent (CapacitorBridge.swift:133,
 /// 535-560), so a video's chunks arrive in order; file work runs there (FiteeFiles.swift), UIKit work hops to the main
@@ -94,6 +95,20 @@ public class FiteeNativePlugin: CAPPlugin, CAPBridgedPlugin {
         backgroundTask = .invalid
     }
 
+    // MARK: - Navigations (the bridge gate's third part: FiteeViewController.swift)
+
+    /// The page never leaves the app. Capacitor asks every plugin about each navigation the web view decides on, of any
+    /// type and in any frame, before its own rules, which would hand a top-level one to a URL outside the app to iOS
+    /// (Safari): WebViewDelegationHandler.swift:83-99, then :114-121. No other plugin answers (CAPPlugin.m:170-172
+    /// returns nil), and true cancels. So only the app's own pages (capacitor://localhost, which the first load is:
+    /// CAPBridgeViewController.loadWebView, CAPInstanceConfiguration.swift:11-16) go on to Capacitor's rules (nil).
+    override public func shouldOverrideLoad(_ navigationAction: WKNavigationAction) -> NSNumber? {
+        guard let url = navigationAction.request.url, url.scheme == "capacitor", url.host == "localhost" else {
+            return NSNumber(value: true)
+        }
+        return nil
+    }
+
     /// Runs file work here, on the bridge queue, and answers the call with its result or a rejection whose code is a
     /// NativeErrorCode (FiteeFiles.Failure).
     private func answer(_ call: CAPPluginCall, _ work: () throws -> PluginCallResultData) {
@@ -114,6 +129,7 @@ public class FiteeNativePlugin: CAPPlugin, CAPBridgedPlugin {
         let info = Bundle.main.infoDictionary ?? [:]
         let version = info["CFBundleShortVersionString"] as? String ?? ""
         let build = info["CFBundleVersion"] as? String ?? ""
+        let deleting = files.isDeleting
         DispatchQueue.main.async {
             // Every page load calls this first: a page that reloaded after its web process died can't have left the
             // screen kept awake.
@@ -124,7 +140,8 @@ public class FiteeNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 "debug": FiteeNativePlugin.isDebugBuild,
                 "selfTest": FiteeNativePlugin.isSelfTest,
                 "rules": FiteeContentRules.installed,
-                "gate": FiteeBridgeGate.installed
+                "gate": FiteeBridgeGate.installed,
+                "deleting": deleting
             ])
         }
     }
@@ -297,8 +314,10 @@ public class FiteeNativePlugin: CAPPlugin, CAPBridgedPlugin {
     // MARK: - Everything
 
     @objc func deleteAllData(_ call: CAPPluginCall) {
+        let store = files
         do {
-            try files.deleteAll()
+            // The marker first (AppInfo.deleting until the end), then fitee/ and tmp/.
+            try store.deleteAll()
         } catch {
             let failure = FiteeFiles.Failure.from(error)
             call.reject(failure.message, failure.code)
@@ -306,9 +325,19 @@ public class FiteeNativePlugin: CAPPlugin, CAPBridgedPlugin {
         }
         DispatchQueue.main.async {
             // Then the web view's own stores (localStorage, IndexedDB and the rest), which are SQLite files that could
-            // keep deleted rows in their free pages; the page reloads to the Welcome screen once this answers.
-            let store = WKWebsiteDataStore.default()
-            store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: Date.distantPast) {
+            // keep deleted rows in their free pages, and the cookies Capacitor keeps in Foundation's shared store too
+            // (CapacitorCookieManager.swift, CapacitorWKCookieObserver: the web view's are copied there). The page
+            // reloads to the Welcome screen once this answers; until then the marker says a delete is under way.
+            let websiteData = WKWebsiteDataStore.default()
+            websiteData.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: Date.distantPast) {
+                HTTPCookieStorage.shared.removeCookies(since: Date.distantPast)
+                do {
+                    try store.finishDeleting()
+                } catch {
+                    let failure = FiteeFiles.Failure.from(error)
+                    call.reject(failure.message, failure.code)
+                    return
+                }
                 call.resolve([:])
             }
         }

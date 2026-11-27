@@ -165,7 +165,9 @@ export function SetScreen({ id }: { id: string }) {
 
       <p class="muted small">
         {url
-          ? `Video saved on this phone (${mb(meta.video?.bytes ?? 0)}). It’s never uploaded.`
+          ? __NATIVE__
+            ? `Video saved on this iPhone (${mb(meta.video?.bytes ?? 0)}). fitee never uploads it.`
+            : `Video saved on this phone (${mb(meta.video?.bytes ?? 0)}). It’s never uploaded.`
           : 'Skeleton replay: the movement of your body as numbers, no video. Save the video right after a technique check to keep it.'}
       </p>
       <div class="stack">

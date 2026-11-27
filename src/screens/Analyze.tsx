@@ -121,7 +121,18 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
 
   const cam = usePoseCamera((f) => onFrame(f), { initialFacing: loadFacing(), onFacingChange: saveFacing });
 
-  useEffect(() => () => void keepAwake(false), []);
+  useEffect(
+    () =>
+      __NATIVE__
+        ? () => {
+            void keepAwake(false);
+            // Left while a picked video is analysed: the analysis stops (at its next frame, or as its last steps end),
+            // and onFile's catch lets the video's temporary copy go (src/native/setsDb.ts).
+            abort.current?.abort();
+          }
+        : () => void keepAwake(false),
+    [],
+  );
 
   const resetLive = () => {
     const l = live.current;
@@ -346,6 +357,8 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
   }
 
   const pickFile = () => {
+    // In the iPhone app the picker puts the video in tmp/ before onFile hears of it: no clear asked before now runs.
+    if (__NATIVE__) void import('../native/setsDb').then((m) => m.pickingFile());
     setError('');
     fileInput.current?.click();
   };
@@ -355,6 +368,8 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
     if (!file) return;
     const controller = new AbortController();
     abort.current = controller;
+    // In the iPhone app the File is a temporary copy iOS made in tmp/: in use until this check ends.
+    if (__NATIVE__) void import('../native/setsDb').then((m) => m.holdPickedFile(file));
     setStage({ kind: 'processing', progress: null });
     try {
       const out = await withVideoFile(file, async (video) => {
@@ -371,15 +386,19 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
         const shots = await grabFrames(video, seq, wanted);
         return { seq, shots };
       });
+      if (__NATIVE__) {
+        // Cancelled, or the check left, during its last steps (which don't stop for it): it ends without results.
+        if (controller.signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+      }
       if (calibrate) {
         await saveForCalibration(out.seq, 'file');
         return;
       }
       setStage({ kind: 'results', ...out, video: { blob: file, offsetMs: 0, mirrored: false } });
     } catch (err) {
-      // The check ended without results (cancelled, or the video couldn't be read): in the iPhone app the temporary
-      // copy iOS made of the picked video goes now (src/native/setsDb.ts).
-      if (__NATIVE__) void import('../native/setsDb').then((m) => m.clearPickedFiles());
+      // The check ended without results (cancelled, left, or the video couldn't be read): in the iPhone app the
+      // temporary copy iOS made of the picked video goes now (src/native/setsDb.ts).
+      if (__NATIVE__) void import('../native/setsDb').then((m) => m.releasePickedFile(file));
       if ((err as DOMException).name !== 'AbortError') setError((err as Error).message ?? String(err));
       setStage({ kind: 'intro' });
     } finally {
@@ -470,8 +489,20 @@ function AnalyzeExercise({ exercise, calibrate }: { exercise: Exercise; calibrat
           <button type="button" class="link center" disabled={!cam.ready} onClick={pickFile}>
             <Icon name="video" size={18} /> Use a video instead
           </button>
-          <input ref={fileInput} type="file" accept="video/*" hidden onChange={(e) => void onFile(e.currentTarget.files?.[0])} />
-          <p class="privacy small center">{PRIVACY}</p>
+          {__NATIVE__ ? (
+            // The picker closed without a file: what an earlier clear left in tmp/ goes now (src/native/setsDb.ts).
+            <input
+              ref={fileInput}
+              type="file"
+              accept="video/*"
+              hidden
+              onChange={(e) => void onFile(e.currentTarget.files?.[0])}
+              onCancel={() => void import('../native/setsDb').then((m) => m.clearPickedFiles())}
+            />
+          ) : (
+            <input ref={fileInput} type="file" accept="video/*" hidden onChange={(e) => void onFile(e.currentTarget.files?.[0])} />
+          )}
+          <p class="privacy small center">{__NATIVE__ ? 'Everything runs on your iPhone. fitee never uploads video, and keeps it only if you choose to save it.' : PRIVACY}</p>
         </>
       )}
 

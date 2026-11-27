@@ -13,11 +13,12 @@
 #    - the self-test (-fiteeSelfTest, and -fiteeProbeURL <probe url> for the content rules' probe): waits for the
 #      fitee:selftest and fitee:rules markers, then checks every step, that the rules blocked the probe, and a
 #      fitee:dropped line for each call the bridge gate must drop (MediaPipe's own stderr lines are allowed here).
-# 3. Installs the same Debug build on the iPad and launches it once in the light appearance, as the light launch: an
-#    iPhone-only app also runs on an iPad (in its iPhone compatibility mode), and the App Store offers it there. Same
-#    checks, its screenshot in <out>/welcome-ipad.png and its console in <out>/console-ipad.log.
-# 4. Installs the Release build on the iPhone and launches it once: it must keep running for 15 s, its screenshot
+# 3. Installs the Release build on the iPhone and launches it once: it must keep running for 15 s, its screenshot
 #    (<out>/release.png) mustn't be blank, and it must log nothing.
+# 4. Boots the iPad, installs the same Debug build there and launches it once in the light appearance, as the light
+#    launch: an iPhone-only app also runs on an iPad (in its iPhone compatibility mode), and the App Store offers it
+#    there. Same checks, its screenshot in <out>/welcome-ipad.png and its console in <out>/console-ipad.log. Last, so
+#    a second simulator runs only for this launch, and the iPad stays booted for the workflow's system log.
 # Each problem prints one "::error::" line, and the run goes on to the next check; the exit status is 0 only when
 # every check passed (1 otherwise, 2 for wrong arguments). The marker formats, the gate's probes and the launch
 # arguments are in src/native/bridge.ts (the native contract).
@@ -34,9 +35,10 @@
 # the JSON markers, the PNG screenshots) is done in Node by tools/ios-check/check.cjs. tests/ios-check.test.ts runs
 # this script against stub xcrun and plutil (tools/ios-check/stub/) and greps it for those constructs.
 #
-# READY_TIMEOUT (120 s), SELFTEST_TIMEOUT (300 s, more than the self-test's own step timeouts add up to) and
-# RELEASE_ALIVE_SECONDS (15), all whole seconds, and SETTLE_SECONDS (2: after a marker, for the first screen's entrance
-# animation and the console's last lines) can be changed through the environment.
+# READY_TIMEOUT (120 s), SELFTEST_TIMEOUT (300 s, more than the self-test's own step timeouts add up to),
+# RELEASE_ALIVE_SECONDS (15), TERMINATE_SECONDS (30) and EXIT_SECONDS (10: see stop()), all whole seconds, and
+# SETTLE_SECONDS (2: after a marker, for the first screen's entrance animation and the console's last lines) can be
+# changed through the environment.
 set -euo pipefail
 
 if [ "$#" -ne 6 ]; then
@@ -57,6 +59,8 @@ here=$(cd "$(dirname "$0")" && pwd)
 ready_timeout=${READY_TIMEOUT:-120}
 selftest_timeout=${SELFTEST_TIMEOUT:-300}
 alive_seconds=${RELEASE_ALIVE_SECONDS:-15}
+terminate_seconds=${TERMINATE_SECONDS:-30}
+exit_seconds=${EXIT_SECONDS:-10}
 settle_seconds=${SETTLE_SECONDS:-2}
 mkdir -p "$out"
 status=0
@@ -91,15 +95,36 @@ running() {
   kill -0 "$app_pid" 2>/dev/null
 }
 
-# stop: ends the app (simctl's console session ends with it), giving it up to 10 s.
-stop() {
+# ends <pid> <seconds>: 0 once the process has ended, 1 if it still runs after <seconds> (bash 3.2 has no timeout).
+ends() {
   local tick=0
-  xcrun simctl terminate "$device" "$bundle" >/dev/null 2>&1 || true
-  while running && [ "$tick" -lt 50 ]; do
+  while kill -0 "$1" 2>/dev/null; do
+    if [ "$tick" -ge $(($2 * 5)) ]; then
+      return 1
+    fi
     sleep 0.2
     tick=$((tick + 1))
   done
-  kill "$app_pid" 2>/dev/null || true
+}
+
+# stop: ends the app, every part bounded (a stuck simctl terminate once held a run up for almost 5 minutes):
+# `simctl terminate` gets TERMINATE_SECONDS, then `simctl launch`, whose console session ends with the app, gets
+# EXIT_SECONDS to end by itself. Either one still running then is killed with SIGKILL (simctl passes a SIGTERM on to
+# the app and waits for it), with a warning; that can leave the app running in the simulator, which the next launch's
+# --terminate-running-process ends.
+stop() {
+  local terminate
+  xcrun simctl terminate "$device" "$bundle" >/dev/null 2>&1 &
+  terminate=$!
+  if ! ends "$terminate" "$terminate_seconds"; then
+    kill -9 "$terminate" 2>/dev/null || true
+    echo "::warning::simctl terminate didn't end within ${terminate_seconds} s, so it was stopped"
+  fi
+  wait "$terminate" 2>/dev/null || true
+  if ! ends "$app_pid" "$exit_seconds"; then
+    kill -9 "$app_pid" 2>/dev/null || true
+    echo "::warning::simctl launch didn't end within ${exit_seconds} s of the app's termination, so it was stopped"
+  fi
   wait "$app_pid" 2>/dev/null || true
 }
 
@@ -274,8 +299,8 @@ fi
 launch_look light light Light || status=1
 launch_look dark dark Dark || status=1
 launch_selftest || status=1
-launch_ipad || status=1
 
+debug_bundle=$bundle
 if xcrun simctl install "$udid" "$release_app"; then
   if [ -n "$release_bundle" ]; then
     bundle=$release_bundle
@@ -285,4 +310,7 @@ else
   echo "::error::The Release build couldn't be installed in the simulator"
   status=1
 fi
+
+bundle=$debug_bundle
+launch_ipad || status=1
 exit "$status"

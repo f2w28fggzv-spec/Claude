@@ -27,32 +27,39 @@
 //   6. an unreadable current copy with a good previous one and nothing stored: restored from it, dropped first;
 //   7. the copy can't be read, or there's no bridge: the start-error screen, no app; Try again starts it;
 //   8. a copy in a newer format (version 2): its toast, and no copy written that session;
-//   9. Settings: no "Install and offline", the iPhone's saved-sets and your-data texts, footer "fitee 1.0.0 (1)",
-//      five taps on it go nowhere; #/dev/* and ?calibrate don't open the developer pages;
+//   9. Settings: no "Install and offline", the iPhone's saved-sets, your-data and privacy texts, footer "fitee 1.0.0 (1)",
+//      five taps on it go nowhere; #/dev/* and ?calibrate don't open the developer pages; the profile (in Settings and
+//      on first launch) kept on this iPhone and in its backups;
 //  10. Back up my data: Save to Files (exportFile) with fitee-backup-<today>.json, whose text Restore from a backup
 //      takes back; the failure toast;
 //  11. a copy that can't be written: one toast per session, later writes go on;
 //  12. Delete all my data: the confirm's text, deleteAllData called while the page still had its keys, then the
 //      reload to Welcome with "All data deleted", nothing left (localStorage, the fake's files), no copy written
-//      after it; cancelled: nothing deleted; failed: its toast, and the copy writer still on;
+//      after it; cancelled: nothing deleted; failed: its toast, and the copy writer still on; stopped part way (the
+//      marker, AppInfo.deleting): the next launch deletes again before it reads the copy, then Welcome;
 //  13. status bar and Appearance: a launch on a dark phone starts with light text; dark text on a light phone,
 //      light text on a dark one, a pinned Appearance wins over the phone's, setAppearance follows it, and a pinned
 //      theme is right from the first style set;
-//  14. a saved set: the <video> plays from the fake's videoUrl (loadedmetadata, Range requests), Delete video
+//  14. a saved set: the <video> plays from the fake's videoUrl (loadedmetadata, Range requests), the note under it
+//      says fitee never uploads it, Delete video
 //      removes every extension and clears the index's video, Delete this saved set removes the replay and the
 //      entry, and its page then says why it's gone; the launch's reconcile: an unreadable index set aside and
 //      rebuilt from the replays with nothing deleted, and on a "restored phone" a missing video cleared from its
 //      entry, a leftover part and an orphan replay removed;
 //  15. a technique check: the camera keeps the screen on (setKeepAwake) and leaving lets it sleep; a picked video
 //      checked to its results, then a video the app can't read: the temporary copies deleted after each
-//      (clearPickedFiles); the camera test runs the full pose model under the native CSP;
+//      (clearPickedFiles); the app's privacy line; the picker closing without a file (its cancel event) and a check
+//      left while its video is analysed (the analysis stops, its hidden <video> goes): deleted too; the camera test
+//      runs the full pose model under the native CSP;
 //  16. the self-test (AppInfo.selfTest): fitee:selftest ok, every step passing but the bridge gate's, which only
 //      the app can test and which is reported as skipped here; nothing of the user's touched; then once more with
 //      an inert webkit.messageHandlers.bridge, so the gate step's own code runs against the stub's imitation of
-//      the gate: every probe unanswered, one fitee:dropped line each, FiteeNative's upload still running after;
+//      the gate: every probe unanswered, one fitee:dropped line each, the prompt answered with null, no window, the
+//      navigation cancelled (no request sent), FiteeNative's upload still running after;
 //  17. a Release build (AppInfo.debug false): nothing printed, the Debug-only chunks never loaded;
-//  18. Terms and Privacy: section 7 lists every licence and opens each to its full text; no browser, home screen,
-//      offline copy, service worker or GitHub wording;
+//  18. Terms and Privacy: section 7 lists every licence and opens each to its full text; section 6 names each
+//      check's skeleton replay; the picked video's temporary copy; no browser, home screen, offline copy, service
+//      worker or GitHub wording;
 //  and in every launch: no uncaught error, fitee:uncaught or fitee:csp line, no "[error]" line or browser error
 //  (MediaPipe's own INFO, I, W and E lines only where the pose model loads; expected rejections only where a
 //  failure is injected), no call the bridge gate would drop, no file the server didn't have, and no request but
@@ -145,6 +152,11 @@ async function loadContract() {
   T.deleted = sourceConst('src/native/data.ts', 'DELETED_TOAST');
   T.exportFailed = sourceConst('src/native/download.ts', 'EXPORT_FAILED_TOAST');
   T.updated = sourceConst('src/native/screens/Legal.tsx', 'NATIVE_UPDATED');
+  // The app's privacy line (src/screens/Analyze.tsx's native branch; Settings says the same), and its profile note.
+  const privacyLine = /__NATIVE__ \? '([^']+)' : PRIVACY/.exec(read('src/screens/Analyze.tsx'));
+  if (!privacyLine) throw new Error('native-check: no native privacy line in src/screens/Analyze.tsx');
+  T.nativePrivacy = privacyLine[1];
+  T.profileNote = 'Your profile stays on this iPhone and in its own backups (iCloud or a computer); fitee sends nothing anywhere.';
   T.licences = [...read('src/native/screens/Legal.tsx').matchAll(/\{ file: '([^']+)', name: '([^']+)', licence: '([^']+)' \}/g)].map((m) => ({ file: m[1], name: m[2], licence: m[3] }));
 }
 
@@ -816,6 +828,10 @@ async function settings() {
     'settings: the your-data text says where the data is, the copy, and the backups',
     body.includes('Your plan, log, profile and settings are kept in fitee on this iPhone, with a copy in the app’s own folder in case iOS clears its web storage. Your iPhone’s backups (iCloud or a computer) include them; fitee asks iOS to leave saved sets and videos out.'),
   );
+  check(
+    'settings: the privacy line says what fitee does (never uploads video), not "Video is never uploaded"',
+    body.includes(T.nativePrivacy) && !body.includes('Video is never uploaded'),
+  );
   const footer = page.locator('p.footer');
   const footerText = (await footer.innerText()).trim();
   check('settings: the footer says "fitee 1.0.0 (1)" (the app’s version and build), not a button', footerText === 'fitee 1.0.0 (1)' && (await footer.locator('button').count()) === 0, footerText);
@@ -838,6 +854,19 @@ async function settings() {
   await heading(page, 'Back squat');
   const subtitle = await page.locator('main').innerText();
   check('settings: #/analyze/<id>?calibrate is a plain technique check', subtitle.includes('Technique check') && !subtitle.includes('Calibration recording'));
+  // The profile, in Settings and on first launch: kept on this iPhone and in its backups (the copy of the log holds it).
+  const profileTexts = [];
+  for (const route of ['#/profile', '#/profile?setup']) {
+    await page.goto(BASE + route);
+    await heading(page, route.endsWith('setup') ? 'About you' : 'Profile');
+    profileTexts.push(await page.locator('main').innerText());
+  }
+  check(
+    'profile: says it stays on this iPhone and in its backups and that fitee sends nothing, never "only on this phone" or "Nothing is sent anywhere"',
+    profileTexts.every((t) => t.includes(T.profileNote) && !/Kept only on this phone|Everything stays on this phone|Nothing is sent anywhere/.test(t)) &&
+      (await page.goto(`${BASE}#/profile`).then(() => visible(page, 'Kept on this iPhone and in its backups'))),
+    profileTexts.map((t) => short(t.slice(t.indexOf('How this is used')), 160)).join(' | '),
+  );
 
   // Back up my data: Save to Files.
   await page.goto(`${BASE}#/settings`);
@@ -972,6 +1001,35 @@ async function deleteAll() {
   await sleep(2500);
   check('delete all: no copy written after it', !fake.calls.slice(callIndex).some((c) => c.method === 'writeSnapshot'), `${fake.calls.slice(callIndex).filter((c) => c.method === 'writeSnapshot').length} writes`);
   await finish(l);
+
+  // Stopped part way (the marker still there): fitee/ was removed, the web view's stores weren't. The next launch
+  // finishes the delete before it reads the copy, and starts at Welcome with "All data deleted".
+  const holder2 = {};
+  const fake2 = new Fake.FakeNative({ fileBase: ORIGIN, onDeleteAll: () => holder2.page?.evaluate(() => window.__fiteeWebsiteDataRemoved?.()) });
+  const s2 = await launch('delete all, stopped part way', { fake: fake2 });
+  holder2.page = s2.page;
+  await seedLocal(s2, { 'formcheck.v1.profile': JSON.stringify(ACCEPTED()), 'formcheck.v1.unit': '"lb"', 'formcheck.v1.device.snapshotRev': '4' });
+  fake2.deleting = true;
+  const before2 = markerLines(s2.run, C.MARKERS.ready).length;
+  await s2.page.goto(BASE);
+  const toast2 = visible(s2.page, T.deleted, 15_000);
+  const reloaded2 = await ready(s2.run, before2 + 1, 15_000);
+  const shown2 = await toast2;
+  const order2 = fake2.calls.map((c) => c.method);
+  check(
+    'delete all, stopped part way: the next launch deletes again before reading the copy, then Welcome with "All data deleted"; nothing left, no copy written',
+    order2[0] === 'appInfo' &&
+      order2[1] === 'deleteAllData' &&
+      order2.indexOf('readSnapshot') > 1 &&
+      !!reloaded2 &&
+      shown2 &&
+      (await heading(s2.page, 'Welcome to fitee')) &&
+      fake2.deleting === false &&
+      Object.keys(await local(s2.page)).every((k) => !k.startsWith('formcheck.v1.')) &&
+      writes(fake2).length === 0,
+    `${order2.slice(0, 4).join(', ')}; marker ${fake2.deleting}; ${writes(fake2).length} writes`,
+  );
+  await finish(s2);
 }
 
 /** 13: the status bar's text and what iOS draws over the page follow the theme. */
@@ -1071,6 +1129,10 @@ async function savedSet(sample, video) {
     `${src}; ${video.type}, ${video.bytes} bytes`,
   );
   check('saved set: the launch’s reconcile listed the files before the first read', fake.calls.find((c) => c.method === 'listSetFiles' || c.method === 'readSetFile')?.method === 'listSetFiles');
+  check(
+    'saved set: the note under the video says fitee never uploads it, not "It’s never uploaded"',
+    (await visible(page, 'fitee never uploads it.')) && !(await page.locator('main').innerText()).includes('It’s never uploaded'),
+  );
   const ranged = server.requests(l.run.name).filter((e) => e.path === `/__files__/${id}.${ext}`);
   check('saved set: the video was read with Range requests (206), as from Capacitor’s file route', ranged.length > 0 && ranged.every((e) => e.status === 206), ranged.map((e) => `${e.status} ${e.range}`).join(', '));
   const subtitle = await page.locator('header').first().innerText();
@@ -1237,6 +1299,25 @@ async function techniqueCheck(media) {
   const cleared2 = await until(() => fake.callsTo('clearPickedFiles').length === 2, 5000);
   check('picked video: one the app can’t read says so, and its temporary copy is deleted too', refused && !!cleared2, `${fake.callsTo('clearPickedFiles').length} calls`);
   check('picked video: nothing saved for a check with no reps (no set files written)', fake.callsTo('writeSetFile').length === 0);
+  check('technique check: the privacy line under "Use a video instead" says fitee never uploads video', await visible(page, T.nativePrivacy));
+  // The picker closes without a file (the input's cancel event): what an earlier clear left in tmp/ goes now.
+  const beforeCancel = fake.callsTo('clearPickedFiles').length;
+  await page.locator('input[type=file][accept="video/*"]').dispatchEvent('cancel');
+  const cancelled = await until(() => fake.callsTo('clearPickedFiles').length > beforeCancel, 5000);
+  check('picked video: the picker closing without a file deletes the temporary copies (clearPickedFiles)', !!cancelled, `${fake.callsTo('clearPickedFiles').length} calls`);
+  // Left while the video is analysed: the analysis stops (its hidden <video> goes) and the temporary copy is deleted.
+  await page.locator('input[type=file][accept="video/*"]').setInputFiles(media.set.file);
+  const analysing = await visible(page, 'Analyzing your video…', 10_000);
+  const beforeLeave = fake.callsTo('clearPickedFiles').length;
+  await page.locator('a.back').first().click();
+  const left = await heading(page, 'Back squat');
+  const cleared3 = await until(() => fake.callsTo('clearPickedFiles').length > beforeLeave, 20_000);
+  const stopped = await until(async () => ((await page.evaluate(() => document.querySelectorAll('video').length)) === 0 ? true : undefined), 20_000);
+  check(
+    'picked video: leaving while it is analysed stops the analysis (its hidden <video> removed) and deletes the temporary copy (clearPickedFiles)',
+    analysing && left && !!cleared3 && !!stopped,
+    `analysing ${analysing}; ${fake.callsTo('clearPickedFiles').length - beforeLeave} clears after leaving; video elements gone ${!!stopped}`,
+  );
   await finish(l);
 
   // The camera test: the full model, under the native CSP (no 'unsafe-eval').
@@ -1313,10 +1394,24 @@ async function selfTestGate() {
   const gate = g.m?.gate ?? {};
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   check(
-    'self-test, stand-in gate: the gate step runs here (nothing skipped): every probe silent for 2 s, none answered, the upload begun before them still running after, one fitee:dropped line each',
-    g.m?.ok === true && same(g.m.skipped, []) && gate.ok === true && gate.skipped === undefined && same([...(gate.silent ?? [])].sort(), probes) && same(gate.answered, []) && gate.stateKept === true && same(dropped, probes),
-    g.m ? `ok ${g.m.ok}, skipped ${JSON.stringify(g.m.skipped)}; silent ${gate.silent?.length ?? 0}, answered ${JSON.stringify(gate.answered)}, stateKept ${gate.stateKept}; ${dropped.length} dropped lines${gate.error ? `; ${gate.error}` : ''}` : 'no marker',
+    'self-test, stand-in gate: the gate step runs here (nothing skipped): every probe silent for 2 s, none answered, the prompt answered with null, no window, the navigation cancelled, the upload begun before them still running after, one fitee:dropped line each',
+    g.m?.ok === true &&
+      same(g.m.skipped, []) &&
+      gate.ok === true &&
+      gate.skipped === undefined &&
+      same([...(gate.silent ?? [])].sort(), probes) &&
+      same(gate.answered, []) &&
+      gate.prompt === true &&
+      gate.window === true &&
+      gate.navigation === true &&
+      gate.stateKept === true &&
+      same(dropped, probes),
+    g.m
+      ? `ok ${g.m.ok}, skipped ${JSON.stringify(g.m.skipped)}; silent ${gate.silent?.length ?? 0}, answered ${JSON.stringify(gate.answered)}, prompt ${gate.prompt}, window ${gate.window}, navigation ${gate.navigation}, stateKept ${gate.stateKept}; ${dropped.length} dropped lines${gate.error ? `; ${gate.error}` : ''}`
+      : 'no marker',
   );
+  const sent = g.l.run.requests.filter((r) => /fitee-(window|nav)-probe/.test(r.url));
+  check('self-test, stand-in gate: the window and navigation probes sent no request', sent.length === 0, sent.map((r) => r.url).join(', '));
   const left = [...g.fake.sets.keys()].filter((k) => k.startsWith('selftest'));
   check('self-test, stand-in gate: no file of its own behind (the gate step’s upload aborted), no upload running', left.length === 0 && g.fake.activeParts.size === 0, left.join(', '));
   await finish(g.l);
@@ -1417,7 +1512,15 @@ async function legal() {
   const privacy = await page.locator('main').innerText();
   const WEB = /browser|home screen|offline copy|service worker|github/i;
   check('privacy: no browser, home screen, offline copy, service worker or GitHub wording (terms neither)', !WEB.test(privacy) && !WEB.test(terms), (WEB.exec(privacy) ?? WEB.exec(terms) ?? [''])[0]);
-  check('privacy: says what happens to a picked video’s temporary copy', privacy.includes('iOS gives the app a temporary copy of it: fitee deletes that copy when you leave the results, the next time it starts, and when you delete all your data.'));
+  check(
+    'privacy: says what happens to a picked video’s temporary copy',
+    privacy.includes('iOS gives the app a temporary copy of it. fitee deletes that copy when you leave that technique check, even before its results show') &&
+      privacy.includes('the next time it starts, and when you delete all your data.'),
+  );
+  check(
+    'terms: section 6 says each check’s skeleton replay is kept, not only what you choose to save, and never "only" on this iPhone',
+    terms.includes('a skeleton replay of each technique check (kept for your last 60 checks') && !/stored only in the app/.test(terms),
+  );
   await shoot(page, 'privacy-full', { full: true });
   await page.goto(BASE);
   await heading(page, 'Welcome to fitee');

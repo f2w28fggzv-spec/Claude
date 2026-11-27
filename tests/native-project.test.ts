@@ -459,7 +459,6 @@ describe('capacitor.config.ts', () => {
   it('has the settings the app relies on, and never a server URL', () => {
     expect(config.appId).toMatch(BUNDLE_ID);
     expect(config).toMatchObject({
-      appId: 'app.fitee',
       appName: 'fitee',
       webDir: 'dist-native',
       loggingBehavior: 'debug',
@@ -912,6 +911,71 @@ describe('Swift: the network guards and what Release builds hold', () => {
     expect(didLoad).toContain('FiteeContentRules.installed = true');
     expect(didLoad).toContain('FiteeBridgeGate.install(in: handler.contentController, forwardingTo: handler)');
     expect(didLoad).toContain('bridge?.registerPluginInstance(FiteeNativePlugin())');
+    // The UI delegate after Capacitor's (loadView set that one), held by the view controller (WKWebView's is weak);
+    // AppInfo.gate only once all three parts are in place, the delegate checked at run time.
+    const ui = didLoad.indexOf('webView?.uiDelegate = ui');
+    expect(ui).toBeGreaterThan(didLoad.indexOf('FiteeBridgeGate.install('));
+    expect(didLoad).toContain('pageUIDelegate = ui');
+    expect(vc).toMatch(/private var pageUIDelegate: FiteeUIDelegate\?/);
+    expect(didLoad).toMatch(/FiteeBridgeGate\.installed = gated && FiteeUIDelegate\.isWired\(webView\) && bridge\?\.plugin\(withName: "FiteeNative"\) is FiteeNativePlugin/);
+    expect(didLoad.indexOf('FiteeBridgeGate.installed =')).toBeGreaterThan(didLoad.indexOf('bridge?.registerPluginInstance('));
+    expect(vc).not.toMatch(/^\s*installed = true/m); // only capacitorDidLoad says the gate is in place
+  });
+
+  it('the gate\'s UI delegate answers every prompt with nothing, opens no window, and passes the rest to Capacitor\'s handler', () => {
+    const vc = releaseCode(swiftSource('FiteeViewController.swift'));
+    const ui = vc.slice(vc.indexOf('final class FiteeUIDelegate: NSObject, WKUIDelegate {'));
+    expect(ui.length).toBeGreaterThan(100);
+    expect(ui).not.toMatch(/func webView\(_ webView: WKWebView, createWebViewWith|UIApplication\.shared\.open|CapacitorCookie|JSONSerialization/);
+    expect(ui).toMatch(/runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String\?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping \(String\?\) -> Void\) \{\n\s+completionHandler\(nil\)\n\s+\}/);
+    // Capacitor's own signatures (WebViewDelegationHandler.swift), each forwarded to its handler.
+    const capacitor = readFileSync(join(ROOT, 'node_modules/@capacitor/ios/Capacitor/Capacitor/WebViewDelegationHandler.swift'), 'utf8');
+    const flat = (signature: string | undefined) => signature?.replace(/\(\s+/g, '(').replace(/,?\s+\)/g, ')').replace(/\s+/g, ' ').trim();
+    for (const label of ['runJavaScriptAlertPanelWithMessage', 'runJavaScriptConfirmPanelWithMessage', 'requestMediaCapturePermissionFor', 'requestDeviceOrientationAndMotionPermissionFor']) {
+      const theirs = flat(new RegExp(`open func (webView\\(\\s*_ webView: WKWebView,\\s+${label}[^{]*)\\{`).exec(capacitor)?.[1]);
+      const ours = flat(new RegExp(`\\n {4}func (webView\\(_ webView: WKWebView, ${label}[^{]*)\\{`).exec(ui)?.[1]);
+      expect(theirs, label).toBeDefined();
+      expect(ours, label).toBe(theirs);
+      expect(ui, label).toMatch(new RegExp(`capacitor\\.webView\\(webView, ${label}: `));
+    }
+    // The run-time check names exactly these Objective-C selectors.
+    for (const selector of [
+      'webView:runJavaScriptAlertPanelWithMessage:initiatedByFrame:completionHandler:',
+      'webView:runJavaScriptConfirmPanelWithMessage:initiatedByFrame:completionHandler:',
+      'webView:runJavaScriptTextInputPanelWithPrompt:defaultText:initiatedByFrame:completionHandler:',
+      'webView:requestMediaCapturePermissionForOrigin:initiatedByFrame:type:decisionHandler:',
+      'webView:requestDeviceOrientationAndMotionPermissionForOrigin:initiatedByFrame:decisionHandler:',
+      'webView:createWebViewWithConfiguration:forNavigationAction:windowFeatures:',
+    ]) {
+      expect(ui, selector).toContain(`"${selector}"`);
+    }
+  });
+
+  it('FiteeNativePlugin cancels every navigation that isn\'t to capacitor://localhost, which Capacitor asks it before its own rules', () => {
+    expect(PLUGIN).toMatch(
+      /override public func shouldOverrideLoad\(_ navigationAction: WKNavigationAction\) -> NSNumber\? \{\n\s+guard let url = navigationAction\.request\.url, url\.scheme == "capacitor", url\.host == "localhost" else \{\n\s+return NSNumber\(value: true\)\n\s+\}\n\s+return nil\n\s+\}/,
+    );
+    // Capacitor 8.6.3: the plugins are asked in decidePolicyFor before it would hand a URL to iOS, and CAPPlugin's own
+    // answer is nil (no other plugin overrides it).
+    const capacitor = readFileSync(join(ROOT, 'node_modules/@capacitor/ios/Capacitor/Capacitor/WebViewDelegationHandler.swift'), 'utf8');
+    const decide = capacitor.slice(capacitor.indexOf('open func webView(_ webView: WKWebView, decidePolicyFor navigationAction'), capacitor.indexOf('open func webView(_ webView: WKWebView, didFinish'));
+    expect(decide.indexOf('plugin.shouldOverrideLoad(navigationAction)')).toBeGreaterThan(0);
+    expect(decide.indexOf('UIApplication.shared.open')).toBeGreaterThan(decide.indexOf('plugin.shouldOverrideLoad(navigationAction)'));
+    expect(readFileSync(join(ROOT, 'node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPlugin.m'), 'utf8')).toMatch(/- \(NSNumber\*\)shouldOverrideLoad:\(WKNavigationAction\*\)navigationAction \{\n\s+return nil;\n\}/);
+  });
+
+  it('Delete all: the marker before anything is removed and after the web view\'s stores and the cookies, which appInfo reports', () => {
+    const files = swiftSource('FiteeFiles.swift');
+    expect(files).toContain('appendingPathComponent("fitee-deleting", isDirectory: false)');
+    expect(files).toMatch(/func deleteAll\(\) throws \{\n\s+markDeleting\(\)\n/);
+    expect(files).toMatch(/private func markDeleting\(\) \{[\s\S]*?try FiteeFiles\.exclude\(marker\)/);
+    const del = SWIFT_METHODS.get('deleteAllData') as string;
+    const removed = del.indexOf('removeData(ofTypes:');
+    expect(del.indexOf('try store.deleteAll()')).toBeLessThan(removed);
+    expect(del.indexOf('HTTPCookieStorage.shared.removeCookies(since: Date.distantPast)')).toBeGreaterThan(removed);
+    expect(del.indexOf('try store.finishDeleting()')).toBeGreaterThan(del.indexOf('HTTPCookieStorage.shared.removeCookies'));
+    expect(del.indexOf('call.resolve([:])')).toBeGreaterThan(del.indexOf('try store.finishDeleting()'));
+    expect(SWIFT_METHODS.get('appInfo')).toMatch(/let deleting = files\.isDeleting[\s\S]*"deleting": deleting/);
   });
 
   it('SceneDelegate empties tmp/ first and makes the bridge only once the rules have compiled', () => {
@@ -933,7 +997,7 @@ describe('npm run native:sync (scripts/native-sync.ts)', () => {
     expect(capacitorConfigJson(config)).toBe(
       [
         '{',
-        '\t"appId": "app.fitee",',
+        `\t"appId": "${config.appId}",`,
         '\t"appName": "fitee",',
         '\t"webDir": "dist-native",',
         '\t"loggingBehavior": "debug",',

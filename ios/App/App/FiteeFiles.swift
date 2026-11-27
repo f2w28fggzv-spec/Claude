@@ -11,6 +11,11 @@ import Darwin
 ///            upload runs. The folder and every file are marked excluded from backup: guidance to iOS (Apple,
 ///            "Optimizing your app's data for iCloud backup"), set again at every save because some file operations
 ///            reset it.
+///   Library/Application Support/fitee-deleting
+///            An empty file while Delete all my data runs (deleteAll() writes it before it removes anything, and
+///            finishDeleting() removes it once the web view's stores are gone too): if the app or its page stops part
+///            way, the next launch finishes the delete (AppInfo.deleting) instead of copying the data back. Outside
+///            fitee/, so it outlives the folder it guards; excluded from backup (it's about this phone, not the user).
 ///   tmp/     fitee-export/<name> while a Save to Files panel is open, and the copies iOS makes of a video picked for a
 ///            technique check or filmed with Take Video (WebKit's file panel puts them here and would keep them until
 ///            the web view goes away). Emptied at launch (SceneDelegate.swift), by clearPickedFiles() and by
@@ -67,6 +72,8 @@ final class FiteeFiles {
     /// The app's temporary folder (FileManager.default.temporaryDirectory).
     let temporaryFolder: URL
     var dataFolder: URL { return root.appendingPathComponent("data", isDirectory: true) }
+    /// Library/Application Support/fitee-deleting: there while a Delete all my data hasn't finished.
+    var deletingMarker: URL { return root.deletingLastPathComponent().appendingPathComponent("fitee-deleting", isDirectory: false) }
     var setsFolder: URL { return root.appendingPathComponent("sets", isDirectory: true) }
     var exportFolder: URL { return temporaryFolder.appendingPathComponent(FiteeFiles.exportFolderName, isDirectory: true) }
 
@@ -315,9 +322,15 @@ final class FiteeFiles {
 
     // MARK: - Everything
 
-    /// deleteAllData's files: the whole fitee/ folder (the copy of the log and every saved set) and everything in
-    /// tmp/. A failure to remove fitee/ throws (IO_ERROR), and tmp/ is then left as it was.
+    /// Whether a Delete all my data began and didn't finish (the marker is there): AppInfo.deleting.
+    var isDeleting: Bool { return fileManager.fileExists(atPath: deletingMarker.path) }
+
+    /// deleteAllData's files: first the marker, then the whole fitee/ folder (the copy of the log and every saved set)
+    /// and everything in tmp/. The marker is written as well as it can be: a phone too full for an empty file still
+    /// gets its data deleted (only a stop part way through then goes unnoticed). A failure to remove fitee/ throws
+    /// (IO_ERROR): tmp/ is then left as it was, and the marker stays, so the next launch finishes the delete.
     func deleteAll() throws {
+        markDeleting()
         _ = locked { activeParts.removeAll() }
         do {
             try removeIfPresent(root)
@@ -325,6 +338,28 @@ final class FiteeFiles {
             throw Failure.from(error)
         }
         FiteeFiles.empty(temporaryFolder, keeping: nil)
+    }
+
+    /// The marker: an empty file, excluded from backup (a phone restored from a backup made mid-delete mustn't delete
+    /// what it restored).
+    private func markDeleting() {
+        let marker = deletingMarker
+        do {
+            try fileManager.createDirectory(at: marker.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: nil)
+            try Data().write(to: marker, options: [.atomic])
+            try FiteeFiles.exclude(marker)
+        } catch {
+            // Best effort (above).
+        }
+    }
+
+    /// Delete all my data has finished (the web view's stores are gone too): the marker goes.
+    func finishDeleting() throws {
+        do {
+            try removeIfPresent(deletingMarker)
+        } catch {
+            throw Failure.from(error)
+        }
     }
 
     // MARK: - The temporary folder (tmp/)

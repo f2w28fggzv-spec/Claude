@@ -13,6 +13,9 @@
 // other device counts as booted.
 // STUB_FAIL, optional: "<command>@<udid>" words (e.g. "bootstatus@<udid> install@<udid>"): that simctl command fails
 // on that device.
+// STUB_HANG, optional: "terminate@<udid>": `simctl terminate` on that device never ends (a SIGTERM doesn't end it
+// either: only SIGKILL), as one once held a CI run up for minutes; "launch@<udid>": `simctl launch` there doesn't end
+// when the app is terminated (it ignores the SIGTERM terminate sends, until SIGKILL).
 // STUB_STATE, the stub's own state, per device: installed-<udid>, appearance-<udid>, booted-<udid>, pid-<udid>,
 // launch-<udid>; and calls.log (each call's arguments as a JSON array, one per line).
 //
@@ -77,6 +80,7 @@ function kill(pid) {
 
 const ipad = process.env.STUB_IPAD || '';
 const failing = (process.env.STUB_FAIL || '').split(/\s+/).filter(Boolean);
+const hanging = (process.env.STUB_HANG || '').split(/\s+/).filter(Boolean);
 
 /** Fails as simctl does for a device that isn't booted, or as the scenario asks (STUB_FAIL). */
 function ready(command, udid) {
@@ -111,6 +115,11 @@ function simctl() {
     const pid = readState(`pid-${rest[0]}`);
     if (pid) kill(pid);
     if (fs.existsSync(stateFile(`pid-${rest[0]}`))) fs.rmSync(stateFile(`pid-${rest[0]}`));
+    if (hanging.includes(`terminate@${rest[0]}`)) {
+      process.on('SIGTERM', () => {});
+      setInterval(() => {}, 1000); // never ends by itself; a stub left behind by a broken test is ended below
+      setTimeout(() => process.exit(0), 60_000);
+    }
     return;
   }
   if (command === 'io' && rest.length === 3 && rest[1] === 'screenshot') {
@@ -140,7 +149,9 @@ function simctl() {
           : readState(`appearance-${udid}`, 'light');
     writeState(`pid-${udid}`, process.pid);
     writeState(`launch-${udid}`, launch);
-    process.on('SIGTERM', () => process.exit(0));
+    process.on('SIGTERM', () => {
+      if (!hanging.includes(`launch@${udid}`)) process.exit(0);
+    });
     const file = path.join(dir, `console-${launch}.txt`);
     const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/\n$/, '').split('\n') : [];
     // Like the real simctl, which prints "<bundle id>: <pid>" for every launch (with app.fitee as the bundle ID

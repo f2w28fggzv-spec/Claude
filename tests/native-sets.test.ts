@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CHUNK, extFor, SET_FILE_NAME, setFileFor, toBase64, uploadVideo, VIDEO_EXTS } from '../src/native/setFiles';
+import { CHUNK, extFor, SET_FILE_NAME, setFileFor, toBase64, UNREADABLE_INDEX, uploadVideo, VIDEO_EXTS } from '../src/native/setFiles';
 import { entryFromReplay, parseIndex, timeFromId } from '../src/native/setsDb';
 import { newSetId, type SavedSetMeta } from '../src/sets/sets';
 import { FakeNative, fakeCapacitor } from './fixtures/fakeNative';
@@ -246,6 +246,100 @@ describe('src/sets/sets.ts on files', () => {
     for (const name of before) expect(fake.file(name), name).toBeDefined();
   });
 
+  /** Another launch: the module state (the reconcile, holds, picks) starts afresh, the files stay. */
+  const relaunch = async () => {
+    vi.resetModules();
+    vi.doMock('../src/db', () => import('../src/native/setsDb'));
+    sets = await import('../src/sets/sets');
+    return sets;
+  };
+  const aside = () => names().filter((n) => UNREADABLE_INDEX.test(n));
+
+  it('sets aside an index whose bytes aren’t UTF-8 (BAD_DATA) as one that doesn’t parse, rebuilds it, and saves go on', async () => {
+    const bad = Buffer.from([0x5b, 0xff, 0xfe, 0x00, 0x9c, 0x5d]); // "[…]" with bytes that aren't UTF-8
+    fake.sets.set('index.json', bad);
+    put(`${ID(1)}.replay.json`, replay());
+    put(`${ID(1)}.mp4`, 'vid');
+    expect((await sets.loadSets()).map((m) => [m.id, m.video?.type])).toEqual([[ID(1), 'video/mp4']]);
+    expect(aside()).toHaveLength(1);
+    expect(fake.file(aside()[0])?.equals(bad)).toBe(true);
+    await sets.saveSet(meta(2), data);
+    expect((await (await relaunch()).loadSets()).map((m) => m.id)).toEqual([ID(2), ID(1)]);
+    expect(names().filter((n) => n.endsWith('.replay.json'))).toEqual([`${ID(1)}.replay.json`, `${ID(2)}.replay.json`]);
+  });
+
+  it('leaves an index it couldn’t read for another reason (IO_ERROR) for the next launch: nothing set aside or deleted', async () => {
+    put('index.json', [meta(1)]);
+    put(`${ID(1)}.replay.json`, replay());
+    put(`${ID(9)}.replay.json`, replay()); // an orphan, which a reconcile would delete
+    fake.failNext('readSetFile', 'IO_ERROR'); // the reconcile's read of index.json
+    expect((await sets.loadSets()).map((m) => m.id)).toEqual([ID(1)]); // read again after it: it works now
+    expect(fake.callsTo('renameSetFile')).toEqual([]);
+    expect(aside()).toEqual([]);
+    expect(fake.file(`${ID(9)}.replay.json`)).toBeDefined();
+    expect(fake.file('index.json')?.toString()).toBe(JSON.stringify([meta(1)]));
+  });
+
+  it('rebuilds before it sets an unreadable index aside: stopped during the rebuild, the next launch starts over', async () => {
+    put('index.json', '{"truncated');
+    for (const i of [1, 2, 3]) put(`${ID(i)}.replay.json`, replay());
+    put(`${ID(2)}.mp4`, 'a saved video');
+    // The app stops while the rebuild reads the second replay (a few MB each over the bridge).
+    const read = fake.readSetFile.bind(fake);
+    let reads = 0;
+    fake.readSetFile = (o, u) => (o.name.endsWith('.replay.json') && ++reads === 2 ? new Promise(() => {}) : read(o, u));
+    void sets.loadSets();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fake.file('index.json')?.toString()).toBe('{"truncated');
+    expect(aside()).toEqual([]);
+    fake.readSetFile = read;
+    expect((await (await relaunch()).loadSets()).map((m) => [m.id, !!m.video])).toEqual([
+      [ID(3), false],
+      [ID(2), true],
+      [ID(1), false],
+    ]);
+    expect(aside()).toHaveLength(1);
+  });
+
+  it('rebuilds again when the rebuilt index wasn’t written (stopped, or no room), and nothing writes over it meanwhile', async () => {
+    put('index.json', '{"truncated');
+    for (const i of [1, 2, 3]) put(`${ID(i)}.replay.json`, replay());
+    put(`${ID(2)}.mp4`, 'a saved video');
+    fake.failNext('writeSetFile', 'NO_ROOM'); // the rebuilt index's write, right after the set-aside
+    // This launch: the sets aren't shown, and a save doesn't write an index of its own over them.
+    await expect(sets.loadSets()).rejects.toThrow(/index/);
+    await expect(sets.saveSet(meta(9), data)).rejects.toThrow(/index/);
+    expect(fake.file('index.json')).toBeUndefined();
+    expect(aside()).toHaveLength(1);
+    // The next launch (room again): rebuilt from the replays, the one written meanwhile included.
+    expect((await (await relaunch()).loadSets()).map((m) => [m.id, !!m.video])).toEqual([
+      [ID(9), false],
+      [ID(3), false],
+      [ID(2), true],
+      [ID(1), false],
+    ]);
+    expect(fake.file(`${ID(2)}.mp4`)).toBeDefined();
+    // And from then on the index is read as usual.
+    await sets.saveSet(meta(10), data);
+    expect((await (await relaunch()).loadSets()).map((m) => m.id)).toEqual([ID(10), ID(9), ID(3), ID(2), ID(1)]);
+  });
+
+  it('while an index is set aside, deletes only orphans saved after it was set aside, never older files or the set-aside index', async () => {
+    const setAside = Date.UTC(2026, 10, 1) + 5 * 60_000; // between ID(4) and ID(6)
+    put(`index.unreadable-${setAside}.json`, '{"truncated');
+    put('index.json', [meta(1)]);
+    put(`${ID(1)}.replay.json`, replay());
+    put(`${ID(2)}.replay.json`, '{broken'); // older: maybe a set the unreadable index named
+    put(`${ID(3)}.mov`, 'older video, no replay');
+    put(`${ID(6)}.replay.json`, replay()); // newer, in no entry: a save that stopped before its index write
+    put(`${ID(7)}.mp4`, 'newer video, no entry');
+    put('selftest1764237600000a.mp4', 'no time in its id'); // kept: its time can't be told
+    expect((await sets.loadSets()).map((m) => m.id)).toEqual([ID(1)]);
+    expect(names()).toEqual(
+      [`index.unreadable-${setAside}.json`, 'index.json', `${ID(1)}.replay.json`, `${ID(2)}.replay.json`, `${ID(3)}.mov`, 'selftest1764237600000a.mp4'].sort(),
+    );
+  });
+
   it('never takes an index that went bad mid-session for an empty one', async () => {
     await sets.saveSet(meta(1), data);
     put('index.json', 'garbage');
@@ -261,6 +355,93 @@ describe('src/sets/sets.ts on files', () => {
     await saving;
     const order = fake.calls.map((c) => c.method).filter((m) => m === 'finishVideo' || m === 'clearPickedFiles');
     expect(order).toEqual(['finishVideo', 'clearPickedFiles']);
+  });
+
+  // ---- picked videos: iOS's temporary copies in tmp/, which clearPickedFiles() empties ----
+
+  /** A picked video's File (WebKit's copy in tmp/), of `bytes` bytes. */
+  const picked = (bytes = 2 * CHUNK) => new Blob([new Uint8Array(bytes)], { type: 'video/quicktime' });
+  /** Holds back a set's video chunks (a big picked video over the bridge) until let go. */
+  const slowUpload = (id: string) => {
+    let go!: () => void;
+    const gate = new Promise<void>((resolve) => (go = resolve));
+    const append = fake.appendVideo.bind(fake);
+    fake.appendVideo = async (o, u) => {
+      if (o.id === id) await gate;
+      return append(o, u);
+    };
+    return go;
+  };
+  const tick = () => new Promise((r) => setTimeout(r, 10));
+
+  it('a clear asked as a check’s results close, while its video saves, doesn’t run once the picker opens again', async () => {
+    const setsDb = await import('../src/native/setsDb');
+    await sets.saveSet(meta(1), data);
+    const a = picked();
+    setsDb.holdPickedFile(a); // check A, on a picked video
+    const go = slowUpload(ID(1));
+    const saving = sets.saveSetVideo(ID(1), a, 0); // A's Save video, still running when…
+    const cleared = setsDb.releasePickedFile(a); // …A's results close ("Record another set")
+    setsDb.pickingFile(); // the picker opens: WebKit puts B's copy in tmp/ before the input's change event
+    go();
+    await saving;
+    await cleared;
+    expect(fake.pickedFilesCleared).toBe(0); // B's copy stays
+    const b = picked();
+    setsDb.holdPickedFile(b);
+    await setsDb.releasePickedFile(b); // B's check ends
+    expect(fake.pickedFilesCleared).toBe(1); // tmp/ emptied then, A's copy with B's
+  });
+
+  it('a clear waits for every video being saved, those started after it was asked too, and not while a picked video is in use', async () => {
+    const setsDb = await import('../src/native/setsDb');
+    for (const i of [1, 2]) await sets.saveSet(meta(i), data);
+    const a = picked();
+    setsDb.holdPickedFile(a);
+    const goA = slowUpload(ID(1));
+    const savingA = sets.saveSetVideo(ID(1), a, 0);
+    const cleared = setsDb.releasePickedFile(a); // A's results close while its video saves
+    // B, picked and in its results, saving its own video (the hold alone protects it here).
+    const b = picked(6 * CHUNK);
+    setsDb.holdPickedFile(b);
+    const goB = slowUpload(ID(2));
+    const savingB = sets.saveSetVideo(ID(2), b, 0);
+    goA();
+    await savingA;
+    await tick();
+    expect(fake.pickedFilesCleared).toBe(0); // B's upload still reads its copy
+    goB();
+    await savingB;
+    await cleared;
+    expect(fake.pickedFilesCleared).toBe(0); // B's results still show (Save video may read it again)
+    await setsDb.releasePickedFile(b);
+    expect(fake.pickedFilesCleared).toBe(1);
+    expect(fake.calls.map((c) => c.method).filter((m) => m === 'finishVideo' || m === 'clearPickedFiles')).toEqual(['finishVideo', 'finishVideo', 'clearPickedFiles']);
+  });
+
+  it('a video being analysed keeps its copy through any clear, until its check is left', async () => {
+    const setsDb = await import('../src/native/setsDb');
+    const a = picked();
+    setsDb.holdPickedFile(a); // the analysis reads it
+    await setsDb.clearPickedFiles(); // a clear left over from the check before
+    expect(fake.pickedFilesCleared).toBe(0);
+    await setsDb.releasePickedFile(a); // left mid-analysis: the stopped analysis lets it go
+    expect(fake.pickedFilesCleared).toBe(1);
+  });
+
+  it('the picker closing without a file empties tmp/ of what an earlier clear left', async () => {
+    const setsDb = await import('../src/native/setsDb');
+    await sets.saveSet(meta(1), data);
+    const a = picked();
+    setsDb.holdPickedFile(a);
+    const go = slowUpload(ID(1));
+    const saving = sets.saveSetVideo(ID(1), a, 0);
+    const cleared = setsDb.releasePickedFile(a);
+    setsDb.pickingFile(); // the picker opens…
+    const cancelled = setsDb.clearPickedFiles(); // …and closes without a file (the input's cancel event)
+    go();
+    await Promise.all([saving, cleared, cancelled]);
+    expect(fake.pickedFilesCleared).toBe(1); // A's copy goes now, not at the next launch
   });
 });
 

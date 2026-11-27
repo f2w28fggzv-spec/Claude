@@ -19,7 +19,7 @@ const SEXES: { id: Sex | 'unspecified'; label: string }[] = [
   { id: 'unspecified', label: 'Prefer not to say' },
 ];
 
-/** Your details, kept only on this phone. `setup` is the first-launch version. */
+/** Your details, kept only on this phone (in the iPhone app, on this iPhone and in its backups). `setup` is the first-launch version. */
 export function ProfileScreen({ setup = false }: { setup?: boolean }) {
   const unit = loadUnit();
   const imperial = unit === 'lb';
@@ -63,7 +63,7 @@ export function ProfileScreen({ setup = false }: { setup?: boolean }) {
   return (
     <Screen
       title={setup ? 'About you' : 'Profile'}
-      subtitle={setup ? 'Optional · used to tailor your plan' : 'Kept only on this phone'}
+      subtitle={setup ? 'Optional · used to tailor your plan' : __NATIVE__ ? 'Kept on this iPhone and in its backups' : 'Kept only on this phone'}
       back={setup ? undefined : 'settings'}
       action={
         <button type="button" onClick={save}>
@@ -151,7 +151,15 @@ export function ProfileScreen({ setup = false }: { setup?: boolean }) {
             </span>
           </li>
         </ul>
-        <p class="muted small">Everything stays on this phone. Nothing is sent anywhere. New plans use your profile; rebuild a plan to apply changes.</p>
+        {__NATIVE__ ? (
+          // The iPhone app: the profile is a user key, in the copy in the app's folder, which the iPhone's backups include.
+          <p class="muted small">
+            Your profile stays on this iPhone and in its own backups (iCloud or a computer); fitee sends nothing anywhere. New plans use your profile; rebuild a plan
+            to apply changes.
+          </p>
+        ) : (
+          <p class="muted small">Everything stays on this phone. Nothing is sent anywhere. New plans use your profile; rebuild a plan to apply changes.</p>
+        )}
       </section>
     </Screen>
   );

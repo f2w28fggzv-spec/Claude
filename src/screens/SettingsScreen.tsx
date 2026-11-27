@@ -150,9 +150,10 @@ export function SettingsScreen() {
       <h2 class="field">Your data</h2>
       {__NATIVE__ ? (
         <p class="muted small">
-          {PRIVACY} Your plan, log, profile and settings are kept in fitee on this iPhone, with a copy in the app’s own folder in case iOS clears its web
-          storage. Your iPhone’s backups (iCloud or a computer) include them; fitee asks iOS to leave saved sets and videos out. To move them to another
-          phone, or between this app and fitee in a browser, back them up to a file (saved sets and videos aren’t in it).
+          Everything runs on your iPhone. fitee never uploads video, and keeps it only if you choose to save it. Your plan, log, profile and settings are
+          kept in fitee on this iPhone, with a copy in the app’s own folder in case iOS clears its web storage. Your iPhone’s backups (iCloud or a computer)
+          include them; fitee asks iOS to leave saved sets and videos out. To move them to another phone, or between this app and fitee in a browser, back
+          them up to a file (saved sets and videos aren’t in it).
         </p>
       ) : (
         <p class="muted small">

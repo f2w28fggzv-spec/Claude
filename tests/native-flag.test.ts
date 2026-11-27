@@ -40,6 +40,7 @@ const SHARED_WITH_FLAG = [
   'src/app.tsx',
   'src/offline/client.ts',
   'src/screens/Analyze.tsx',
+  'src/screens/ProfileScreen.tsx',
   'src/screens/ProgramView.tsx',
   'src/screens/Results.tsx',
   'src/screens/SetScreen.tsx',

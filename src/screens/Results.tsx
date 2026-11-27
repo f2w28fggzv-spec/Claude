@@ -47,8 +47,8 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
         ? () => {
             shots.clear();
             // In the iPhone app a picked video (or one filmed with Take Video) is also a temporary copy iOS made for
-            // the app: deleted now too, once the results that hold it close (src/native/setsDb.ts).
-            if (seq.source === 'file') void import('../native/setsDb').then((m) => m.clearPickedFiles());
+            // the app: no longer in use once the results that hold it close, so deleted now too (src/native/setsDb.ts).
+            if (seq.source === 'file') void import('../native/setsDb').then((m) => (video ? m.releasePickedFile(video.blob) : m.clearPickedFiles()));
           }
         : () => shots.clear(),
     [shots],
@@ -231,11 +231,17 @@ export function Results({ exercise, seq, shots, video, onAgain }: Props) {
               <Icon name="video" size={18} /> Save video on this phone ({mb(video.blob.size)})
             </button>
           )}
-          {videoState === 'saved' && (
-            <p class="saved-note">
-              <Icon name="check" size={16} /> Video saved on this phone. It’s never uploaded.
-            </p>
-          )}
+          {videoState === 'saved' &&
+            (__NATIVE__ ? (
+              // The iPhone app says what fitee does: it asks iOS to leave saved videos out of backups, and can't promise more.
+              <p class="saved-note">
+                <Icon name="check" size={16} /> Video saved on this iPhone. fitee never uploads it.
+              </p>
+            ) : (
+              <p class="saved-note">
+                <Icon name="check" size={16} /> Video saved on this phone. It’s never uploaded.
+              </p>
+            ))}
           {setId && (
             <a class="link center" href={`#/set/${setId}`}>
               <Icon name="play" size={16} /> Watch {videoState === 'saved' ? 'the video' : 'the replay'}

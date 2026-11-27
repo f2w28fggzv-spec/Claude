@@ -186,20 +186,44 @@ async function videoStep(): Promise<SelfTestMarker['video']> {
 const hasNativeBridge = () =>
   typeof (globalThis as { webkit?: { messageHandlers?: { bridge?: { postMessage?: unknown } } } }).webkit?.messageHandlers?.bridge?.postMessage === 'function';
 
+/**
+ * Runs `leave` (something that would take the page away, or the app to the background, if the bridge gate let it
+ * through), then waits 2 s: true when the page stayed (no pagehide, and no visibilitychange to hidden).
+ */
+async function stays(leave: () => void): Promise<boolean> {
+  let left = false;
+  const onHide = () => {
+    left = true;
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden') left = true;
+  };
+  addEventListener('pagehide', onHide);
+  document.addEventListener('visibilitychange', onVisibility);
+  try {
+    leave();
+    await sleep(2000);
+  } finally {
+    removeEventListener('pagehide', onHide);
+    document.removeEventListener('visibilitychange', onVisibility);
+  }
+  return !left && document.visibilityState !== 'hidden';
+}
+
 async function gateStep(info: AppInfo): Promise<SelfTestMarker['gate']> {
+  const none = { silent: [], answered: [], stateKept: false, prompt: false, window: false, navigation: false };
   if (!hasNativeBridge()) {
-    return { ok: true, skipped: 'no webkit.messageHandlers.bridge here: only the app has the bridge gate', silent: [], answered: [], stateKept: false };
+    return { ok: true, skipped: 'no webkit.messageHandlers.bridge here: only the app has the bridge gate', ...none };
   }
   const n = native();
   const send = capacitor()?.nativePromise;
   const target = { id: `selftest${Date.now()}g`, ext: 'mp4' as const };
-  const silent: string[] = [];
-  const answered: string[] = [];
-  let stateKept = false;
+  const out: Omit<SelfTestMarker['gate'], 'ok' | 'error'> = { ...none, silent: [], answered: [] };
   let error: string | undefined;
   try {
     if (!send) throw new Error('Capacitor.nativePromise is missing');
     await n.beginVideo({ ...target, bytes: 2 });
+    // 1. Messages: each call to a plugin the page must never reach gets no answer.
     await Promise.all(
       GATE_PROBES.map(async ({ pluginId, method }) => {
         const call = send(pluginId, method, {}).then(
@@ -207,11 +231,21 @@ async function gateStep(info: AppInfo): Promise<SelfTestMarker['gate']> {
           () => 'answered',
         );
         const outcome = await Promise.race([call, sleep(2000).then(() => 'silent')]);
-        (outcome === 'silent' ? silent : answered).push(`${pluginId}.${method}`);
+        (outcome === 'silent' ? out.silent : out.answered).push(`${pluginId}.${method}`);
       }),
     );
-    // The upload begun before the probes is still running: no second FiteeNative took the first one's place.
-    stateKept = (await n.appendVideo({ ...target, offset: 0, data: btoa('\u0000\u0001') })).length === 2;
+    // 2. The UI delegate: a prompt carrying Capacitor's cookie request is answered with nothing, and no window opens.
+    out.prompt = window.prompt(JSON.stringify({ type: 'CapacitorCookies.get' })) === null;
+    const opened: { window: Window | null } = { window: null };
+    const stayed = await stays(() => {
+      opened.window = window.open(`${PROBE_ORIGIN}/fitee-window-probe`);
+    });
+    out.window = stayed && opened.window === null;
+    // 3. Navigations: one to another site is cancelled, so the page stays.
+    out.navigation = await stays(() => location.assign(`${PROBE_ORIGIN}/fitee-nav-probe`));
+    // The page still runs, and the upload begun before the probes is still running: no second FiteeNative took the
+    // first one's place.
+    out.stateKept = (await n.appendVideo({ ...target, offset: 0, data: btoa('\u0000\u0001') })).length === 2;
   } catch (err) {
     error = errText(err);
   }
@@ -221,7 +255,8 @@ async function gateStep(info: AppInfo): Promise<SelfTestMarker['gate']> {
     // Its part file is a leftover then, which the next launch deletes.
   }
   error ??= info.gate ? undefined : 'AppInfo.gate is false';
-  return { ok: !error && answered.length === 0 && stateKept, silent, answered, stateKept, ...(error ? { error } : {}) };
+  const ok = !error && out.answered.length === 0 && out.prompt && out.window && out.navigation && out.stateKept;
+  return { ok, ...out, ...(error ? { error } : {}) };
 }
 
 // ---- the rest ----------------------------------------------------------------------------------------------------
@@ -268,8 +303,10 @@ export async function run(info: AppInfo): Promise<SelfTestMarker> {
   const csp = await step('csp', 5_000, { directive: '' }, cspStep);
   const blank = { ok: false, type: '', bytes: 0, listed: false, excluded: false, range: false, sha256: false, removed: false };
   const video = await step('video', 90_000, { folderExcluded: false, recorded: { ok: false, played: false }, random: blank }, videoStep);
-  const gate = await step('gate', 20_000, { silent: [], answered: [], stateKept: false }, () => gateStep(info));
   const pose = await step('pose', 95_000, { delegate: '', ms: 0 }, poseStep);
+  // Last: if a way out were open and took the app to the background, the marker still comes (the plugin's 5 s
+  // background task covers it).
+  const gate = await step('gate', 20_000, { silent: [], answered: [], stateKept: false, prompt: false, window: false, navigation: false }, () => gateStep(info));
   const steps = { video, snapshot, pose, csp, outside, keepAwake, gate };
   const skipped = Object.entries(steps)
     .filter(([, s]) => s.skipped !== undefined)

@@ -135,10 +135,11 @@ export function TermsScreen() {
 
         <h2>6. Your data</h2>
         <p>
-          Your plans, log, profile and settings, and any sets and videos you choose to save, are stored only in the app on this iPhone. You are responsible
-          for backing them up (Settings → Back up my data); fitee’s own backup files don’t include saved sets or videos. If you back up your iPhone to
-          iCloud or a computer, that backup includes your plans, log, profile and settings, as it does any app’s data; fitee asks iOS to leave saved sets and
-          videos out of it. Deleting the app removes what it stored on this iPhone. Copies in your iPhone’s backups stay until those backups are replaced.
+          Your plans, log, profile and settings, a skeleton replay of each technique check (kept for your last 60 checks, and for any set whose video you
+          save) and any video you choose to save are stored in the app on this iPhone. You are responsible for backing them up (Settings → Back up my
+          data); fitee’s own backup files don’t include saved sets or videos. If you back up your iPhone to iCloud or a computer, that backup includes your
+          plans, log, profile and settings, as it does any app’s data; fitee asks iOS to leave saved sets and videos out of it. Deleting the app removes what
+          it stored on this iPhone. Copies in your iPhone’s backups stay until those backups are replaced.
         </p>
 
         <h2>7. Ownership and licences</h2>
@@ -205,8 +206,9 @@ export function PrivacyScreen() {
         <p>
           If you check a video you pick and choose Take Video in the picker, iOS records it, with sound if you allow the microphone; a video you pick keeps
           any sound it has, and the app keeps it only if you tap “Save video”. When you pick a video or film one with Take Video, iOS gives the app a
-          temporary copy of it: fitee deletes that copy when you leave the results, the next time it starts, and when you delete all your data. A backup file
-          you pick to restore is copied the same way, and deleted the next time the app starts.
+          temporary copy of it. fitee deletes that copy when you leave that technique check, even before its results show (if you pick another video while
+          one is still being saved, the copies go together when you leave that check), the next time it starts, and when you delete all your data. A backup
+          file you pick to restore is copied the same way, and deleted the next time the app starts.
         </p>
         <p>Saved videos stay in the app on this iPhone until you delete them or the app.</p>
 

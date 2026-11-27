@@ -140,6 +140,7 @@ const ready = (over: Partial<ReadyMarker> = {}): ReadyMarker => ({
 });
 
 const PROBED = GATE_PROBES.map((p) => `${p.pluginId}.${p.method}`);
+const GATE: SelfTestMarker['gate'] = { ok: true, silent: PROBED, answered: [], prompt: true, window: true, navigation: true, stateKept: true };
 const VIDEO = { ok: true, type: 'video/mp4', bytes: 48211, listed: true, excluded: true, range: true, sha256: true, removed: true };
 const selftest = (over: Partial<SelfTestMarker> = {}): SelfTestMarker => ({
   ok: true,
@@ -149,7 +150,7 @@ const selftest = (over: Partial<SelfTestMarker> = {}): SelfTestMarker => ({
   csp: { ok: true, directive: 'img-src' },
   outside: { ok: true, result: 'blocked' },
   keepAwake: { ok: true },
-  gate: { ok: true, silent: PROBED, answered: [], stateKept: true },
+  gate: GATE,
   ...over,
 });
 const rules = (over: Partial<RulesMarker> = {}): RulesMarker => ({ url: PROBE, withRules: 'blocked', withoutRules: 'loaded', ...over });
@@ -163,7 +164,7 @@ const lookConsole = (look: 'light' | 'dark', readyOver: Partial<ReadyMarker> = {
   'fitee:statusbar default',
   '⚡️  WebView loaded',
   '⚡️  To Native ->  FiteeNative appInfo 71520343',
-  '⚡️  TO JS {"version":"1.0.0","build":"1","debug":true,"selfTest":false,"rules":true,"gate":true}',
+  '⚡️  TO JS {"version":"1.0.0","build":"1","debug":true,"selfTest":false,"rules":true,"gate":true,"deleting":false}',
   '⚡️  To Native ->  FiteeNative readSnapshot 71520344',
   '⚡️  TO JS {}',
   '⚡️  To Native ->  FiteeNative setAppearance 71520345',
@@ -375,7 +376,7 @@ const SLOW = { timeout: 30_000 };
 // ---- whole runs of the script -------------------------------------------------------------------------------------
 
 describe('the simulator check, on a good run', SLOW, () => {
-  it('passes, launches light, dark, the self-test, the iPad and the Release build, and keeps every console and screenshot', async () => {
+  it('passes, launches light, dark, the self-test, the Release build and then the iPad, and keeps every console and screenshot', async () => {
     const result = await run();
     expect(result.errors, result.out).toEqual([]);
     expect(result.warnings, result.out).toEqual([]);
@@ -384,24 +385,26 @@ describe('the simulator check, on a good run', SLOW, () => {
     const simctl = result.calls.filter((c) => c[0] === 'xcrun').map((c) => c.slice(1));
     const installs = simctl.filter((c) => c[1] === 'install').map((c) => [c[2], c[3]]);
     const debugApp = join(result.dir, 'debug/App.app');
+    // The iPad last: a second simulator runs only for its launch, and it stays booted for the workflow's system log.
     expect(installs).toEqual([
       [UDID, debugApp],
-      [IPAD, debugApp],
       [UDID, join(result.dir, 'release/App.app')],
+      [IPAD, debugApp],
     ]);
     const launches = simctl.filter((c) => c[1] === 'launch');
     expect(launches).toHaveLength(5);
     for (const launch of launches) expect(launch.slice(2, 4)).toEqual(['--console-pty', '--terminate-running-process']);
-    expect(launches.map((l) => [l[4], l[5]])).toEqual([...Array(3).fill([UDID, config.appId]), [IPAD, config.appId], [UDID, config.appId]]);
+    expect(launches.map((l) => [l[4], l[5]])).toEqual([...Array(4).fill([UDID, config.appId]), [IPAD, config.appId]]);
     expect(launches.map((l) => l.slice(6))).toEqual([[], [], [SELF_TEST_ARG, PROBE_URL_ARG, PROBE], [], []]);
     const looks = simctl.filter((c) => c[1] === 'ui').map((c) => [c[2], c[4]]);
     expect(looks).toEqual([
       [UDID, 'light'],
       [UDID, 'dark'],
-      [IPAD, 'light'],
       [UDID, 'light'],
+      [IPAD, 'light'],
     ]);
-    expect(simctl.filter((c) => c[1] === 'terminate').map((c) => c[2])).toEqual([UDID, UDID, UDID, IPAD, UDID]);
+    expect(simctl.filter((c) => c[1] === 'terminate').map((c) => c[2])).toEqual([UDID, UDID, UDID, UDID, IPAD]);
+    expect(simctl.filter((c) => c[1] === 'bootstatus' || c[1] === 'shutdown').map((c) => c[1])).toEqual(['bootstatus']);
     // The iPad is booted (it starts shut down) before anything is installed on it.
     const ipadCalls = simctl.filter((c) => c.includes(IPAD)).map((c) => c[1]);
     expect(ipadCalls.slice(0, 3)).toEqual(['bootstatus', 'install', 'ui']);
@@ -415,6 +418,18 @@ describe('the simulator check, on a good run', SLOW, () => {
     // The consoles are printed with workflow commands off, so no line of theirs can act as one.
     expect(result.out).toMatch(/::stop-commands::(fitee-console-\d+-\d+)[\s\S]*?::\1::/);
     expect(result.out).toContain('::notice::Self-test launch: the pose model loaded with the GPU delegate');
+  });
+
+  it('stops each launch within its bounds when simctl terminate, or simctl launch after it, never ends: a warning each, and it passes', async () => {
+    const started = Date.now();
+    const result = await run({ env: { STUB_HANG: `terminate@${UDID} launch@${UDID}`, TERMINATE_SECONDS: '1', EXIT_SECONDS: '1' } });
+    expect(result.errors, result.out).toEqual([]);
+    expect(result.code, result.out).toBe(0);
+    // The iPhone's four launches (light, dark, the self-test, the Release build); the iPad's ends as usual.
+    expect(result.warnings.filter((w) => w.includes("simctl terminate didn't end within 1 s, so it was stopped"))).toHaveLength(4);
+    expect(result.warnings.filter((w) => w.includes("simctl launch didn't end within 1 s of the app's termination, so it was stopped"))).toHaveLength(4);
+    expect(Date.now() - started).toBeLessThan(25_000);
+    for (const file of ['console-light.log', 'console-selftest.log', 'console-release.log', 'console-ipad.log']) expect(existsSync(join(result.dir, 'out', file)), file).toBe(true);
   });
 
   it("warns, and still passes, when the probe can't show the difference or the simulator records no video", async () => {
@@ -450,7 +465,7 @@ describe.concurrent('the simulator check fails, in a whole run,', SLOW, () => {
   it('an iPad launch that never logs its ready marker', () => fails({ consoles: { ipad: lookConsole('light').slice(0, -1) } }, 'iPad launch', 'no fitee:ready marker after 3 s'));
   it('an iPad launch whose app ends before it is ready', () =>
     fails({ consoles: { ipad: ['⚡️  Loading app at capacitor://localhost...', '⚡️  WebView process terminated', '@exit 1'] } }, 'iPad launch', 'the app ended before its fitee:ready marker'));
-  it("an iPad simulator that can't boot, and still launches the Release build", async () => {
+  it("an iPad simulator that can't boot, after the Release build's launch", async () => {
     const result = await run({ env: { STUB_FAIL: `bootstatus@${IPAD}` } });
     expectError(result, 'iPad launch', `the iPad simulator (${IPAD}) couldn't be booted`);
     expect(result.calls.some((c) => c[1] === 'simctl' && c[2] === 'install' && c[3] === IPAD)).toBe(false);
@@ -654,15 +669,22 @@ describe.concurrent('the self-test launch', SLOW, () => {
     // As the Chromium check's stand-in bridge reports it (tools/native-check/): never in the app.
     [
       'the gate step skipped itself',
-      marker({ skipped: ['gate'], gate: { ok: true, skipped: 'no webkit.messageHandlers.bridge here: only the app has the bridge gate', silent: [], answered: [], stateKept: false } }),
+      marker({
+        skipped: ['gate'],
+        gate: { ok: true, skipped: 'no webkit.messageHandlers.bridge here: only the app has the bridge gate', silent: [], answered: [], prompt: false, window: false, navigation: false, stateKept: false },
+      }),
       'the gate step was skipped',
       'only the app has the bridge gate',
     ],
     ['the marker lists a skipped step', marker({ skipped: ['csp'] }), 'lists skipped steps: csp'],
     ['the pose step names no delegate', marker({ pose: { ok: true, delegate: '', ms: 10 } }), 'without saying which delegate'],
-    ['a gated call got an answer', marker({ ok: false, gate: { ok: false, silent: PROBED.slice(1), answered: [PROBED[0]], stateKept: true } }), 'got an answer', PROBED[0]],
-    ["the gate step didn't try a probe", marker({ gate: { ok: true, silent: PROBED.slice(1), answered: [], stateKept: true } }), "didn't try", PROBED[0]],
-    ['FiteeNative lost its state', marker({ ok: false, gate: { ok: false, silent: PROBED, answered: [], stateKept: false } }), 'lost its state'],
+    ['a gated call got an answer', marker({ ok: false, gate: { ...GATE, ok: false, silent: PROBED.slice(1), answered: [PROBED[0]] } }), 'got an answer', PROBED[0]],
+    ["the gate step didn't try a probe", marker({ gate: { ...GATE, silent: PROBED.slice(1) } }), "didn't try", PROBED[0]],
+    ['FiteeNative lost its state', marker({ ok: false, gate: { ...GATE, ok: false, stateKept: false } }), 'lost its state'],
+    ['a prompt got an answer (Capacitor’s UI delegate read it as a cookie request)', marker({ ok: false, gate: { ...GATE, ok: false, prompt: false } }), 'prompt()', 'FiteeUIDelegate'],
+    ['window.open opened a window', marker({ ok: false, gate: { ...GATE, ok: false, window: false } }), 'window.open', 'FiteeUIDelegate'],
+    ['a navigation to another site went ahead', marker({ ok: false, gate: { ...GATE, ok: false, navigation: false } }), "a navigation to another site wasn't cancelled", 'shouldOverrideLoad'],
+    ['a gate step written before the three ways out', marker({ gate: { ok: true, silent: PROBED, answered: [], stateKept: true } as unknown as SelfTestMarker['gate'] }), 'a prompt()'],
     ['a probe has no fitee:dropped line', selftestConsole().filter((l) => l !== `${MARKERS.dropped} message ${first.pluginId}.${first.method}`), `no "${MARKERS.dropped} message ${first.pluginId}.${first.method}" line`],
     ["the gate dropped a call the self-test didn't make", [...selftestConsole(), `${MARKERS.dropped} cordova Device.getDeviceInfo`], "a call the self-test didn't make", 'Device.getDeviceInfo'],
     ["a probe reached Capacitor's own handler", [...selftestConsole(), '⚡️  To Native ->  Capacitor.CAPHttpPlugin request 1031'], 'Capacitor.CAPHttpPlugin.request reached Capacitor'],
@@ -879,7 +901,15 @@ describe('.github/workflows/ios.yml', () => {
     expect(code).toMatch(/if: always\(\)\n\s+uses: actions\/upload-artifact@v4\n\s+with:\n[\s\S]*?path: ios-check\//);
   });
 
-  it('archives for TestFlight ad hoc by default, development-signed on request, and never with a certificate in the keychain', () => {
+  it('gives the check its own time limit under the job\'s, so a hang fails the step and the system log still comes', () => {
+    const job = Number(/name: Build and check in the simulator\n\s+runs-on: macos-26\n\s+timeout-minutes: (\d+)/.exec(code)?.[1]);
+    const step = Number(/- name: Launch and check[^\n]*\n\s+timeout-minutes: (\d+)/.exec(code)?.[1]);
+    expect(step).toBeGreaterThan(0);
+    expect(step).toBeLessThan(job - 10); // the builds before it take about 10 minutes
+    expect(code).toMatch(/- name: System log of the app and its web content\n\s+if: failure\(\)/);
+  });
+
+  it('archives for TestFlight ad hoc by default, development-signed on request, and imports no certificate into a keychain', () => {
     expect(code).toMatch(/archive_signing:\n[\s\S]*?type: choice\n[\s\S]*?options: \[adhoc, development\]\n[\s\S]*?default: adhoc/);
     expect(code).toContain('CODE_SIGN_IDENTITY=- AD_HOC_CODE_SIGNING_ALLOWED=YES');
     expect(code).toContain('CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER"');
