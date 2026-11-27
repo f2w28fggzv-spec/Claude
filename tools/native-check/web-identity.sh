@@ -19,7 +19,9 @@
 #   are the plain ones.
 #
 # Leaves in <work-dir>: out-base/ and out-head/ (the two builds), base.sha256 and head.sha256 (the hash
-# lists), and the logs of npm ci and both builds.
+# lists), and the logs of npm ci and both builds. The two output folders are removed first, so a build
+# that writes nowhere fails (its folder is missing) rather than the last run's files passing as its own,
+# and one that writes nothing fails as "empty".
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
@@ -58,10 +60,12 @@ step() {
 }
 
 hashes() {
-  # Every file under $1 as "sha256  relative/path", sorted by path (byte order).
-  (cd "$1" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sed 's#  \./#  #')
+  # Every file under $1 as "sha256  relative/path", sorted by path (byte order); nothing for an empty
+  # folder (-r: else xargs runs sha256sum once anyway, which hashes its empty stdin as "-").
+  (cd "$1" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum | sed 's#  \./#  #')
 }
 
+rm -rf "$work/out-base" "$work/out-head"
 git -C "$repo" worktree add --detach "$tree" "$base" >/dev/null 2>&1
 cp -R "$repo/public/mediapipe" "$tree/public/mediapipe"
 # Each bash -c script reads its paths as "$1" and "$2", passed after the _, so its single quotes are meant.
