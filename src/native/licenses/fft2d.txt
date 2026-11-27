@@ -1,0 +1,25 @@
+fft2d, Takuya Ooura’s FFT package, compiled into MediaPipe’s WebAssembly runtime (TensorFlow Lite’s RFFT2D operator uses it). Its copyright notice and terms, from the package’s readme:
+
+Copyright:
+    Copyright(C) 1996-2001 Takuya OOURA
+    email: ooura@mmm.t.u-tokyo.ac.jp
+    download: http://momonga.t.u-tokyo.ac.jp/~ooura/fft.html
+    You may use, copy, modify this code for any purpose and 
+    without fee. You may distribute this ORIGINAL package.
+
+TensorFlow, which builds it in, keeps this licence file for it:
+
+Copyright(C) 1997,2001 Takuya OOURA (email: ooura@kurims.kyoto-u.ac.jp).
+You may use, copy, modify this code for any purpose and 
+without fee. You may distribute this ORIGINAL package.
+
+----------------------------------------
+Sources: the package’s readme.txt in OouraFFT v1.0, the copy TensorFlow builds with:
+
+https://raw.githubusercontent.com/petewarden/OouraFFT/v1.0/readme.txt
+
+and TensorFlow’s third_party/fft2d/LICENSE at commit a481b10260dfdf833a1b16007eead49c1d7febf3:
+
+https://raw.githubusercontent.com/tensorflow/tensorflow/a481b10260dfdf833a1b16007eead49c1d7febf3/third_party/fft2d/LICENSE
+
+Read 27 November 2026.

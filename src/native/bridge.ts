@@ -72,7 +72,8 @@
 //                            "<reason>" for an unhandled rejection.
 //   fitee:csp <directive> <blocked URI>
 //                            JS, ready.ts, console.error: a securitypolicyviolation (effectiveDirective, blockedURI).
-//                            The self-test's own probe (a blocked URI containing "fitee-csp-probe") logs
+//                            The self-test's own probe (a blocked URI on PROBE_ORIGIN, which WebKit may report as
+//                            the origin alone: ContentSecurityPolicy::createURLForReporting) logs
 //                            "fitee:csp-probe <directive> <blocked URI>" with console.info instead.
 // A launch fails in CI on any "fitee:uncaught " or "fitee:csp " line, Capacitor's "STARTUP JS ERROR", or an [error]
 // line, except, in the self-test launch only, MediaPipe's own stderr (messages starting "INFO:", or I, W or E and four

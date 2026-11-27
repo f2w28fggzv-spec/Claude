@@ -1,0 +1,37 @@
+/* The iPhone app only (src/native/entry.ts imports it; the web build never includes it). */
+
+/* The web view runs under the status bar (contentInset "never"): a strip in the page colour keeps scrolled content
+   from showing behind the clock. Above the page and its bars (z-index 10-11), below sheets (30). Named for view
+   transitions, so a page change doesn't slide it with the page. */
+.status-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  background: var(--bg);
+  z-index: 20;
+  pointer-events: none;
+  view-transition-name: status-strip;
+}
+
+/* No Copy/Share callout on a long press of a link (rows and the tab bar are links). */
+html.native a {
+  -webkit-touch-callout: none;
+}
+
+/* Licence texts in the Terms (src/native/screens/Legal.tsx). */
+.licences {
+  padding-left: 0;
+  list-style: none;
+}
+.licences details.more {
+  margin: 4px 0;
+}
+.licence {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  margin: 4px 0 12px;
+}
